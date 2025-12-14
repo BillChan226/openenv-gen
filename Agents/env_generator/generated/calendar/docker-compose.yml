@@ -1,50 +1,39 @@
-version: "3.8"
+version: "3.9"
 
 services:
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: calendar
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  api:
-    build: ./calendar_api
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/calendar
-      SECRET_KEY: change-me-in-production
-    ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-
-  ui:
-    build: ./calendar_ui
-    ports:
-      - "3000:80"
-    depends_on:
-      - api
-
-  openenv:
+  calendar_api:
     build:
       context: .
-      dockerfile: openenv_adapter/Dockerfile
-    environment:
-      API_BASE_URL: http://api:8000
+      dockerfile: calendar_api/Dockerfile
+    container_name: calendar_api
     ports:
-      - "8080:8080"
-    depends_on:
-      - api
+      - "8000:8000"
+    environment:
+      # Adjust or extend environment variables as needed
+      # Example: API_CORS_ORIGINS: "http://localhost:8080"
+      PYTHONUNBUFFERED: "1"
+    networks:
+      - calendar_net
 
-volumes:
-  postgres_data:
+  calendar_ui:
+    build:
+      context: .
+      dockerfile: calendar_ui/Dockerfile
+    container_name: calendar_ui
+    ports:
+      - "8080:80"
+    depends_on:
+      - calendar_api
+    environment:
+      # If the UI needs to know the API URL at build/runtime, configure it here
+      # Example for many SPA setups:
+      # VITE_API_URL: "http://calendar_api:8000"
+      # REACT_APP_API_URL: "http://calendar_api:8000"
+      # NEXT_PUBLIC_API_URL: "http://calendar_api:8000"
+      API_URL: "http://calendar_api:8000"
+    networks:
+      - calendar_net
+
+networks:
+  calendar_net:
+    driver: bridge

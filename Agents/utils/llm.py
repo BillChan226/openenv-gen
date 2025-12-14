@@ -214,11 +214,16 @@ class OpenAIClient(BaseLLMClient):
     ) -> LLMResponse:
         client = self._get_client()
         
+        # Determine token parameter name based on model
+        model_name = self.config.model_name
+        use_completion_tokens = model_name.startswith(("gpt-5", "o1", "o3"))
+        token_param = "max_completion_tokens" if use_completion_tokens else "max_tokens"
+        
         request_params = {
-            "model": self.config.model_name,
+            "model": model_name,
             "messages": [m.to_dict() for m in messages],
             "temperature": temperature or self.config.temperature,
-            "max_tokens": max_tokens or self.config.max_tokens,
+            token_param: max_tokens or self.config.max_tokens,
             "top_p": self.config.top_p,
             "frequency_penalty": self.config.frequency_penalty,
             "presence_penalty": self.config.presence_penalty,

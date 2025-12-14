@@ -1,14 +1,16 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import './App.css';
-import App from './App';
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+import "./index.css";
 
-// Create a root container for the React application
-const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
+const rootElement: HTMLElement | null = document.getElementById("root");
 
-// Render the App component inside the root container
-root.render(
+if (!rootElement) {
+  throw new Error("Root element with id 'root' not found in the document.");
+}
+
+ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  </React.StrictMode>,
 );

@@ -1,87 +1,62 @@
 from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, EmailStr
+from typing import List, Optional
 
-# User Schemas
+from pydantic import BaseModel, EmailStr, Field
+
+
+# ===== User Schemas =====
+
+
 class UserBase(BaseModel):
+    """Shared user properties exposed via API."""
+
     email: EmailStr
-    full_name: Optional[str] = None
+    first_name: Optional[str] = Field(None, max_length=100)
+    last_name: Optional[str] = Field(None, max_length=100)
+    timezone: str = Field(default="UTC", max_length=64)
+    is_active: bool = True
+    is_verified: bool = False
 
-    class Config:
-        orm_mode = True
-        anystr_strip_whitespace = True
-        from_attributes = True
 
-class UserCreate(UserBase):
-    password: str
+class UserCreate(BaseModel):
+    """Properties required to create a new user."""
 
-class UserUpdate(UserBase):
-    password: Optional[str] = None
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    first_name: Optional[str] = Field(None, max_length=100)
+    last_name: Optional[str] = Field(None, max_length=100)
+    timezone: Optional[str] = Field(default="UTC", max_length=64)
+
+
+class UserUpdate(BaseModel):
+    """Properties allowed to be updated for an existing user."""
+
+    email: Optional[EmailStr] = None
+    password: Optional[str] = Field(None, min_length=8)
+    first_name: Optional[str] = Field(None, max_length=100)
+    last_name: Optional[str] = Field(None, max_length=100)
+    timezone: Optional[str] = Field(None, max_length=64)
+    is_active: Optional[bool] = None
+    is_verified: Optional[bool] = None
+
 
 class UserResponse(UserBase):
-    id: int
-    is_active: bool
+    """User representation returned to clients."""
 
-# Event Schemas
-class EventBase(BaseModel):
-    title: str
-    description: Optional[str] = None
-    start_time: datetime
-    end_time: datetime
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    last_login_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
         from_attributes = True
 
-class EventCreate(EventBase):
-    pass
 
-class EventUpdate(EventBase):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+class UserListResponse(BaseModel):
+    """Paginated list of users."""
 
-class EventResponse(EventBase):
-    id: int
-    creator_id: int
-
-# Invitation Schemas
-class InvitationBase(BaseModel):
-    event_id: int
-    invitee_email: EmailStr
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
-
-class InvitationCreate(InvitationBase):
-    pass
-
-class InvitationResponse(InvitationBase):
-    id: int
-    status: str
-
-# Reminder Schemas
-class ReminderBase(BaseModel):
-    event_id: int
-    remind_at: datetime
-
-    class Config:
-        orm_mode = True
-        from_attributes = True
-
-class ReminderCreate(ReminderBase):
-    pass
-
-class ReminderResponse(ReminderBase):
-    id: int
-
-# Auth Schemas
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
+    items: List[UserResponse]
+    total: int
+    page: int
+    page_size: int
+    pages: int

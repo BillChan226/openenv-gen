@@ -1,35 +1,58 @@
-import React from 'react';
-import { Card, Grid, Typography } from '@mui/material';
-import { useHistory } from 'react-router-dom';
+import React from "react";
+import { useAuth } from "../contexts/AuthContext";
 
 const Dashboard: React.FC = () => {
-  const history = useHistory();
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
 
-  const navigationCards = [
-    { title: 'Events', path: '/events' },
-    { title: 'Invitations', path: '/invitations' },
-    { title: 'Reminders', path: '/reminders' },
-  ];
+  if (isLoading) {
+    return (
+      <main style={{ padding: "2rem" }}>
+        <p>Loading your dashboard...</p>
+      </main>
+    );
+  }
 
-  const handleCardClick = (path: string) => {
-    history.push(path);
-  };
+  if (!isAuthenticated) {
+    return (
+      <main style={{ padding: "2rem" }}>
+        <h1>Dashboard</h1>
+        <p>You must be logged in to view this page.</p>
+      </main>
+    );
+  }
 
   return (
-    <Grid container spacing={3}>
-      {navigationCards.map((card, index) => (
-        <Grid item xs={12} sm={6} md={4} key={index}>
-          <Card
-            sx={{ height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-            onClick={() => handleCardClick(card.path)}
-          >
-            <Typography variant="h5" component="div">
-              {card.title}
-            </Typography>
-          </Card>
-        </Grid>
-      ))}
-    </Grid>
+    <main style={{ padding: "2rem" }}>
+      <header style={{ marginBottom: "1.5rem" }}>
+        <h1>Dashboard</h1>
+        <p>
+          Welcome{" "}
+          {user?.full_name && user.full_name.trim().length > 0
+            ? user.full_name
+            : user?.email}
+          !
+        </p>
+        <button
+          type="button"
+          onClick={logout}
+          style={{
+            marginTop: "0.75rem",
+            padding: "0.5rem 1rem",
+            cursor: "pointer",
+          }}
+        >
+          Logout
+        </button>
+      </header>
+
+      <section>
+        <h2>Your Calendar Overview</h2>
+        <p>
+          This is the main dashboard area. Future enhancements can include your
+          upcoming events, a monthly calendar view, and quick actions.
+        </p>
+      </section>
+    </main>
   );
 };
 
