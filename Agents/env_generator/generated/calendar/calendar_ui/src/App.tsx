@@ -1,70 +1,52 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import Dashboard from "./pages/Dashboard";
-import EventList from "./pages/EventList";
-import InvitationList from "./pages/InvitationList";
-import ReminderList from "./pages/ReminderList";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 
-// Protected Route Wrapper
-const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
-  const { currentUser } = useAuth();
-
-  if (!currentUser) {
-    // User not logged in, redirect to login
-    return <Navigate to="/login" />;
-  }
-
-  return children;
+const Login: React.FC = () => {
+  return (
+    <main style={{ padding: "2rem" }}>
+      <h1>Login</h1>
+      <p>Please log in to access your calendar.</p>
+    </main>
+  );
 };
 
-const App = () => {
+const Register: React.FC = () => {
   return (
-    <Router>
-      <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/events"
-            element={
-              <ProtectedRoute>
-                <EventList />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/invitations"
-            element={
-              <ProtectedRoute>
-                <InvitationList />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/reminders"
-            element={
-              <ProtectedRoute>
-                <ReminderList />
-              </ProtectedRoute>
-            }
-          />
-          {/* Redirect to Dashboard if path is not recognized */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </AuthProvider>
-    </Router>
+    <main style={{ padding: "2rem" }}>
+      <h1>Register</h1>
+      <p>Create an account to start using the calendar.</p>
+    </main>
+  );
+};
+
+const Dashboard: React.FC = () => {
+  return (
+    <main style={{ padding: "2rem" }}>
+      <h1>Dashboard</h1>
+      <p>Welcome to your calendar dashboard.</p>
+    </main>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        {/* Fallback for unknown routes */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 };
 
 export default App;
+tsx

@@ -1,0 +1,323 @@
+{
+  "version": "1.0",
+  "name": "calendar",
+  "description": "A calendar and event scheduling application with user authentication, events, invitations, and reminders",
+  "domain_type": "custom",
+  "started_at": "2025-12-14T04:18:38.554460",
+  "last_updated": "2025-12-14T04:44:59.342008",
+  "status": "complete",
+  "current_phase": "docker",
+  "phases": {
+    "design": {
+      "name": "design",
+      "status": "complete",
+      "started_at": "2025-12-14T04:18:38.554728",
+      "completed_at": "2025-12-14T04:22:04.898478",
+      "iteration": 0,
+      "planned_files": [
+        "env_spec.json"
+      ],
+      "generated_files": [
+        "env_spec.json"
+      ],
+      "issues": [],
+      "fixes": []
+    },
+    "backend": {
+      "name": "backend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:22:04.901384",
+      "completed_at": "2025-12-14T04:27:23.473731",
+      "iteration": 0,
+      "planned_files": [
+        "calendar_api/models.py",
+        "calendar_api/schemas.py",
+        "calendar_api/database.py",
+        "calendar_api/main.py",
+        "calendar_api/routers/auth.py",
+        "calendar_api/requirements.txt"
+      ],
+      "generated_files": [
+        "calendar_api/models.py",
+        "calendar_api/schemas.py",
+        "calendar_api/database.py",
+        "calendar_api/main.py",
+        "calendar_api/routers/auth.py",
+        "calendar_api/requirements.txt"
+      ],
+      "issues": [],
+      "fixes": []
+    },
+    "frontend": {
+      "name": "frontend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:34:31.411521",
+      "completed_at": "2025-12-14T04:36:55.283399",
+      "iteration": 0,
+      "planned_files": [
+        "calendar_ui/package.json",
+        "calendar_ui/src/main.tsx",
+        "calendar_ui/src/App.tsx",
+        "calendar_ui/src/contexts/AuthContext.tsx",
+        "calendar_ui/src/services/api.ts",
+        "calendar_ui/src/pages/Login.tsx",
+        "calendar_ui/src/pages/Dashboard.tsx"
+      ],
+      "generated_files": [],
+      "issues": [],
+      "fixes": []
+    },
+    "openenv": {
+      "name": "openenv",
+      "status": "complete",
+      "started_at": "2025-12-14T04:36:55.287841",
+      "completed_at": "2025-12-14T04:42:22.662266",
+      "iteration": 0,
+      "planned_files": [
+        "openenv_adapter/models.py",
+        "openenv_adapter/server/environment.py",
+        "openenv_adapter/server/main.py",
+        "openenv_adapter/requirements.txt"
+      ],
+      "generated_files": [
+        "openenv_adapter/models.py",
+        "openenv_adapter/server/environment.py",
+        "openenv_adapter/server/main.py",
+        "openenv_adapter/requirements.txt"
+      ],
+      "issues": [],
+      "fixes": []
+    },
+    "docker": {
+      "name": "docker",
+      "status": "complete",
+      "started_at": "2025-12-14T04:42:22.668723",
+      "completed_at": "2025-12-14T04:44:53.090258",
+      "iteration": 0,
+      "planned_files": [
+        "calendar_api/Dockerfile",
+        "calendar_ui/Dockerfile",
+        "docker-compose.yml"
+      ],
+      "generated_files": [
+        "calendar_api/Dockerfile",
+        "calendar_ui/Dockerfile",
+        "docker-compose.yml"
+      ],
+      "issues": [],
+      "fixes": []
+    }
+  },
+  "files": {
+    "env_spec.json": {
+      "path": "env_spec.json",
+      "phase": "design",
+      "status": "complete",
+      "started_at": "2025-12-14T04:20:20.964150",
+      "completed_at": "2025-12-14T04:22:04.896393",
+      "content_hash": "1767cb3b6f89532953df82c0b66d79e5",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_api/models.py": {
+      "path": "calendar_api/models.py",
+      "phase": "backend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:23:34.451932",
+      "completed_at": "2025-12-14T04:24:32.975340",
+      "content_hash": "7467324c08e9dc8dba9c8eba6f260255",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_api/schemas.py": {
+      "path": "calendar_api/schemas.py",
+      "phase": "backend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:24:32.975734",
+      "completed_at": "2025-12-14T04:25:04.977464",
+      "content_hash": "9b24fff49db97476c978d665e9cda7f2",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_api/database.py": {
+      "path": "calendar_api/database.py",
+      "phase": "backend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:25:04.978705",
+      "completed_at": "2025-12-14T04:25:32.314262",
+      "content_hash": "756b079cd6c9791e187d6d8ecc1ae8cc",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_api/main.py": {
+      "path": "calendar_api/main.py",
+      "phase": "backend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:25:32.315691",
+      "completed_at": "2025-12-14T04:26:06.118374",
+      "content_hash": "6dd4fd3ae09d1930b91cd46c2a2b4a92",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_api/routers/auth.py": {
+      "path": "calendar_api/routers/auth.py",
+      "phase": "backend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:26:06.120242",
+      "completed_at": "2025-12-14T04:26:53.635826",
+      "content_hash": "49498485f782865364c5e282fa054bf4",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_api/requirements.txt": {
+      "path": "calendar_api/requirements.txt",
+      "phase": "backend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:26:53.638159",
+      "completed_at": "2025-12-14T04:27:23.468164",
+      "content_hash": "3b9de96011e70444cd17c629e74cb017",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_ui/package.json": {
+      "path": "calendar_ui/package.json",
+      "phase": "frontend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:28:35.495717",
+      "completed_at": "2025-12-14T04:29:02.393769",
+      "content_hash": "464c45c10a4644ebe15b602a51c792a4",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_ui/src/main.tsx": {
+      "path": "calendar_ui/src/main.tsx",
+      "phase": "frontend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:29:02.394923",
+      "completed_at": "2025-12-14T04:29:23.344964",
+      "content_hash": "00e6115a622c5a8ec3ba696eef124d76",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_ui/src/App.tsx": {
+      "path": "calendar_ui/src/App.tsx",
+      "phase": "frontend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:29:23.346123",
+      "completed_at": "2025-12-14T04:29:53.866624",
+      "content_hash": "4acecbb1e07cc1b9654b36fec68117e1",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_ui/src/contexts/AuthContext.tsx": {
+      "path": "calendar_ui/src/contexts/AuthContext.tsx",
+      "phase": "frontend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:29:53.867682",
+      "completed_at": "2025-12-14T04:30:38.694978",
+      "content_hash": "a8004e6c7e0966c6a3034bdf33c11a41",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_ui/src/services/api.ts": {
+      "path": "calendar_ui/src/services/api.ts",
+      "phase": "frontend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:30:38.695814",
+      "completed_at": "2025-12-14T04:31:12.789439",
+      "content_hash": "fa4c0b48733159c1e887915040f09b63",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_ui/src/pages/Login.tsx": {
+      "path": "calendar_ui/src/pages/Login.tsx",
+      "phase": "frontend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:31:12.791787",
+      "completed_at": "2025-12-14T04:31:49.718275",
+      "content_hash": "435d735675e3ed97b16e7327553b3a80",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_ui/src/pages/Dashboard.tsx": {
+      "path": "calendar_ui/src/pages/Dashboard.tsx",
+      "phase": "frontend",
+      "status": "complete",
+      "started_at": "2025-12-14T04:31:49.720573",
+      "completed_at": "2025-12-14T04:32:20.642164",
+      "content_hash": "094f819490c0ee9765a461cdfec86d6c",
+      "issues": [],
+      "fixes": []
+    },
+    "openenv_adapter/models.py": {
+      "path": "openenv_adapter/models.py",
+      "phase": "openenv",
+      "status": "complete",
+      "started_at": "2025-12-14T04:38:13.246828",
+      "completed_at": "2025-12-14T04:38:55.188349",
+      "content_hash": "bd02e4ee2240a0d0947958210cc39a00",
+      "issues": [],
+      "fixes": []
+    },
+    "openenv_adapter/server/environment.py": {
+      "path": "openenv_adapter/server/environment.py",
+      "phase": "openenv",
+      "status": "complete",
+      "started_at": "2025-12-14T04:38:55.189807",
+      "completed_at": "2025-12-14T04:40:37.903881",
+      "content_hash": "c99f809fdcb84b706aa9ec3e4b086572",
+      "issues": [],
+      "fixes": []
+    },
+    "openenv_adapter/server/main.py": {
+      "path": "openenv_adapter/server/main.py",
+      "phase": "openenv",
+      "status": "complete",
+      "started_at": "2025-12-14T04:40:37.906250",
+      "completed_at": "2025-12-14T04:42:03.297247",
+      "content_hash": "c3b3c2a62b461aa2104085b63f944fd4",
+      "issues": [],
+      "fixes": []
+    },
+    "openenv_adapter/requirements.txt": {
+      "path": "openenv_adapter/requirements.txt",
+      "phase": "openenv",
+      "status": "complete",
+      "started_at": "2025-12-14T04:42:03.299222",
+      "completed_at": "2025-12-14T04:42:22.656654",
+      "content_hash": "29fa8c5e1320b39a6a24483f51ea37ce",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_api/Dockerfile": {
+      "path": "calendar_api/Dockerfile",
+      "phase": "docker",
+      "status": "complete",
+      "started_at": "2025-12-14T04:43:08.947180",
+      "completed_at": "2025-12-14T04:43:43.145980",
+      "content_hash": "865ef834d28f169a44aed7a330267d05",
+      "issues": [],
+      "fixes": []
+    },
+    "calendar_ui/Dockerfile": {
+      "path": "calendar_ui/Dockerfile",
+      "phase": "docker",
+      "status": "complete",
+      "started_at": "2025-12-14T04:43:43.148522",
+      "completed_at": "2025-12-14T04:44:16.018164",
+      "content_hash": "7c1c775b4fc0d3b63027ad8849a8be29",
+      "issues": [],
+      "fixes": []
+    },
+    "docker-compose.yml": {
+      "path": "docker-compose.yml",
+      "phase": "docker",
+      "status": "complete",
+      "started_at": "2025-12-14T04:44:16.021790",
+      "completed_at": "2025-12-14T04:44:53.085920",
+      "content_hash": "755c9c4664ab292436dad78507a52f4c",
+      "issues": [],
+      "fixes": []
+    }
+  }
+}
