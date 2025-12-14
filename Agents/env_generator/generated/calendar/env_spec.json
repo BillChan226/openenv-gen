@@ -1,0 +1,175 @@
+{
+  "name": "Calendar",
+  "description": "A Google Calendar-like application for managing events and schedules",
+  "entities": [
+    {
+      "name": "User",
+      "table_name": "users",
+      "description": "Stores user information",
+      "fields": [
+        {
+          "name": "id",
+          "type": "Integer",
+          "primary_key": true
+        },
+        {
+          "name": "email",
+          "type": "String(255)",
+          "nullable": false
+        },
+        {
+          "name": "hashed_password",
+          "type": "String(255)",
+          "nullable": false
+        },
+        {
+          "name": "full_name",
+          "type": "String(255)",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime",
+          "nullable": false
+        },
+        {
+          "name": "is_active",
+          "type": "Boolean",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "Event",
+      "table_name": "events",
+      "description": "Stores events information",
+      "fields": [
+        {
+          "name": "id",
+          "type": "Integer",
+          "primary_key": true
+        },
+        {
+          "name": "title",
+          "type": "String(255)",
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "type": "Text",
+          "nullable": true
+        },
+        {
+          "name": "start_time",
+          "type": "DateTime",
+          "nullable": false
+        },
+        {
+          "name": "end_time",
+          "type": "DateTime",
+          "nullable": false
+        },
+        {
+          "name": "creator_id",
+          "type": "Integer",
+          "nullable": false
+        },
+        {
+          "name": "location",
+          "type": "String(255)",
+          "nullable": true
+        },
+        {
+          "name": "is_all_day",
+          "type": "Boolean",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "Invitation",
+      "table_name": "invitations",
+      "description": "Stores event invitations for users",
+      "fields": [
+        {
+          "name": "id",
+          "type": "Integer",
+          "primary_key": true
+        },
+        {
+          "name": "event_id",
+          "type": "Integer",
+          "nullable": false
+        },
+        {
+          "name": "invitee_id",
+          "type": "Integer",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "String(255)",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "Reminder",
+      "table_name": "reminders",
+      "description": "Stores reminders for events",
+      "fields": [
+        {
+          "name": "id",
+          "type": "Integer",
+          "primary_key": true
+        },
+        {
+          "name": "event_id",
+          "type": "Integer",
+          "nullable": false
+        },
+        {
+          "name": "reminder_time",
+          "type": "DateTime",
+          "nullable": false
+        },
+        {
+          "name": "note",
+          "type": "Text",
+          "nullable": true
+        }
+      ]
+    }
+  ],
+  "features": [
+    "EventCreation",
+    "EventEdit",
+    "EventDeletion",
+    "EventViewing",
+    "InviteParticipants",
+    "RespondToInvitations",
+    "SetReminders",
+    "ShareEvents",
+    "ViewSharedCalendars"
+  ],
+  "user_roles": [
+    {
+      "name": "admin",
+      "permissions": [
+        "create",
+        "read",
+        "update",
+        "delete"
+      ]
+    },
+    {
+      "name": "user",
+      "permissions": [
+        "create",
+        "read",
+        "update",
+        "delete"
+      ]
+    }
+  ]
+}

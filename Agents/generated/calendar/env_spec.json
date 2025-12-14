@@ -1,0 +1,553 @@
+{
+  "name": "calendar",
+  "display_name": "Calendar",
+  "description": "A calendar application for managing events and schedules",
+  "domain": "calendar",
+  "entities": [
+    {
+      "name": "User",
+      "table_name": "users",
+      "description": "User entity for calendar",
+      "fields": [
+        {
+          "name": "id",
+          "type": "Integer",
+          "primary_key": true
+        },
+        {
+          "name": "email",
+          "type": "String(255)",
+          "unique": true
+        },
+        {
+          "name": "hashed_password",
+          "type": "String(255)"
+        },
+        {
+          "name": "full_name",
+          "type": "String(255)",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime",
+          "default": "now"
+        },
+        {
+          "name": "is_active",
+          "type": "Boolean",
+          "default": true
+        }
+      ]
+    },
+    {
+      "name": "Calendar",
+      "table_name": "calendars",
+      "description": "Calendar entity for calendar",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String(36)",
+          "primary_key": true
+        },
+        {
+          "name": "user_id",
+          "type": "Integer",
+          "foreign_key": "users.id"
+        },
+        {
+          "name": "summary",
+          "type": "String(255)"
+        },
+        {
+          "name": "description",
+          "type": "Text",
+          "nullable": true
+        },
+        {
+          "name": "time_zone",
+          "type": "String(50)",
+          "default": "UTC"
+        },
+        {
+          "name": "primary",
+          "type": "Boolean",
+          "default": false
+        }
+      ]
+    },
+    {
+      "name": "Event",
+      "table_name": "events",
+      "description": "Event entity for calendar",
+      "fields": [
+        {
+          "name": "id",
+          "type": "String(36)",
+          "primary_key": true
+        },
+        {
+          "name": "calendar_id",
+          "type": "String(36)",
+          "foreign_key": "calendars.id"
+        },
+        {
+          "name": "summary",
+          "type": "String(255)"
+        },
+        {
+          "name": "description",
+          "type": "Text",
+          "nullable": true
+        },
+        {
+          "name": "location",
+          "type": "String(255)",
+          "nullable": true
+        },
+        {
+          "name": "start_datetime",
+          "type": "DateTime"
+        },
+        {
+          "name": "end_datetime",
+          "type": "DateTime"
+        },
+        {
+          "name": "status",
+          "type": "String(20)",
+          "default": "confirmed"
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime",
+          "default": "now"
+        }
+      ]
+    },
+    {
+      "name": "Attendee",
+      "table_name": "attendees",
+      "description": "Attendee entity for calendar",
+      "fields": [
+        {
+          "name": "id",
+          "type": "Integer",
+          "primary_key": true
+        },
+        {
+          "name": "name",
+          "type": "String(255)"
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime",
+          "default": "now"
+        }
+      ]
+    },
+    {
+      "name": "Reminder",
+      "table_name": "reminders",
+      "description": "Reminder entity for calendar",
+      "fields": [
+        {
+          "name": "id",
+          "type": "Integer",
+          "primary_key": true
+        },
+        {
+          "name": "name",
+          "type": "String(255)"
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime",
+          "default": "now"
+        }
+      ]
+    }
+  ],
+  "features": [
+    {
+      "name": "Authentication",
+      "description": "Authentication functionality"
+    },
+    {
+      "name": "Calendar CRUD",
+      "description": "Calendar CRUD functionality"
+    },
+    {
+      "name": "Event CRUD",
+      "description": "Event CRUD functionality"
+    },
+    {
+      "name": "Invitations",
+      "description": "Invitations functionality"
+    },
+    {
+      "name": "Recurring Events",
+      "description": "Recurring Events functionality"
+    }
+  ],
+  "user_roles": [
+    {
+      "name": "owner",
+      "permissions": [
+        "create",
+        "read",
+        "update",
+        "delete",
+        "share"
+      ]
+    },
+    {
+      "name": "editor",
+      "permissions": [
+        "create",
+        "read",
+        "update"
+      ]
+    },
+    {
+      "name": "viewer",
+      "permissions": [
+        "read"
+      ]
+    }
+  ],
+  "api_endpoints": [
+    {
+      "path": "/users",
+      "method": "GET",
+      "operation_id": "list_users",
+      "summary": "List all users",
+      "auth_required": true
+    },
+    {
+      "path": "/users",
+      "method": "POST",
+      "operation_id": "create_user",
+      "summary": "Create a new user",
+      "auth_required": true
+    },
+    {
+      "path": "/users/{user_id}",
+      "method": "GET",
+      "operation_id": "get_user",
+      "summary": "Get a user by ID",
+      "auth_required": true
+    },
+    {
+      "path": "/users/{user_id}",
+      "method": "PUT",
+      "operation_id": "update_user",
+      "summary": "Update a user",
+      "auth_required": true
+    },
+    {
+      "path": "/users/{user_id}",
+      "method": "DELETE",
+      "operation_id": "delete_user",
+      "summary": "Delete a user",
+      "auth_required": true
+    },
+    {
+      "path": "/calendars",
+      "method": "GET",
+      "operation_id": "list_calendars",
+      "summary": "List all calendars",
+      "auth_required": true
+    },
+    {
+      "path": "/calendars",
+      "method": "POST",
+      "operation_id": "create_calendar",
+      "summary": "Create a new calendar",
+      "auth_required": true
+    },
+    {
+      "path": "/calendars/{calendar_id}",
+      "method": "GET",
+      "operation_id": "get_calendar",
+      "summary": "Get a calendar by ID",
+      "auth_required": true
+    },
+    {
+      "path": "/calendars/{calendar_id}",
+      "method": "PUT",
+      "operation_id": "update_calendar",
+      "summary": "Update a calendar",
+      "auth_required": true
+    },
+    {
+      "path": "/calendars/{calendar_id}",
+      "method": "DELETE",
+      "operation_id": "delete_calendar",
+      "summary": "Delete a calendar",
+      "auth_required": true
+    },
+    {
+      "path": "/events",
+      "method": "GET",
+      "operation_id": "list_events",
+      "summary": "List all events",
+      "auth_required": true
+    },
+    {
+      "path": "/events",
+      "method": "POST",
+      "operation_id": "create_event",
+      "summary": "Create a new event",
+      "auth_required": true
+    },
+    {
+      "path": "/events/{event_id}",
+      "method": "GET",
+      "operation_id": "get_event",
+      "summary": "Get a event by ID",
+      "auth_required": true
+    },
+    {
+      "path": "/events/{event_id}",
+      "method": "PUT",
+      "operation_id": "update_event",
+      "summary": "Update a event",
+      "auth_required": true
+    },
+    {
+      "path": "/events/{event_id}",
+      "method": "DELETE",
+      "operation_id": "delete_event",
+      "summary": "Delete a event",
+      "auth_required": true
+    },
+    {
+      "path": "/attendees",
+      "method": "GET",
+      "operation_id": "list_attendees",
+      "summary": "List all attendees",
+      "auth_required": true
+    },
+    {
+      "path": "/attendees",
+      "method": "POST",
+      "operation_id": "create_attendee",
+      "summary": "Create a new attendee",
+      "auth_required": true
+    },
+    {
+      "path": "/attendees/{attendee_id}",
+      "method": "GET",
+      "operation_id": "get_attendee",
+      "summary": "Get a attendee by ID",
+      "auth_required": true
+    },
+    {
+      "path": "/attendees/{attendee_id}",
+      "method": "PUT",
+      "operation_id": "update_attendee",
+      "summary": "Update a attendee",
+      "auth_required": true
+    },
+    {
+      "path": "/attendees/{attendee_id}",
+      "method": "DELETE",
+      "operation_id": "delete_attendee",
+      "summary": "Delete a attendee",
+      "auth_required": true
+    },
+    {
+      "path": "/reminders",
+      "method": "GET",
+      "operation_id": "list_reminders",
+      "summary": "List all reminders",
+      "auth_required": true
+    },
+    {
+      "path": "/reminders",
+      "method": "POST",
+      "operation_id": "create_reminder",
+      "summary": "Create a new reminder",
+      "auth_required": true
+    },
+    {
+      "path": "/reminders/{reminder_id}",
+      "method": "GET",
+      "operation_id": "get_reminder",
+      "summary": "Get a reminder by ID",
+      "auth_required": true
+    },
+    {
+      "path": "/reminders/{reminder_id}",
+      "method": "PUT",
+      "operation_id": "update_reminder",
+      "summary": "Update a reminder",
+      "auth_required": true
+    },
+    {
+      "path": "/reminders/{reminder_id}",
+      "method": "DELETE",
+      "operation_id": "delete_reminder",
+      "summary": "Delete a reminder",
+      "auth_required": true
+    },
+    {
+      "path": "/auth/register",
+      "method": "POST",
+      "operation_id": "register",
+      "summary": "Register a new user",
+      "auth_required": false
+    },
+    {
+      "path": "/auth/login",
+      "method": "POST",
+      "operation_id": "login",
+      "summary": "Login user",
+      "auth_required": false
+    },
+    {
+      "path": "/auth/me",
+      "method": "GET",
+      "operation_id": "get_current_user",
+      "summary": "Get current user info",
+      "auth_required": true
+    }
+  ],
+  "ui_pages": [
+    {
+      "name": "Login",
+      "route": "/login",
+      "description": "User login page",
+      "components": [
+        "LoginForm"
+      ]
+    },
+    {
+      "name": "Register",
+      "route": "/register",
+      "description": "User registration page",
+      "components": [
+        "RegisterForm"
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "route": "/",
+      "description": "Main dashboard",
+      "components": [
+        "Header",
+        "Sidebar",
+        "MainContent"
+      ]
+    },
+    {
+      "name": "CalendarList",
+      "route": "/calendars",
+      "description": "List of calendars",
+      "components": [
+        "CalendarTable",
+        "Pagination",
+        "SearchBar"
+      ]
+    },
+    {
+      "name": "CalendarDetail",
+      "route": "/calendars/:id",
+      "description": "Calendar detail view",
+      "components": [
+        "CalendarView",
+        "CalendarActions"
+      ]
+    },
+    {
+      "name": "CalendarForm",
+      "route": "/calendars/new",
+      "description": "Create/edit calendar",
+      "components": [
+        "CalendarForm"
+      ]
+    },
+    {
+      "name": "EventList",
+      "route": "/events",
+      "description": "List of events",
+      "components": [
+        "EventTable",
+        "Pagination",
+        "SearchBar"
+      ]
+    },
+    {
+      "name": "EventDetail",
+      "route": "/events/:id",
+      "description": "Event detail view",
+      "components": [
+        "EventView",
+        "EventActions"
+      ]
+    },
+    {
+      "name": "EventForm",
+      "route": "/events/new",
+      "description": "Create/edit event",
+      "components": [
+        "EventForm"
+      ]
+    },
+    {
+      "name": "AttendeeList",
+      "route": "/attendees",
+      "description": "List of attendees",
+      "components": [
+        "AttendeeTable",
+        "Pagination",
+        "SearchBar"
+      ]
+    },
+    {
+      "name": "AttendeeDetail",
+      "route": "/attendees/:id",
+      "description": "Attendee detail view",
+      "components": [
+        "AttendeeView",
+        "AttendeeActions"
+      ]
+    },
+    {
+      "name": "AttendeeForm",
+      "route": "/attendees/new",
+      "description": "Create/edit attendee",
+      "components": [
+        "AttendeeForm"
+      ]
+    },
+    {
+      "name": "ReminderList",
+      "route": "/reminders",
+      "description": "List of reminders",
+      "components": [
+        "ReminderTable",
+        "Pagination",
+        "SearchBar"
+      ]
+    },
+    {
+      "name": "ReminderDetail",
+      "route": "/reminders/:id",
+      "description": "Reminder detail view",
+      "components": [
+        "ReminderView",
+        "ReminderActions"
+      ]
+    },
+    {
+      "name": "ReminderForm",
+      "route": "/reminders/new",
+      "description": "Create/edit reminder",
+      "components": [
+        "ReminderForm"
+      ]
+    }
+  ]
+}
