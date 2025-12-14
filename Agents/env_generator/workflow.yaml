@@ -1,0 +1,462 @@
+# OpenEnv Generator Workflow Specification
+# This file defines the complete workflow for environment generation
+
+version: "1.0"
+name: "OpenEnv Environment Generator"
+description: "Multi-agent workflow for generating OpenEnv-compatible environments"
+
+# =============================================================================
+# Input Modes
+# =============================================================================
+input_modes:
+  user_description:
+    description: "User provides natural language description"
+    required_inputs:
+      - name: string
+      - description: string
+    optional_inputs:
+      - domain_type: enum[calendar, ecommerce, social, inventory, custom]
+      - constraints: list[string]
+      
+  reference_data:
+    description: "Agent infers environment from sample data"
+    required_inputs:
+      - name: string
+      - data: json
+    optional_inputs:
+      - domain_type: enum
+      
+  reference_ui:
+    description: "Agent designs environment from UI screenshot"
+    required_inputs:
+      - name: string
+      - ui_image: path
+    optional_inputs:
+      - description: string
+      - domain_type: enum
+
+# =============================================================================
+# Phase 1: Design
+# =============================================================================
+phase_1_design:
+  name: "Environment Design"
+  description: "Design environment structure and specifications"
+  
+  agents:
+    env_designer:
+      class: "EnvDesignerAgent"
+      role: "Analyze requirements and design environment structure"
+      inputs:
+        - user_description
+        - reference_data
+        - domain_type
+      outputs:
+        - environment_spec.yaml
+      reasoning: "ReAct"
+      
+    requirement_doc:
+      class: "RequirementDocAgent"
+      role: "Generate detailed specifications from design"
+      inputs:
+        - environment_spec.yaml
+      outputs:
+        - data_schema.yaml
+        - api_spec.yaml
+        - ui_wireframe.md
+      reasoning: "ChainOfThought"
+  
+  outputs:
+    environment_spec:
+      path: "spec/environment_spec.yaml"
+      schema:
+        name: string
+        description: string
+        domain: string
+        entities:
+          type: list
+          items:
+            name: string
+            description: string
+            attributes:
+              type: list
+              items:
+                name: string
+                type: string
+                description: string
+            relationships:
+              type: list
+              items:
+                type: enum[one-to-one, one-to-many, many-to-many]
+                target: string
+                description: string
+        user_roles:
+          type: list
+          items:
+            name: string
+            permissions: list[string]
+        core_features:
+          type: list
+          items:
+            name: string
+            description: string
+            user_stories: list[string]
+            
+    data_schema:
+      path: "spec/data_schema.yaml"
+      schema:
+        entities:
+          type: list
+          items:
+            name: string
+            table_name: string
+            fields:
+              type: list
+              items:
+                name: string
+                type: string
+                nullable: bool
+                default: any
+                constraints: list[string]
+            indexes:
+              type: list
+              items:
+                columns: list[string]
+                unique: bool
+            relationships:
+              type: list
+              items:
+                type: enum[one-to-many, many-to-many]
+                target: string
+                foreign_key: string
+                back_populates: string
+                
+    api_spec:
+      path: "spec/api_spec.yaml"
+      format: "OpenAPI 3.0"
+      
+    ui_wireframe:
+      path: "spec/ui_wireframe.md"
+      schema:
+        pages:
+          type: list
+          items:
+            name: string
+            route: string
+            description: string
+            components: list[string]
+            api_dependencies: list[string]
+
+# =============================================================================
+# Phase 2: Backend Generation
+# =============================================================================
+phase_2_backend:
+  name: "Backend Generation"
+  description: "Generate FastAPI backend with database"
+  
+  agents:
+    schema_designer:
+      class: "SchemaDesignerAgent"
+      role: "Generate SQLAlchemy models and Pydantic schemas"
+      inputs:
+        - spec/data_schema.yaml
+      outputs:
+        - "{env}_api/models.py"
+        - "{env}_api/schemas.py"
+      tools:
+        - create_file
+        - write_file
+        - run_code
+      reasoning: "ReAct"
+      
+    database_builder:
+      class: "DatabaseBuilderAgent"
+      role: "Create database connection and authentication"
+      inputs:
+        - "{env}_api/models.py"
+        - spec/environment_spec.yaml
+      outputs:
+        - "{env}_api/database.py"
+        - "{env}_api/auth.py"
+      tools:
+        - create_file
+        - write_file
+        
+    api_builder:
+      class: "APIBuilderAgent"
+      role: "Generate FastAPI routers and services"
+      inputs:
+        - spec/api_spec.yaml
+        - "{env}_api/schemas.py"
+        - "{env}_api/models.py"
+      outputs:
+        - "{env}_api/main.py"
+        - "{env}_api/routers/*.py"
+        - "{env}_api/services/*.py"
+        - "{env}_api/Dockerfile"
+        - "{env}_api/pyproject.toml"
+      tools:
+        - create_file
+        - write_file
+        - run_code
+      reasoning: "ReAct"
+  
+  outputs:
+    models:
+      path: "{env}_api/models.py"
+      description: "SQLAlchemy ORM models"
+      
+    schemas:
+      path: "{env}_api/schemas.py"
+      description: "Pydantic request/response schemas"
+      
+    database:
+      path: "{env}_api/database.py"
+      description: "Database connection setup"
+      
+    auth:
+      path: "{env}_api/auth.py"
+      description: "Authentication module"
+      
+    main:
+      path: "{env}_api/main.py"
+      description: "FastAPI application entry"
+      
+    routers:
+      path: "{env}_api/routers/"
+      description: "API route handlers"
+      
+    services:
+      path: "{env}_api/services/"
+      description: "Business logic services"
+      
+    dockerfile:
+      path: "{env}_api/Dockerfile"
+      description: "Backend container definition"
+
+# =============================================================================
+# Phase 3: Frontend Generation
+# =============================================================================
+phase_3_frontend:
+  name: "Frontend Generation"
+  description: "Generate React frontend with components"
+  
+  agents:
+    ui_designer:
+      class: "UIDesignerAgent"
+      role: "Design component hierarchy and styling"
+      inputs:
+        - spec/ui_wireframe.md
+        - reference_ui (optional)
+      outputs:
+        - component_tree.json
+        - style_guide.yaml
+      reasoning: "ChainOfThought"
+      
+    component_builder:
+      class: "ComponentBuilderAgent"
+      role: "Generate React components with API integration"
+      inputs:
+        - component_tree.json
+        - spec/api_spec.yaml
+      outputs:
+        - "{env}_ui/src/App.js"
+        - "{env}_ui/src/api.js"
+        - "{env}_ui/src/components/*.js"
+        - "{env}_ui/src/pages/*.js"
+      tools:
+        - create_file
+        - write_file
+      reasoning: "ReAct"
+      
+    style_builder:
+      class: "StyleBuilderAgent"
+      role: "Create CSS styles matching design"
+      inputs:
+        - style_guide.yaml
+        - "{env}_ui/src/components/*.js"
+      outputs:
+        - "{env}_ui/src/App.css"
+        - "{env}_ui/src/index.css"
+        - "{env}_ui/src/components/*.css"
+      tools:
+        - create_file
+        - write_file
+  
+  outputs:
+    app:
+      path: "{env}_ui/src/App.js"
+      description: "Main application component"
+      
+    api_client:
+      path: "{env}_ui/src/api.js"
+      description: "API client functions"
+      
+    components:
+      path: "{env}_ui/src/components/"
+      description: "Reusable React components"
+      
+    pages:
+      path: "{env}_ui/src/pages/"
+      description: "Page-level components"
+      
+    styles:
+      path: "{env}_ui/src/*.css"
+      description: "CSS stylesheets"
+      
+    package:
+      path: "{env}_ui/package.json"
+      description: "NPM dependencies"
+      
+    dockerfile:
+      path: "{env}_ui/Dockerfile"
+      description: "Frontend container definition"
+      
+    nginx:
+      path: "{env}_ui/nginx.conf"
+      description: "Production server config"
+
+# =============================================================================
+# Phase 4: Integration
+# =============================================================================
+phase_4_integration:
+  name: "Integration"
+  description: "Docker orchestration and OpenEnv adapter"
+  
+  agents:
+    docker_composer:
+      class: "DockerComposerAgent"
+      role: "Create Docker orchestration files"
+      inputs:
+        - "{env}_api/Dockerfile"
+        - "{env}_ui/Dockerfile"
+        - spec/environment_spec.yaml
+      outputs:
+        - docker-compose.yml
+        - .env.example
+      tools:
+        - create_file
+        - write_file
+        
+    openenv_adapter:
+      class: "OpenEnvAdapterAgent"
+      role: "Generate OpenEnv-compatible wrapper"
+      inputs:
+        - spec/environment_spec.yaml
+        - spec/api_spec.yaml
+      outputs:
+        - openenv_adapter/models.py
+        - openenv_adapter/client.py
+        - openenv_adapter/server/environment.py
+        - openenv_adapter/server/app.py
+        - openenv_adapter/openenv.yaml
+      tools:
+        - create_file
+        - write_file
+      reasoning: "ReAct"
+      
+    validator:
+      class: "ValidatorAgent"
+      role: "Validate and test generated environment"
+      inputs:
+        - all generated files
+      outputs:
+        - validation_report.json
+        - tests/*
+      tools:
+        - run_code
+        - read_file
+        - write_file
+      validation_steps:
+        - docker_build: "Verify Docker images build successfully"
+        - api_health: "Check API health endpoint"
+        - ui_load: "Verify UI loads correctly"
+        - openenv_endpoints: "Test reset/step/state endpoints"
+        - integration_tests: "Run full integration test suite"
+  
+  outputs:
+    docker_compose:
+      path: "docker-compose.yml"
+      description: "Multi-container orchestration"
+      
+    env_example:
+      path: ".env.example"
+      description: "Environment variables template"
+      
+    openenv_models:
+      path: "openenv_adapter/models.py"
+      description: "Action, Observation, State dataclasses"
+      
+    openenv_client:
+      path: "openenv_adapter/client.py"
+      description: "HTTPEnvClient implementation"
+      
+    openenv_environment:
+      path: "openenv_adapter/server/environment.py"
+      description: "Environment implementation"
+      
+    openenv_app:
+      path: "openenv_adapter/server/app.py"
+      description: "OpenEnv HTTP server"
+      
+    readme:
+      path: "README.md"
+      description: "Generated documentation"
+      
+    tests:
+      path: "tests/"
+      description: "Test suite"
+
+# =============================================================================
+# Shared Context
+# =============================================================================
+shared_context:
+  description: "Data shared between agents across phases"
+  fields:
+    - env_name: string
+    - env_display_name: string
+    - env_class_name: string
+    - output_dir: path
+    - api_port: int
+    - ui_port: int
+    - openenv_port: int
+    - entities: list
+    - api_endpoints: list
+    - ui_pages: list
+    - ui_components: list
+
+# =============================================================================
+# Error Handling
+# =============================================================================
+error_handling:
+  retry_policy:
+    max_retries: 3
+    backoff: exponential
+    
+  validation_errors:
+    action: "Send to ValidatorAgent for auto-fix"
+    
+  generation_errors:
+    action: "Retry with modified prompt"
+    
+  critical_errors:
+    action: "Halt and report to user"
+
+# =============================================================================
+# Execution Order
+# =============================================================================
+execution:
+  mode: "sequential"  # or "parallel" for independent agents
+  phases:
+    - phase_1_design
+    - phase_2_backend
+    - phase_3_frontend
+    - phase_4_integration
+  
+  dependencies:
+    phase_2_backend:
+      requires: [phase_1_design]
+    phase_3_frontend:
+      requires: [phase_1_design]
+    phase_4_integration:
+      requires: [phase_2_backend, phase_3_frontend]
+
