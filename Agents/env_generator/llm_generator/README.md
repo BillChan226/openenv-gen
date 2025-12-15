@@ -1,206 +1,367 @@
-# LLM Generator
+# LLM Generator - Intelligent Environment Code Generator
 
-A multi-agent system for generating OpenEnv-compatible environments, built on the AgentForge framework.
+An AI-powered code generation system that automatically creates complete, runnable OpenEnv-compatible environments using Large Language Models.
+
+## Overview
+
+The LLM Generator is a multi-agent system that generates full-stack applications (backend API + frontend UI + OpenEnv adapter) from natural language descriptions. Unlike simple template-based generators, it uses an iterative approach similar to how a human developer works:
+
+1. **Think** - Understand the requirements
+2. **Plan** - Decide what files to generate
+3. **Generate** - Create code file by file
+4. **Reflect** - Check for errors and issues
+5. **Fix** - Automatically repair problems
+6. **Test** - Run the code to verify it works
 
 ## Architecture
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│                    GeneratorOrchestrator                        │
-│              (Coordinator - manages phases)                     │
-└───────────────┬──────────────┬──────────────┬─────────────────┘
-                │              │              │
-        ┌───────▼──────┐ ┌────▼─────┐ ┌─────▼──────┐
-        │BackendAgent  │ │Frontend  │ │OpenEnv     │
-        │              │ │Agent     │ │Agent       │
-        └───────┬──────┘ └────┬─────┘ └─────┬──────┘
-                │              │              │
-                └──────────────┴──────────────┘
-                               │
-              ┌────────────────▼────────────────┐
-              │       CodeGeneratorAgent        │
-              │   (Base class with tools)       │
-              │                                 │
-              │  Tools:                         │
-              │  - read_file   - write_file     │
-              │  - grep        - search_replace │
-              │  - lint        - syntax_check   │
-              └─────────────────────────────────┘
+llm_generator/
+├── main.py                 # CLI entry point
+├── __init__.py
+├── context.py              # Generation context management
+├── events.py               # Real-time event streaming
+├── checkpoint.py           # Progress persistence for resume
+├── snippets/               # Code templates library
+│   ├── __init__.py
+│   ├── backend_snippets.py
+│   ├── frontend_snippets.py
+│   └── openenv_snippets.py
+├── agents/
+│   ├── __init__.py
+│   ├── orchestrator.py     # Main orchestrator (coordinates phases)
+│   └── code_agent.py       # Code generation agent
+└── tools/
+    ├── __init__.py
+    ├── file_tools.py       # File system operations
+    ├── code_tools.py       # Code manipulation (grep, search_replace, lint)
+    └── runtime_tools.py    # Server management, API testing
 ```
 
-## Key Features
+## Key Components
 
-### 1. Iterative Generation (Not One-Shot)
+### 1. GeneratorOrchestrator (`orchestrator.py`)
 
-Unlike simple generators, this system generates code iteratively:
+The main coordinator that manages the generation process across multiple phases:
+
+- **Design Phase**: Generate `env_spec.json` with environment specification
+- **Backend Phase**: Generate FastAPI backend with authentication
+- **Frontend Phase**: Generate React/TypeScript frontend
+- **OpenEnv Phase**: Generate OpenEnv adapter for RL integration
+
+Each phase runs through **3 iterations**:
+1. **GENERATE**: Create all planned files
+2. **VERIFY & FIX**: Run tests, identify issues, apply fixes
+3. **FINAL CHECK**: Ensure everything works
+
+### 2. CodeGeneratorAgent (`code_agent.py`)
+
+The intelligent agent that generates individual files with:
+
+- **Dynamic Planning**: LLM decides which files to generate (not hardcoded)
+- **Context Gathering**: Uses `grep` and `read_file` to understand existing code
+- **Per-File Intelligence**: Thinks before generating each file
+- **Reflection**: Checks generated code for issues
+- **Self-Fixing**: Automatically repairs detected problems
+
+### 3. Tools
+
+The agent has access to various tools:
+
+#### File Tools
+- `read_file(path, start_line?, end_line?)` - Read files with optional line range
+- `write_file(path, content)` - Create/overwrite files
+- `list_dir(path)` - List directory contents
+- `file_exists(path)` - Check if file exists
+- `list_generated(phase?)` - List all generated files with summaries
+
+#### Code Tools
+- `grep(pattern, path)` - Search for patterns across files
+- `search_replace(path, old, new)` - Replace text in files
+- `edit_lines(path, start, end, content)` - Replace specific line range
+- `insert_lines(path, after_line, content)` - Insert lines at position
+- `edit_function(path, name, new_code)` - Replace entire function/class
+- `lint(path)` - Check code for errors
+- `syntax_check(code, language)` - Verify syntax before writing
+
+#### Runtime Tools
+- `install_dependencies(project_type, cwd)` - Install pip/npm packages
+- `start_server(name, command, cwd, port)` - Start backend/frontend server
+- `stop_server(name)` - Stop a running server
+- `test_api(method, url, json_data?)` - Test API endpoints
+- `get_server_logs(name)` - Get server output for debugging
+- `quick_test(backend_dir)` - Automated backend test cycle
+
+## Generation Flow
+
+### Phase Execution (3 Iterations)
 
 ```
-THINK → PLAN → GENERATE → REFLECT → FIX → (repeat if needed)
+┌─────────────────────────────────────────────────────────────┐
+│                     PHASE: backend                          │
+├─────────────────────────────────────────────────────────────┤
+│ ITERATION 1: GENERATE                                       │
+│   ├── Think: Analyze phase requirements                     │
+│   ├── Plan: LLM decides files to generate                   │
+│   └── Generate: Create each file with per-file intelligence │
+│       ├── think_before_file() - What context needed?        │
+│       ├── gather_context_dynamically() - Read/grep files    │
+│       ├── generate_file() - Create the code                 │
+│       └── reflect_on_file() - Check for issues              │
+├─────────────────────────────────────────────────────────────┤
+│ ITERATION 2: VERIFY & FIX                                   │
+│   ├── Check for missing planned files                       │
+│   ├── Run runtime tests (start server, test API)            │
+│   ├── Collect all issues                                    │
+│   ├── Call fix_issues() to repair                           │
+│   └── Re-test after fixes                                   │
+├─────────────────────────────────────────────────────────────┤
+│ ITERATION 3: FINAL CHECK                                    │
+│   ├── Handle any remaining issues from iteration 2          │
+│   ├── Run final tests                                       │
+│   └── Mark phase complete (success/failure)                 │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-Each phase:
-1. **THINK**: Analyze what needs to be done
-2. **PLAN**: Break down into steps, identify dependencies
-3. **GENERATE**: Create files one by one
-4. **REFLECT**: Check for syntax errors, import issues
-5. **FIX**: If issues found, analyze and fix
+### Per-File Generation Flow
 
-### 2. Tool-Augmented Generation
+```
+┌──────────────────────────────────────────────────────────┐
+│              Generating: calendar_api/main.py            │
+├──────────────────────────────────────────────────────────┤
+│ 1. think_before_file()                                   │
+│    └── LLM decides: "I need to read database.py and     │
+│        schemas.py, grep for 'APIRouter' patterns"        │
+├──────────────────────────────────────────────────────────┤
+│ 2. gather_context_dynamically()                          │
+│    ├── read_file("calendar_api/database.py")            │
+│    ├── read_file("calendar_api/schemas.py")             │
+│    └── grep("APIRouter", ".")                           │
+├──────────────────────────────────────────────────────────┤
+│ 3. generate_file()                                       │
+│    ├── Build prompt with context                         │
+│    ├── Call LLM to generate code                         │
+│    ├── Strip line numbers if present                     │
+│    ├── Fix JSON formatting if needed                     │
+│    └── Write file                                        │
+├──────────────────────────────────────────────────────────┤
+│ 4. reflect_on_file()                                     │
+│    ├── Run syntax_check()                               │
+│    ├── Run lint()                                       │
+│    ├── LLM analyzes code quality                        │
+│    └── Return issues list                               │
+├──────────────────────────────────────────────────────────┤
+│ 5. fix_issues() (if issues found)                        │
+│    ├── Parse issue type (IMPORT, SYNTAX, MISSING, etc.) │
+│    ├── Apply appropriate fix strategy                    │
+│    └── Re-validate after fix                            │
+└──────────────────────────────────────────────────────────┘
+```
 
-Agents have access to developer tools:
+## Issue Detection & Auto-Fixing
 
-| Tool | Description | Use Case |
-|------|-------------|----------|
-| `read_file` | Read file contents | Understand existing code |
-| `write_file` | Create/overwrite files | Generate new code |
-| `grep` | Search for patterns | Find definitions, usages |
-| `search_replace` | Targeted modifications | Fix specific issues |
-| `lint` | Check code quality | Verify syntax |
-| `syntax_check` | Quick syntax verification | Before writing |
+The system can detect and fix various issues:
 
-### 3. Cross-Phase Consistency
+### Issue Types & Fix Strategies
 
-The orchestrator verifies that:
-- Backend endpoints match frontend API calls
-- Imports reference existing files
-- Database models match schemas
+| Issue Type | Detection | Fix Strategy |
+|------------|-----------|--------------|
+| `IMPORT ERROR: ModuleNotFoundError` | Server fails to start | Convert absolute imports to relative imports |
+| `MISSING FILE` | Import references non-existent file | Generate the missing file |
+| `SYNTAX ERROR` | syntax_check fails | Regenerate file or apply targeted fix |
+| `TRUNCATED` | Code appears incomplete | Continue generation with LLM |
+| `JSON FORMATTING` | Single-line JSON | Reformat with proper indentation |
+| `INCOMPLETE` | Contains TODO/FIXME markers | Regenerate with complete implementation |
 
-### 4. Self-Healing
+### Example: Import Error Fix
 
-When issues are detected:
-1. Agent analyzes the error
-2. Proposes a fix
-3. Applies the fix
-4. Re-verifies
+```python
+# Detected issue:
+"IMPORT ERROR: ModuleNotFoundError: No module named 'calendar_api'. 
+This usually means the imports need to be changed to relative imports."
+
+# Fix applied:
+# Before: from calendar_api.database import init_db
+# After:  from .database import init_db
+```
+
+## Runtime Testing
+
+The system includes automated testing capabilities:
+
+1. **Dependency Installation**: `pip install -r requirements.txt`
+2. **Server Startup**: `uvicorn main:app --host 0.0.0.0 --port 8008`
+3. **API Testing**: 
+   - Health check: `GET /health`
+   - Registration: `POST /auth/register`
+   - Login: `POST /auth/token`
+4. **Error Analysis**: Parse server logs for specific error types
+5. **Automatic Cleanup**: Stop servers after testing
 
 ## Usage
 
+### Basic Usage
+
 ```bash
-# Set API key
-export OPENAI_API_KEY=sk-...
-
-# Generate a calendar app
-python -m llm_generator.main --name calendar --domain calendar --description "A calendar app"
-
-# Generate with verbose logging
-python -m llm_generator.main --name shop --domain ecommerce --verbose
+cd Agents/env_generator
+python -m llm_generator.main \
+    --name calendar \
+    --description "A calendar app with events and authentication" \
+    --verbose
 ```
 
-## Directory Structure
+### With Runtime Testing
+
+```bash
+python -m llm_generator.main \
+    --name calendar \
+    --description "A calendar app" \
+    --test \
+    --verbose
+```
+
+### Resume from Checkpoint
+
+```bash
+python -m llm_generator.main \
+    --name calendar \
+    --description "A calendar app" \
+    --resume \
+    --verbose
+```
+
+### CLI Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `--name` | Environment name (e.g., "calendar") |
+| `--description` | Natural language description |
+| `--domain` | Domain type: "web_gui", "cli", "game", etc. |
+| `--output` | Output directory (default: "generated") |
+| `--test` | Enable runtime testing |
+| `--resume` | Resume from checkpoint |
+| `--verbose` | Enable detailed logging |
+| `--model` | LLM model (default: "gpt-5.1") |
+
+## Output Structure
+
+Generated environment structure:
 
 ```
-llm_generator/
-├── __init__.py
-├── README.md
-├── main.py                 # CLI entry point
-├── context.py              # Shared generation context
-├── agents/
+generated/calendar/
+├── env_spec.json              # Environment specification
+├── calendar_api/              # FastAPI backend
 │   ├── __init__.py
-│   ├── code_agent.py       # Base code generator agent
-│   └── orchestrator.py     # Multi-agent coordinator
-└── tools/
-    ├── __init__.py
-    ├── file_tools.py       # File operations
-    └── code_tools.py       # Code operations
+│   ├── main.py                # FastAPI app entry point
+│   ├── database.py            # Database configuration
+│   ├── models.py              # SQLAlchemy models
+│   ├── schemas.py             # Pydantic schemas
+│   ├── requirements.txt       # Python dependencies
+│   └── routers/
+│       ├── __init__.py
+│       └── auth.py            # Authentication endpoints
+├── calendar_ui/               # React frontend
+│   ├── package.json
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   ├── vite.config.ts
+│   ├── index.html
+│   └── src/
+│       ├── main.tsx
+│       ├── App.tsx
+│       ├── index.css
+│       ├── contexts/
+│       ├── pages/
+│       └── services/
+└── openenv_adapter/           # OpenEnv integration
+    ├── models.py
+    ├── requirements.txt
+    └── server/
+        ├── environment.py
+        └── main.py
 ```
 
-## How It Mimics Human Developers
+## Real-time Logging
 
-### Thinking Before Acting
-```python
-# Agent thinks about the task
-analysis = await agent.think(
-    task="Generate authentication endpoints",
-    context="We need JWT-based auth with login/register"
-)
+The system provides two log files:
+
+1. **`{name}_realtime.log`**: Human-readable event stream
+   ```
+   [21:22:09] 🤔 THINK: ITERATION 1/3
+   [21:22:09] 📋 PLAN: 8 files for phase
+   [21:22:30] START: calendar_api/main.py
+   [21:22:45] 🔧 TOOL: grep pattern='APIRouter'
+   [21:22:46] DONE: calendar_api/main.py (45 lines, good)
+   ```
+
+2. **`{name}_generation.log`**: JSON event log for programmatic analysis
+
+## Memory System
+
+The generator uses a shared memory system across phases:
+
+- **Short-term**: Recent context (FIFO buffer)
+- **Long-term**: Important patterns and fixes
+- **Working**: Current task context
+
+This enables:
+- Learning from fixes applied in earlier phases
+- Maintaining consistency across generated files
+- Recalling relevant patterns for similar files
+
+## Checkpointing
+
+Progress is automatically saved to `.checkpoint.json`:
+
+```json
+{
+  "name": "calendar",
+  "current_phase": "backend",
+  "phases": {
+    "design": {"status": "complete", "files": ["env_spec.json"]},
+    "backend": {"status": "in_progress", "files": ["main.py", "database.py"]}
+  },
+  "files": {
+    "calendar_api/main.py": {
+      "status": "complete",
+      "content_hash": "abc123...",
+      "phase": "backend"
+    }
+  }
+}
 ```
 
-### Using Tools to Understand Context
-```python
-# Agent reads existing files to understand structure
-result = await agent.call_tool("read_file", path="models.py")
-```
+## Known Limitations
 
-### Iterative Refinement
-```python
-# Agent reflects on generated code
-issues = await agent.reflect_on_generation(generated_files)
+1. **Line Numbers in Output**: LLMs sometimes output code with embedded line numbers. The system now strips these automatically.
 
-# If issues found, fix them
-if issues:
-    fixes = await agent.fix_issues(issues)
-```
+2. **Import Resolution**: When running from subdirectories, absolute imports may fail. The system detects this and converts to relative imports.
 
-### Cross-File Consistency
-```python
-# Orchestrator verifies across phases
-cross_issues = await orchestrator._verify_cross_phase()
-```
+3. **Server Port Conflicts**: Orphan processes from previous runs can cause port conflicts. The system now checks and cleans up before testing.
 
-## Extending
+4. **tsconfig.node.json**: Special handling added for TypeScript configuration files to ensure valid output.
 
-### Add a New Tool
+## Environment Variables
 
-```python
-from utils.tool import BaseTool, ToolDefinition, ToolParameter, ToolResult
+| Variable | Description |
+|----------|-------------|
+| `OPENAI_API_KEY` | OpenAI API key for GPT models |
 
-class MyTool(BaseTool):
-    @property
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="my_tool",
-            description="Does something useful",
-            parameters=[
-                ToolParameter(name="input", param_type=str, required=True),
-            ],
-        )
-    
-    async def execute(self, input: str, **kwargs) -> ToolResult:
-        # Do something
-        return ToolResult.ok(result)
-```
+## Dependencies
 
-### Add a New Phase
+- Python 3.9+
+- OpenAI API (GPT-4, GPT-4o, or GPT-5.1)
+- FastAPI, Uvicorn (for backend)
+- Node.js, npm (for frontend)
 
-```python
-# In orchestrator.py
-PHASES = [
-    "design",
-    "backend",
-    "frontend",
-    "openenv",
-    "docker",
-    "my_new_phase",  # Add here
-]
+## Contributing
 
-# Define phase spec
-def _get_phase_spec(self, phase: str):
-    if phase == "my_new_phase":
-        return {
-            "description": "My new phase",
-            "files": [
-                {"path": "my_file.py", "purpose": "...", "instructions": "..."},
-            ],
-        }
-```
+The system is designed to be extensible:
 
-## Comparison with Old Generator
+1. **Add new tools**: Create in `tools/` and register in `code_agent.py`
+2. **Add code snippets**: Add to `snippets/` for common patterns
+3. **Customize phases**: Modify `_get_phase_spec()` in `orchestrator.py`
 
-| Feature | Old (llm_generate.py) | New (llm_generator/) |
-|---------|----------------------|---------------------|
-| Structure | Single 2500+ line file | Modular, separated concerns |
-| Generation | One-shot per file | Iterative with reflection |
-| Tools | None | Full tool support (grep, etc.) |
-| Planning | Hardcoded phases | Dynamic, agent-driven |
-| Fixing | Limited auto-fix | Full analysis + fix loop |
-| Extensibility | Difficult | Easy to add tools/phases |
+## License
 
-## Based On
-
-Built on the AgentForge framework (`utils/`):
-- `BaseAgent` - Agent lifecycle management
-- `PlanningAgent` - Planning and reasoning capabilities
-- `ReActEngine` - THINK-ACTION-OBSERVATION loop
-- `ToolRegistry` - Tool management
-- `LLM` - LLM client wrapper
-
+[Your License Here]

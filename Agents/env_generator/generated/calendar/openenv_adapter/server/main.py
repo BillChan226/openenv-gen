@@ -4,20 +4,18 @@ import logging
 from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field, ValidationError
 
-from .environment import Environment  # CalendarEnvironment should subclass this
+from .environment import CalendarEnvironment
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
-# Try to import CalendarEnvironment if it exists in environment.py
-try:
-    from .environment import CalendarEnvironment  # type: ignore
-except ImportError:  # pragma: no cover - fallback if not present
-    CalendarEnvironment = None  # type: ignore[assignment]
+class ActionRequest(BaseModel):
+    """Request model for the /step endpoint.
 
-
-class StepRequest(BaseModel):
-    """Request body for /step endpoint."""
+    The exact structure of the action depends on the CalendarEnvironment
+    implementation. For flexibility, we accept an arbitrary JSON object.
+    """

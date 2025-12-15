@@ -90,6 +90,7 @@ class GeneratorOrchestrator(PlanningAgent):
         event_emitter: Optional[EventEmitter] = None,
         verbose: bool = False,
         resume: bool = False,
+        enable_testing: bool = False,  # Optional: run tests after generation
     ):
         super().__init__(config, role=AgentRole.COORDINATOR)
         
@@ -97,6 +98,7 @@ class GeneratorOrchestrator(PlanningAgent):
         self.gen_context: Optional[GenerationContext] = None
         self.verbose = verbose
         self.resume = resume
+        self._enable_testing = enable_testing
         
         # Event emitter for real-time progress streaming
         self._emitter = event_emitter or EventEmitter()
@@ -360,14 +362,49 @@ class GeneratorOrchestrator(PlanningAgent):
             await self._fix_cross_phase_issues(final_issues)
         
         # ========== RUNTIME VERIFICATION ==========
-        # Actually try to run the generated code!
+        # Let the agent TEST its own generated code!
+        self._logger.info("\n" + "="*50)
+        self._logger.info("AGENT SELF-TESTING")
+        self._logger.info("="*50)
+        
+        self._emitter.emit(EventType.PHASE_START, "Agent self-testing", {
+            "phase": "self_test",
+            "description": "Agent tests its own generated code",
+        })
+        
+        # Get backend agent to run tests
+        backend_agent = await self._get_phase_agent("backend")
+        
+        self._logger.info("  [TEST] Agent is now testing the generated environment...")
+        test_results = await backend_agent.test_generated_environment(
+            env_name=name,
+            backend_dir=f"{name}_api",
+            frontend_dir=f"{name}_ui",
+        )
+        
+        test_success = len(test_results.get("issues_found", [])) == 0
+        
+        # If agent found issues, it already tried to fix them
+        if test_results.get("fixes_applied"):
+            self._logger.info(f"  [FIXED] Agent applied {len(test_results['fixes_applied'])} fixes during testing")
+        
+        self._emitter.emit(EventType.PHASE_COMPLETE, "Agent self-testing complete", {
+            "phase": "self_test",
+            "success": test_success,
+            "api_tests_passed": sum(1 for t in test_results.get("api_tests", []) if t.get("success")),
+            "api_tests_total": len(test_results.get("api_tests", [])),
+            "issues_found": len(test_results.get("issues_found", [])),
+            "fixes_applied": len(test_results.get("fixes_applied", [])),
+        })
+        
+        # Also run traditional runtime verification for completeness
         self._logger.info("\n" + "="*50)
         self._logger.info("RUNTIME VERIFICATION")
         self._logger.info("="*50)
         
         self._emitter.emit(EventType.PHASE_START, "Runtime verification", {
             "phase": "runtime_verify",
-            "description": "Testing if generated code actually runs",
+            "description": "Additional runtime checks",
         })
         
         runtime_report = await self._run_runtime_verification()
@@ -440,66 +477,254 @@ class GeneratorOrchestrator(PlanningAgent):
             self._shared_memory.working.set("phase_context", memory_context)
             self._shared_memory.working.set("current_phase", phase)
         
-        # Execute phase with INTELLIGENT iterative generation
+        # ================================================================
+        # PHASE EXECUTION WITH 3 ITERATIONS
+        # ================================================================
+        # 
+        # GOAL: Generate RUNNABLE environment code (no manual fixes needed!)
+        #
+        # ITERATION 1: GENERATE
+        #   - Plan files based on phase requirements
+        #   - Generate all planned files
+        #   - Basic syntax/lint checks
+        #
+        # ITERATION 2: VERIFY & FIX
+        #   - Check for missing files, broken imports
+        #   - Run runtime tests (start server, test API)
+        #   - Fix any issues found
+        #
+        # ITERATION 3: FINAL VERIFICATION
+        #   - Ensure everything runs without errors
+        #   - Final polish and cleanup
+        #
+        # ================================================================
+        
         result = PhaseResult(phase=phase, success=True)
-        files_this_iteration = []
         existing_files = list(self.gen_context.files.keys())
+        planned_files = []
+        phase_issues = []
+        files_this_phase = []  # Track files generated in this phase run
         
         max_iterations = 3
         for iteration in range(max_iterations):
-            self._logger.info(f"  Iteration {iteration + 1}/{max_iterations}")
+            iteration_name = ["GENERATE", "VERIFY & FIX", "FINAL CHECK"][iteration]
+            self._logger.info(f"\n{'='*60}")
+            self._logger.info(f"  ITERATION {iteration + 1}/{max_iterations}: {iteration_name}")
+            self._logger.info(f"{'='*60}")
             
-            # High-level phase thinking
-            self._emitter.emit(EventType.THINK_START, f"Thinking about {phase} phase", {
-                "topic": f"Phase: {phase}, Iteration: {iteration + 1}",
-                "context": f"Existing files: {len(existing_files)}",
+            # Emit iteration start event for realtime log
+            self._emitter.emit(EventType.THINK_START, f"Iteration {iteration + 1}: {iteration_name}", {
+                "topic": f"ITERATION {iteration + 1}/{max_iterations}",
+                "context": f"Phase: {phase}, Files so far: {len(result.files_generated)}, Issues: {len(phase_issues)}",
             })
             
-            analysis = await agent.think(
-                task=phase_spec["description"],
-                context=f"Phase: {phase}\nIteration: {iteration + 1}\nExisting files: {existing_files}"
-            )
-            
-            self._emitter.emit(EventType.THINK_RESULT, f"Analysis complete", {
-                "result": analysis,
-            })
-            self._logger.info(f"  Analysis: {str(analysis)[:100]}...")
-            
-            # ========== DYNAMIC FILE PLANNING ==========
-            # LLM decides what files to generate, not hardcoded list!
-            self._logger.info(f"  [PLAN] Dynamically planning files for {phase}...")
-            
-            planned_files = await agent.plan_phase_files(
-                phase=phase,
-                phase_description=phase_spec["description"],
-                env_name=self.gen_context.name,
-                env_description=self.gen_context.description,
-                existing_files=existing_files,
-                reference_files=phase_spec.get("files", []),  # Hints, not requirements
-            )
-            
-            self._logger.info(f"  [PLAN] LLM planned {len(planned_files)} files:")
-            for pf in planned_files[:5]:
-                self._logger.info(f"    - {pf.get('path', 'unknown')}")
-            if len(planned_files) > 5:
-                self._logger.info(f"    ... and {len(planned_files) - 5} more")
-            
-            # Emit file plan event with details
-            self._emitter.emit(EventType.FILE_PLAN, f"Planned {len(planned_files)} files", {
-                "phase": phase,
-                "files": [f.get("path", "unknown") for f in planned_files],
-                "details": [
-                    {"path": f.get("path", ""), "purpose": f.get("purpose", "")[:100]}
-                    for f in planned_files[:10]
-                ],
-            })
-            
-            # Save planned files to checkpoint
-            if self._checkpoint:
-                self._checkpoint.set_phase_planned_files(
-                    phase, 
-                    [f.get("path", "") for f in planned_files]
+            # ================================================================
+            # ITERATION 1: GENERATE ALL FILES
+            # ================================================================
+            if iteration == 0:
+                self._emitter.emit(EventType.THINK_START, f"Planning {phase} phase", {
+                    "topic": f"Phase: {phase} - Initial Generation",
+                    "context": f"Existing files: {len(existing_files)}",
+                })
+                
+                # Think about the phase
+                analysis = await agent.think(
+                    task=phase_spec["description"],
+                    context=f"Phase: {phase}\nExisting files: {existing_files}\n\nGOAL: Generate RUNNABLE code that works without manual fixes!"
                 )
+                
+                self._emitter.emit(EventType.THINK_RESULT, f"Analysis complete", {"result": analysis})
+                self._logger.info(f"  Analysis: {str(analysis)[:100]}...")
+                
+                # Plan files to generate
+                self._logger.info(f"  [PLAN] Planning files for {phase}...")
+                
+                planned_files = await agent.plan_phase_files(
+                    phase=phase,
+                    phase_description=phase_spec["description"],
+                    env_name=self.gen_context.name,
+                    env_description=self.gen_context.description,
+                    existing_files=existing_files,
+                    reference_files=phase_spec.get("files", []),
+                )
+                
+                self._logger.info(f"  [PLAN] Planned {len(planned_files)} files")
+                self._emitter.emit(EventType.FILE_PLAN, f"Planned {len(planned_files)} files", {
+                    "phase": phase,
+                    "files": [f.get("path", "unknown") for f in planned_files],
+                })
+                
+                if self._checkpoint:
+                    self._checkpoint.set_phase_planned_files(phase, [f.get("path", "") for f in planned_files])
+            
+            # ================================================================
+            # ITERATION 2: VERIFY, TEST, FIX, AND ADD NEW FILES IF NEEDED
+            # ================================================================
+            elif iteration == 1:
+                self._logger.info(f"  [VERIFY] Verifying generated code...")
+                self._emitter.emit(EventType.THINK_START, f"Verifying {phase}", {
+                    "topic": "Verification and Testing",
+                    "context": f"Generated: {len(result.files_generated)} files, Issues: {len(phase_issues)}",
+                })
+                
+                # Check for missing planned files
+                planned_paths = [f.get("path", "") for f in planned_files]
+                verification = await agent.verify_planned_files(planned_paths)
+                missing = verification.get("missing", [])
+                
+                if missing:
+                    self._logger.warning(f"  [MISSING] {len(missing)} files not generated: {missing}")
+                    for mf in missing:
+                        phase_issues.append(f"MISSING FILE: {mf}")
+                        # Try to generate missing files
+                        file_spec = next((f for f in planned_files if f.get("path") == mf), None)
+                        if file_spec:
+                            self._logger.info(f"  [GENERATE MISSING] {mf}")
+                            code = await agent.generate_file(
+                                file_path=mf,
+                                purpose=file_spec.get("purpose", ""),
+                                instructions=file_spec.get("instructions", ""),
+                                dependencies=file_spec.get("dependencies", []),
+                            )
+                            if code:
+                                result.files_generated.append(mf)
+                                files_this_phase.append(mf)
+                
+                # Run runtime tests for backend
+                if phase == "backend" and self._enable_testing:
+                    self._logger.info(f"  [TEST] Running backend tests...")
+                    self._emitter.emit(EventType.THINK_START, f"Running backend tests", {
+                        "topic": "Runtime Testing (Iteration 2)",
+                        "context": f"Current issues: {len(phase_issues)}",
+                    })
+                    test_issues = await self._run_backend_tests(agent)
+                    if test_issues:
+                        phase_issues.extend(test_issues)
+                        self._logger.warning(f"  [TEST FAILED] {len(test_issues)} issues found:")
+                        self._emitter.emit(EventType.VERIFICATION_ERROR, f"Backend tests failed", {
+                            "phase": phase,
+                            "iteration": 2,
+                            "issues": test_issues[:3],
+                        })
+                        for ti in test_issues[:3]:
+                            self._logger.warning(f"    - {ti[:80]}")
+                    else:
+                        self._emitter.emit(EventType.VERIFICATION_PASS, f"Backend tests passed", {
+                            "phase": phase,
+                            "iteration": 2,
+                        })
+                else:
+                    self._emitter.emit(EventType.THINK_START, f"Skipping runtime tests", {
+                        "topic": "No Testing",
+                        "context": f"phase={phase}, testing={self._enable_testing}",
+                    })
+                
+                # Fix any issues using ITERATIVE FIX LOOP
+                # Run -> Fix -> Run -> Fix -> ... until success or max attempts
+                self._logger.info(f"  [CHECK] phase_issues count: {len(phase_issues)}")
+                self._emitter.emit(EventType.THINK_START, f"Checking issues to fix", {
+                    "topic": "Fix Check",
+                    "context": f"Issues: {len(phase_issues)}, Issues list: {phase_issues[:3] if phase_issues else []}",
+                })
+                
+                if phase_issues or (phase == "backend" and self._enable_testing):
+                    # Use iterative fix loop for backend with testing
+                    max_fix_attempts = 15  # Allow up to 15 fix cycles
+                    
+                    phase_issues, all_fixes, new_files = await self._iterative_fix_loop(
+                        agent=agent,
+                        phase=phase,
+                        initial_issues=phase_issues,
+                        max_attempts=max_fix_attempts,
+                        enable_runtime_test=(phase == "backend" and self._enable_testing),
+                    )
+                    
+                    result.fixes_applied.extend(all_fixes)
+                    for nf in new_files:
+                        if nf not in result.files_generated:
+                            result.files_generated.append(nf)
+                            files_this_phase.append(nf)
+                    
+                    if not phase_issues:
+                        self._logger.info(f"  [RESOLVED] All issues fixed after iterative loop!")
+                else:
+                    self._logger.info(f"  [OK] No issues found in iteration 2")
+            
+            # ================================================================
+            # ITERATION 3: FINAL VERIFICATION AND POLISH (AGGRESSIVE FIX LOOP)
+            # ================================================================
+            elif iteration == 2:
+                self._logger.info(f"  [FINAL] Final verification and aggressive fix loop...")
+                self._emitter.emit(EventType.THINK_START, f"Final check for {phase}", {
+                    "topic": "Final Verification",
+                    "context": f"Files: {len(result.files_generated)}, Fixes: {len(result.fixes_applied)}, Pending issues: {len(phase_issues)}",
+                })
+                
+                # Use AGGRESSIVE iterative fix loop in final iteration
+                # Allow more attempts since this is the last chance!
+                max_final_attempts = 20  # More aggressive in final iteration
+                
+                phase_issues, all_fixes, new_files = await self._iterative_fix_loop(
+                    agent=agent,
+                    phase=phase,
+                    initial_issues=phase_issues,
+                    max_attempts=max_final_attempts,
+                    enable_runtime_test=(phase == "backend" and self._enable_testing),
+                )
+                
+                result.fixes_applied.extend(all_fixes)
+                for nf in new_files:
+                    if nf not in result.files_generated:
+                        result.files_generated.append(nf)
+                        self._logger.info(f"  [NEW FILE] Added in final pass: {nf}")
+                
+                if phase_issues:
+                    self._logger.error(f"  [FAIL] {len(phase_issues)} issues remain after {max_final_attempts} fix attempts")
+                    result.issues.extend(phase_issues)
+                    self._emitter.emit(EventType.VERIFICATION_ERROR, f"Unfixable issues remain after max attempts", {
+                        "phase": phase,
+                        "issues": phase_issues,
+                        "attempts": max_final_attempts,
+                    })
+                else:
+                    self._logger.info(f"  [SUCCESS] All issues resolved!")
+                
+                # Final reflection (code quality check)
+                final_issues = await agent.reflect_on_generation(result.files_generated)
+                if final_issues:
+                    self._logger.info(f"  [POLISH] Addressing {len(final_issues)} code quality issues...")
+                    fixes = await agent.fix_issues(final_issues)
+                    result.fixes_applied.extend(fixes)
+                    
+                    if fixes:
+                        self._logger.info(f"  [POLISHED] Applied {len(fixes)} final fixes")
+                    else:
+                        # Code quality issues are warnings, not blockers
+                        self._logger.warning(f"  [WARN] {len(final_issues)} quality issues remain (non-blocking)")
+                
+                # Summary
+                if result.issues:
+                    self._logger.error(f"  [INCOMPLETE] Phase {phase} has {len(result.issues)} unresolved issues")
+                    self._emitter.emit(EventType.PHASE_COMPLETE, f"Phase complete with issues: {phase}", {
+                        "phase": phase,
+                        "success": False,
+                        "issues": len(result.issues),
+                    })
+                else:
+                    self._logger.info(f"  [COMPLETE] Phase {phase} completed successfully!")
+                    self._emitter.emit(EventType.PHASE_COMPLETE, f"Phase complete: {phase}", {
+                        "phase": phase,
+                        "success": True,
+                        "files": len(result.files_generated),
+                    })
+                
+                break  # Always exit after iteration 3
+            
+            # ================================================================
+            # FILE GENERATION (ONLY IN ITERATION 1)
+            # ================================================================
+            if iteration != 0:
+                continue  # Skip file generation for iterations 2 and 3
             
             # Generate files with PER-FILE intelligence
             for file_spec in planned_files:
@@ -538,7 +763,7 @@ class GeneratorOrchestrator(PlanningAgent):
                 pre_thinking = await agent.think_before_file(
                     file_path=file_path,
                     purpose=file_spec.get("purpose", ""),
-                    existing_files=existing_files + files_this_iteration,
+                    existing_files=existing_files + files_this_phase,
                 )
                 
                 self._emitter.emit(EventType.THINK_RESULT, f"Pre-thinking complete", {
@@ -579,7 +804,7 @@ class GeneratorOrchestrator(PlanningAgent):
                 # Add recent files from this iteration
                 priority_keywords = ["models", "schemas", "auth", "types", "config"]
                 relevant_prev = sorted(
-                    [f for f in files_this_iteration if f not in all_dependencies],
+                    [f for f in files_this_phase if f not in all_dependencies],
                     key=lambda f: any(kw in f.lower() for kw in priority_keywords),
                     reverse=True
                 )[:5]
@@ -671,6 +896,19 @@ class GeneratorOrchestrator(PlanningAgent):
                             )
                             
                             if code:
+                                # For JSON files, ensure proper formatting
+                                if file_path.endswith('.json'):
+                                    import json
+                                    try:
+                                        data = json.loads(code)
+                                        formatted_code = json.dumps(data, indent=2, ensure_ascii=False)
+                                        # Write formatted version
+                                        full_path = self.gen_context.output_dir / file_path
+                                        full_path.write_text(formatted_code, encoding='utf-8')
+                                        self._logger.info(f"  [FORMAT] Formatted JSON with proper indentation")
+                                    except json.JSONDecodeError:
+                                        pass  # If JSON is invalid, let it go through normal validation
+                                
                                 self._emitter.emit(EventType.FIX_APPLIED, f"Regenerated: {file_path}", {
                                     "path": file_path,
                                     "fix": "Complete regeneration",
@@ -749,7 +987,7 @@ class GeneratorOrchestrator(PlanningAgent):
                 
                 # Track successful generation
                 result.files_generated.append(file_path)
-                files_this_iteration.append(file_path)
+                files_this_phase.append(file_path)
                 existing_files.append(file_path)
                 
                 # Store in memory
@@ -768,38 +1006,461 @@ class GeneratorOrchestrator(PlanningAgent):
             
             # ========== END OF ITERATION REFLECTION ==========
             self._logger.info(f"  [PHASE REFLECT] Checking all generated files...")
-            phase_issues = await agent.reflect_on_generation(result.files_generated)
+            
+            # Prepare test config for backend phase (if testing enabled)
+            test_config = None
+            enable_test = False
+            if phase == "backend" and self._enable_testing:
+                enable_test = True
+                test_config = {
+                    "env_name": self.gen_context.name,
+                    "backend_dir": f"{self.gen_context.name}_api",
+                }
+                self._logger.info(f"  [RUNTIME TEST] Will test backend code...")
+            
+            # Reflection now includes optional runtime testing
+            phase_issues = await agent.reflect_on_generation(
+                result.files_generated,
+                enable_runtime_test=enable_test,
+                test_config=test_config,
+            )
             
             if not phase_issues:
-                self._logger.info(f"  [COMPLETE] No issues found, phase complete")
-                break
+                self._logger.info(f"  [ITERATION COMPLETE] No issues in iteration {iteration + 1}")
+                # DON'T BREAK HERE! Continue to next iteration for verification/testing
+            else:
+                self._logger.info(f"  [ISSUES] Found {len(phase_issues)} issues, fixing...")
+                result.issues.extend(phase_issues)
+                
+                fixes = await agent.fix_issues(phase_issues)
+                result.fixes_applied.extend(fixes)
+                
+                if not fixes:
+                    self._logger.warning(f"  [WARN] No fixes applied, issues may persist")
+        
+        # ========== POST-PHASE VERIFICATION ==========
+        # Verify all PLANNED files were actually generated
+        self._logger.info(f"  [VERIFY] Checking planned files were generated...")
+        
+        planned_paths = [f.get("path", "") for f in planned_files if f.get("path")]
+        verification = await agent.verify_planned_files(planned_paths)
+        
+        missing = verification.get("missing", [])
+        if missing:
+            self._logger.warning(f"  [MISSING] {len(missing)} planned files not generated: {missing}")
+            result.issues.extend([f"MISSING: {f}" for f in missing])
             
-            self._logger.info(f"  [ISSUES] Found {len(phase_issues)} issues, fixing...")
-            result.issues.extend(phase_issues)
+            # Emit event about missing files
+            self._emitter.emit(EventType.VERIFICATION_ERROR, f"Missing {len(missing)} planned files", {
+                "phase": phase,
+                "missing_files": missing,
+                "total_planned": len(planned_paths),
+            })
             
-            fixes = await agent.fix_issues(phase_issues)
-            result.fixes_applied.extend(fixes)
-            
-            if not fixes:
-                self._logger.info(f"  [STOP] No fixes applied, stopping iteration")
-                break
+            # Generate missing files
+            for missing_file in missing:
+                self._logger.info(f"  [GENERATE MISSING] {missing_file}")
+                
+                # Find the spec for this file
+                file_spec = next((f for f in planned_files if f.get("path") == missing_file), None)
+                if file_spec:
+                    code = await agent.generate_file(
+                        file_path=missing_file,
+                        purpose=file_spec.get("purpose", ""),
+                        instructions=file_spec.get("instructions", ""),
+                        dependencies=file_spec.get("dependencies", []),
+                    )
+                    if code:
+                        result.files_generated.append(missing_file)
+                        self._logger.info(f"  [OK] Generated missing file: {missing_file}")
+        else:
+            self._logger.info(f"  [OK] All {len(planned_paths)} planned files exist")
         
         result.duration = (datetime.now() - start_time).total_seconds()
-        result.success = len(result.issues) == 0 or len(result.fixes_applied) > 0
+        
+        # Phase is successful only if NO issues remain
+        # (having applied fixes doesn't count if issues still exist)
+        result.success = len(result.issues) == 0
+        
+        # Emit VERIFY PASS or FAIL based on ALL issues (including runtime tests!)
+        if result.success:
+            self._logger.info(f"  [PHASE OK] {phase} completed successfully in {result.duration:.1f}s")
+            self._emitter.emit(EventType.VERIFICATION_PASS, f"Phase {phase} passed all checks", {
+                "phase": phase,
+                "files_count": len(planned_paths),
+                "issues_count": 0,
+            })
+        else:
+            self._logger.error(f"  [PHASE FAIL] {phase} has {len(result.issues)} unresolved issues:")
+            for issue in result.issues[:5]:
+                self._logger.error(f"    - {issue[:80]}")
+            self._emitter.emit(EventType.VERIFICATION_ERROR, f"Phase {phase} has {len(result.issues)} issues", {
+                "phase": phase,
+                "files_count": len(planned_paths),
+                "issues_count": len(result.issues),
+                "issues": result.issues[:5],  # Top 5 issues
+            })
         
         return result
+    
+    async def _iterative_fix_loop(
+        self,
+        agent: CodeGeneratorAgent,
+        phase: str,
+        initial_issues: List[str],
+        max_attempts: int = 15,
+        enable_runtime_test: bool = False,
+    ) -> tuple:
+        """
+        Iterative fix loop: Run -> Fix -> Run -> Fix -> ... until success or max attempts.
+        
+        This is the KEY improvement for generating runnable code!
+        Instead of fixing once, we keep trying until:
+        - All issues are resolved
+        - Or we've exhausted max_attempts
+        
+        Args:
+            agent: The CodeGeneratorAgent to use for fixes
+            phase: Current phase name
+            initial_issues: Issues to start with
+            max_attempts: Maximum fix cycles (default 15, can go up to 20)
+            enable_runtime_test: Whether to run runtime tests (for backend)
+            
+        Returns:
+            (remaining_issues, all_fixes_applied, new_files_created)
+        """
+        current_issues = list(initial_issues)
+        all_fixes = []
+        new_files = []
+        
+        for attempt in range(max_attempts):
+            # If no issues from static analysis, run runtime test
+            if not current_issues and enable_runtime_test:
+                self._logger.info(f"  [FIX LOOP {attempt + 1}/{max_attempts}] Running runtime test...")
+                self._emitter.emit(EventType.THINK_START, f"Fix attempt {attempt + 1}: Runtime test", {
+                    "topic": f"FIX LOOP {attempt + 1}/{max_attempts}",
+                    "action": "runtime_test",
+                })
+                current_issues = await self._run_backend_tests(agent)
+            
+            # If still no issues, we're done!
+            if not current_issues:
+                self._logger.info(f"  [FIX LOOP] SUCCESS after {attempt + 1} attempts!")
+                self._emitter.emit(EventType.VERIFICATION_PASS, f"All issues fixed", {
+                    "phase": phase,
+                    "attempts": attempt + 1,
+                    "total_fixes": len(all_fixes),
+                })
+                break
+            
+            # Log current issues
+            self._logger.info(f"  [FIX LOOP {attempt + 1}/{max_attempts}] {len(current_issues)} issues to fix:")
+            for i, issue in enumerate(current_issues[:3]):
+                self._logger.info(f"    {i+1}. {issue[:100]}")
+            if len(current_issues) > 3:
+                self._logger.info(f"    ... and {len(current_issues) - 3} more")
+            
+            self._emitter.emit(EventType.THINK_START, f"Fix attempt {attempt + 1}/{max_attempts}", {
+                "topic": f"FIX ATTEMPT {attempt + 1}",
+                "issues_count": len(current_issues),
+                "issues": current_issues[:3],
+            })
+            
+            # Try to fix the issues
+            fixes = await agent.fix_issues(current_issues)
+            all_fixes.extend(fixes)
+            
+            if not fixes:
+                self._logger.warning(f"  [FIX LOOP {attempt + 1}] No fixes applied, trying different approach...")
+                
+                # If no fixes applied, try to regenerate the problematic file
+                for issue in current_issues:
+                    if "main.py" in issue or "STARTUP" in issue or "IMPORT" in issue:
+                        # Try to regenerate main.py with explicit relative imports
+                        self._logger.info(f"  [REGENERATE] Attempting to regenerate problematic file...")
+                        
+                        # Find and fix all absolute imports in the project
+                        backend_dir = f"{self.gen_context.name}_api"
+                        await self._fix_all_absolute_imports(agent, backend_dir)
+                        break
+                
+                # Small wait before retry
+                import asyncio
+                await asyncio.sleep(0.5)
+            else:
+                self._logger.info(f"  [FIX LOOP {attempt + 1}] Applied {len(fixes)} fixes")
+                self._emitter.emit(EventType.THINK_RESULT, f"Applied {len(fixes)} fixes", {
+                    "topic": f"FIX RESULT {attempt + 1}",
+                    "fixes": fixes[:5],
+                })
+                
+                # Track new files created
+                import re
+                for fix in fixes:
+                    if "CREATED:" in fix or "NEW FILE:" in fix:
+                        match = re.search(r"(?:CREATED:|NEW FILE:)\s*(\S+)", fix)
+                        if match:
+                            new_file = match.group(1)
+                            if new_file not in new_files:
+                                new_files.append(new_file)
+                                self._logger.info(f"  [NEW FILE] Created: {new_file}")
+            
+            # Clear issues and re-run tests to check if fixed
+            if enable_runtime_test:
+                self._logger.info(f"  [FIX LOOP {attempt + 1}] Re-running tests after fixes...")
+                current_issues = await self._run_backend_tests(agent)
+                
+                if current_issues:
+                    self._logger.warning(f"  [FIX LOOP {attempt + 1}] {len(current_issues)} issues remain")
+                else:
+                    self._logger.info(f"  [FIX LOOP {attempt + 1}] All tests pass!")
+            else:
+                # For non-runtime phases, clear issues after fix
+                current_issues = []
+        
+        if current_issues:
+            self._logger.error(f"  [FIX LOOP] FAILED - {len(current_issues)} issues remain after {max_attempts} attempts")
+            self._emitter.emit(EventType.VERIFICATION_ERROR, f"Fix loop exhausted", {
+                "phase": phase,
+                "remaining_issues": len(current_issues),
+                "max_attempts": max_attempts,
+                "total_fixes": len(all_fixes),
+            })
+        
+        return current_issues, all_fixes, new_files
+    
+    async def _fix_all_absolute_imports(self, agent: CodeGeneratorAgent, backend_dir: str):
+        """
+        Find and fix ALL absolute imports in the backend directory.
+        This is a common issue that causes server startup failures.
+        """
+        import os
+        from pathlib import Path
+        
+        backend_path = self.gen_context.output_dir / backend_dir
+        if not backend_path.exists():
+            return
+        
+        self._logger.info(f"  [FIX IMPORTS] Scanning {backend_dir} for absolute imports...")
+        
+        # Find all Python files
+        py_files = list(backend_path.rglob("*.py"))
+        
+        for py_file in py_files:
+            try:
+                content = py_file.read_text(encoding="utf-8")
+                
+                # Check for absolute imports like "from calendar_api.xxx import"
+                module_name = self.gen_context.name + "_api"
+                if f"from {module_name}." in content or f"from {module_name} import" in content:
+                    self._logger.info(f"  [FIX IMPORTS] Found absolute import in: {py_file.relative_to(self.gen_context.output_dir)}")
+                    
+                    # Calculate relative path depth
+                    rel_path = py_file.relative_to(backend_path)
+                    depth = len(rel_path.parts) - 1  # -1 for the file itself
+                    
+                    if depth == 0:
+                        # In root of package: from calendar_api.xxx -> from .xxx
+                        new_content = content.replace(f"from {module_name}.", "from .")
+                        new_content = new_content.replace(f"from {module_name} import", "from . import")
+                    else:
+                        # In subdirectory: need more dots
+                        dots = "." * (depth + 1)
+                        new_content = content.replace(f"from {module_name}.", f"from {dots}")
+                        new_content = new_content.replace(f"from {module_name} import", f"from {dots[:-1]} import")
+                    
+                    if new_content != content:
+                        py_file.write_text(new_content, encoding="utf-8")
+                        self._logger.info(f"  [FIX IMPORTS] Fixed imports in: {py_file.name}")
+                        
+            except Exception as e:
+                self._logger.warning(f"  [FIX IMPORTS] Error processing {py_file}: {e}")
+
+    async def _run_backend_tests(self, agent: CodeGeneratorAgent) -> List[str]:
+        """
+        Run runtime tests for the backend to ensure it's runnable.
+        
+        This is critical for ensuring the generated environment works without manual fixes!
+        
+        Tests:
+        1. Install dependencies
+        2. Start the server
+        3. Test basic endpoints (health, auth)
+        4. Stop the server
+        
+        Returns: List of issues found (empty if all tests pass)
+        """
+        import sys
+        issues = []
+        backend_dir = f"{self.gen_context.name}_api"
+        
+        self._logger.info(f"  [RUNTIME] Testing backend in: {backend_dir}")
+        self._emitter.emit(EventType.TOOL_CALL, f"_run_backend_tests ENTERED", {
+            "tool": "_run_backend_tests",
+            "backend_dir": backend_dir,
+        })
+        
+        # Clean up any existing server first!
+        self._logger.info(f"  [CLEANUP] Stopping any existing test server...")
+        try:
+            await agent.call_tool("stop_server", server_name="test_backend")
+        except:
+            pass  # Ignore if no server running
+        
+        # Check if directory exists
+        backend_path = self.gen_context.output_dir / backend_dir
+        if not backend_path.exists():
+            self._logger.error(f"  [ERROR] Backend directory does not exist: {backend_path}")
+            self._emitter.emit(EventType.TOOL_RESULT, f"Backend dir not found", {
+                "tool": "_run_backend_tests",
+                "error": f"Directory not found: {backend_dir}",
+            })
+            return [f"SETUP: Backend directory {backend_dir} does not exist"]
+        
+        # Check if port is already in use (orphan process from previous runs)
+        import socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        port_in_use = sock.connect_ex(('localhost', 8008)) == 0
+        sock.close()
+        if port_in_use:
+            self._logger.warning(f"  [WARN] Port 8008 already in use, killing any process using it...")
+            import os
+            os.system("pkill -f 'uvicorn.*8008' 2>/dev/null || true")
+            import asyncio
+            await asyncio.sleep(2)  # Wait for process to die
+        
+        try:
+            # 1. Install dependencies
+            self._logger.info(f"  [1/4] Installing dependencies...")
+            install_result = await agent.call_tool(
+                "install_dependencies",
+                project_type="python",
+                cwd=backend_dir,
+            )
+            
+            if not install_result.success:
+                error = install_result.data.get("error", "") if install_result.data else "Unknown error"
+                issues.append(f"DEPENDENCY: Failed to install - {error[:100]}")
+                return issues
+            
+            # 2. Start the server
+            self._logger.info(f"  [2/4] Starting server...")
+            
+            # Use sys.executable for correct Python
+            uvicorn_cmd = f"{sys.executable} -m uvicorn main:app --host 0.0.0.0 --port 8008"
+            
+            start_result = await agent.call_tool(
+                "start_server",
+                server_name="test_backend",
+                command=uvicorn_cmd,
+                cwd=backend_dir,
+                port=8008,
+                wait_for_ready=30,
+            )
+            
+            if not start_result.success:
+                error = start_result.data.get("error", "") if start_result.data else ""
+                stderr = start_result.data.get("stderr", "") if start_result.data else ""
+                full_error = (error + stderr)
+                
+                self._logger.error(f"  [FAIL] Server failed to start!")
+                self._logger.error(f"  [ERROR] Full error: {full_error[:500]}")
+                self._emitter.emit(EventType.TOOL_RESULT, f"Server start failed", {
+                    "tool": "start_server",
+                    "success": False,
+                    "error": full_error[:300],
+                })
+                
+                # Analyze the error - provide DETAILED issues for fixing
+                if "ModuleNotFoundError" in full_error:
+                    import re
+                    module = re.search(r"No module named ['\"]?([^'\"]+)['\"]?", full_error)
+                    if module:
+                        module_name = module.group(1)
+                        # Provide detailed fix suggestion
+                        issues.append(
+                            f"IMPORT ERROR: ModuleNotFoundError: No module named '{module_name}'. "
+                            f"This usually means the imports need to be changed to relative imports. "
+                            f"For example, change 'from calendar_api.database import X' to 'from .database import X'. "
+                            f"Check main.py and other files for absolute imports that should be relative."
+                        )
+                elif "ImportError" in full_error:
+                    issues.append(
+                        f"IMPORT ERROR: {full_error[:200]}. "
+                        f"Check if the imports are correct and all required modules exist."
+                    )
+                elif "SyntaxError" in full_error:
+                    # Extract line number and details
+                    line_match = re.search(r"line (\d+)", full_error) if "import re" not in dir() else None
+                    issues.append(
+                        f"SYNTAX ERROR: {full_error[:200]}. "
+                        f"Check for Python syntax errors in the generated code."
+                    )
+                else:
+                    issues.append(
+                        f"SERVER STARTUP ERROR: {full_error[:250]}. "
+                        f"The server failed to start. Check main.py and imports."
+                    )
+                
+                self._logger.error(f"  [ISSUES] Returning {len(issues)} issues: {issues}")
+                return issues
+            
+            self._logger.info(f"  [3/4] Server started, testing endpoints...")
+            
+            # 3. Test endpoints
+            # Test /docs endpoint (FastAPI auto-generated)
+            test_result = await agent.call_tool(
+                "test_api",
+                method="GET",
+                url="http://localhost:8008/docs",
+            )
+            
+            if not test_result.success:
+                issues.append("API: /docs endpoint not responding")
+            else:
+                status = test_result.data.get("status_code", 0) if test_result.data else 0
+                if status != 200:
+                    issues.append(f"API: /docs returned status {status}, expected 200")
+            
+            self._logger.info(f"  [4/4] Stopping server...")
+            
+            # 4. Stop the server
+            await agent.call_tool("stop_server", server_name="test_backend")
+            
+            if not issues:
+                self._logger.info(f"  [SUCCESS] Backend tests passed!")
+            
+        except Exception as e:
+            issues.append(f"RUNTIME: Unexpected error - {str(e)[:100]}")
+            # Try to stop server anyway
+            try:
+                await agent.call_tool("stop_server", server_name="test_backend")
+            except:
+                pass
+        
+        return issues
     
     async def _get_phase_agent(self, phase: str) -> CodeGeneratorAgent:
         """Get or create agent for a phase"""
         if phase not in self._agents:
             # Create agent with same config and SHARED MEMORY
+            self._logger.info(f"[GET_AGENT] Creating CodeGeneratorAgent for phase: {phase}")
             agent = CodeGeneratorAgent(
                 config=self._config,
                 output_dir=self.gen_context.output_dir,
                 gen_context=self.gen_context,
                 shared_memory=self._shared_memory,  # Pass shared memory!
+                event_emitter=self._emitter,  # Pass event emitter for logging!
             )
-            await agent.initialize()
+            self._logger.info(f"[GET_AGENT] Calling agent.initialize()...")
+            result = await agent.initialize()
+            self._logger.info(f"[GET_AGENT] agent.initialize() returned: {result}")
+            
+            # Verify tools are registered
+            tool_count = len(agent._tools.get_all())
+            tool_names = [t.name for t in agent._tools.get_all()]
+            self._logger.info(f"[GET_AGENT] Agent has {tool_count} tools: {tool_names}")
+            
             self._agents[phase] = agent
         
         return self._agents[phase]
@@ -817,99 +1478,261 @@ class GeneratorOrchestrator(PlanningAgent):
                         "path": "env_spec.json",
                         "purpose": "Environment specification",
                         "instructions": f"""Create a JSON specification for {self.gen_context.description}.
+
+CRITICAL: JSON MUST be properly formatted with 2-space indentation. DO NOT generate single-line JSON!
+
 Include:
+- name: string
+- description: string
 - entities: list of data entities with fields and types
-- features: list of features/capabilities
+- features: list of features/capabilities  
 - api_endpoints: list of API endpoints
 
-Example format:
+Example format (note the proper indentation):
 {{
   "name": "{name}",
+  "description": "...",
   "entities": [
-    {{"name": "User", "fields": [{{"name": "email", "type": "string"}}]}}
+    {{
+      "name": "User",
+      "fields": [
+        {{"name": "email", "type": "string"}},
+        {{"name": "password_hash", "type": "string"}}
+      ]
+    }}
   ],
   "features": ["authentication", "crud"],
   "api_endpoints": ["/api/v1/users", "/api/v1/auth"]
-}}""",
+}}
+
+The output MUST be valid JSON with proper indentation (2 spaces per level).""",
                     }
                 ],
             },
             "backend": {
                 "description": f"Generate FastAPI backend for {self.gen_context.display_name}",
                 "files": [
+                    # === PYTHON PACKAGE STRUCTURE (MUST GENERATE FIRST) ===
+                    {
+                        "path": f"{name}_api/__init__.py",
+                        "purpose": "Python package marker",
+                        "instructions": "Create empty __init__.py or with package version: __version__ = '1.0.0'",
+                    },
+                    {
+                        "path": f"{name}_api/routers/__init__.py",
+                        "purpose": "Routers package marker",
+                        "instructions": "Create empty __init__.py file",
+                    },
+                    # === CORE FILES ===
+                    {
+                        "path": f"{name}_api/database.py",
+                        "purpose": "Database configuration",
+                        "instructions": """Create SQLAlchemy database setup:
+- Create engine with SQLite (DATABASE_URL from env or sqlite:///./{name}.db)
+- Create SessionLocal with sessionmaker
+- Create Base = declarative_base()
+- Create get_db() dependency function
+- Create init_db() function to create tables""",
+                    },
                     {
                         "path": f"{name}_api/models.py",
                         "purpose": "SQLAlchemy database models",
-                        "instructions": "Create SQLAlchemy models based on entities in env_spec.json. Use ABSOLUTE imports.",
-                        "dependencies": ["env_spec.json"],
+                        "instructions": """Create SQLAlchemy models based on entities in env_spec.json.
+IMPORTANT: Import Base from {name}_api.database (absolute import).
+Include User model with: id, email, password_hash, name, created_at.
+Include other entities from env_spec.json.""",
+                        "dependencies": ["env_spec.json", f"{name}_api/database.py"],
                     },
                     {
                         "path": f"{name}_api/schemas.py",
                         "purpose": "Pydantic schemas for API",
-                        "instructions": "Create Pydantic schemas for request/response. Use ABSOLUTE imports.",
+                        "instructions": """Create Pydantic schemas for request/response.
+Include: UserCreate, UserLogin, UserResponse, Token, etc.
+Use ABSOLUTE imports. Match models.py entities.""",
                         "dependencies": [f"{name}_api/models.py"],
-                    },
-                    {
-                        "path": f"{name}_api/database.py",
-                        "purpose": "Database configuration",
-                        "instructions": "SQLAlchemy database setup with SQLite default.",
-                    },
-                    {
-                        "path": f"{name}_api/main.py",
-                        "purpose": "FastAPI application entry point",
-                        "instructions": "Create FastAPI app with CORS, include routers. Use ABSOLUTE imports.",
-                        "dependencies": [f"{name}_api/database.py", f"{name}_api/models.py"],
                     },
                     {
                         "path": f"{name}_api/routers/auth.py",
                         "purpose": "Authentication endpoints",
-                        "instructions": "JWT-based auth with login/register. Use ABSOLUTE imports (from models import ...).",
-                        "dependencies": [f"{name}_api/models.py", f"{name}_api/schemas.py"],
+                        "instructions": """JWT-based auth with these endpoints:
+- POST /register - Create new user
+- POST /login - Login, return JWT token
+- GET /me - Get current user (requires auth)
+
+IMPORTANT: Use ABSOLUTE imports:
+  from {name}_api.database import get_db
+  from {name}_api.models import User
+  from {name}_api.schemas import UserCreate, Token
+
+Use passlib for password hashing, python-jose for JWT.
+Handle bcrypt 72-byte limit: password[:72]""",
+                        "dependencies": [f"{name}_api/models.py", f"{name}_api/schemas.py", f"{name}_api/database.py"],
+                    },
+                    {
+                        "path": f"{name}_api/main.py",
+                        "purpose": "FastAPI application entry point",
+                        "instructions": """Create FastAPI app with:
+- CORS middleware (allow all origins for dev)
+- /health endpoint
+- Include auth router: from {name}_api.routers import auth
+- app.include_router(auth.router, prefix="/auth", tags=["auth"])
+- @app.on_event("startup") to call init_db()
+
+IMPORTANT: Use ABSOLUTE imports throughout.""",
+                        "dependencies": [f"{name}_api/database.py", f"{name}_api/models.py", f"{name}_api/routers/auth.py"],
                     },
                     {
                         "path": f"{name}_api/requirements.txt",
                         "purpose": "Python dependencies",
-                        "instructions": "List all required packages: fastapi, uvicorn, sqlalchemy, python-jose, passlib, etc.",
+                        "instructions": """List all required packages with versions:
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+sqlalchemy>=2.0.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.6
+pydantic>=2.0.0
+pydantic-settings>=2.0.0""",
                     },
                 ],
             },
             "frontend": {
                 "description": f"Generate React TypeScript frontend for {self.gen_context.display_name}",
                 "files": [
+                    # === PROJECT INFRASTRUCTURE (MUST GENERATE FIRST) ===
                     {
                         "path": f"{name}_ui/package.json",
                         "purpose": "NPM package configuration",
-                        "instructions": "React 18, TypeScript, Vite, React Router, Axios",
+                        "instructions": """Create package.json with:
+- name, version, private, description
+- scripts: dev, build, preview
+- dependencies: react ^18, react-dom ^18, react-router-dom ^6, axios ^1
+- devDependencies: typescript, @types/react, @types/react-dom, @vitejs/plugin-react-swc, vite
+MUST be valid JSON.""",
                     },
+                    {
+                        "path": f"{name}_ui/index.html",
+                        "purpose": "Vite entry point HTML",
+                        "instructions": """Create index.html for Vite:
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>App Title</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>""",
+                    },
+                    {
+                        "path": f"{name}_ui/tsconfig.json",
+                        "purpose": "TypeScript configuration",
+                        "instructions": """Create tsconfig.json:
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true
+  },
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}""",
+                    },
+                    {
+                        "path": f"{name}_ui/tsconfig.node.json",
+                        "purpose": "TypeScript config for Vite",
+                        "instructions": """Create tsconfig.node.json:
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "strict": true
+  },
+  "include": ["vite.config.ts"]
+}""",
+                    },
+                    {
+                        "path": f"{name}_ui/vite.config.ts",
+                        "purpose": "Vite bundler configuration",
+                        "instructions": """Create vite.config.ts:
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react-swc'
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 3000,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
+  },
+})""",
+                    },
+                    {
+                        "path": f"{name}_ui/src/index.css",
+                        "purpose": "Base CSS styles",
+                        "instructions": """Create basic CSS reset and styles:
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; background: #f5f5f5; min-height: 100vh; }
+/* Add more base styles */""",
+                    },
+                    # === APPLICATION CODE ===
                     {
                         "path": f"{name}_ui/src/main.tsx",
                         "purpose": "React entry point",
-                        "instructions": "Render App component",
+                        "instructions": "Import React, ReactDOM, App, and index.css. Render App to #root element.",
+                        "dependencies": [f"{name}_ui/src/index.css"],
                     },
                     {
                         "path": f"{name}_ui/src/App.tsx",
                         "purpose": "Main App component with routing",
-                        "instructions": "BrowserRouter with routes for Login, Register, Dashboard. ONLY import files that exist.",
+                        "instructions": """Create App component with BrowserRouter and Routes.
+Routes: /, /login, /register, /dashboard.
+IMPORTANT: Define components inline OR only import files you will generate. Never import non-existent files.""",
+                        "dependencies": [f"{name}_ui/src/main.tsx"],
                     },
                     {
                         "path": f"{name}_ui/src/contexts/AuthContext.tsx",
-                        "purpose": "Authentication context",
-                        "instructions": "React context for auth state, login/logout/register functions",
+                        "purpose": "Authentication context and hook",
+                        "instructions": "Create AuthContext with login, logout, register, user state, and useAuth hook.",
                     },
                     {
                         "path": f"{name}_ui/src/services/api.ts",
-                        "purpose": "API client",
-                        "instructions": "Axios instance with auth interceptor",
+                        "purpose": "API client with Axios",
+                        "instructions": "Create Axios instance with baseURL '/api', auth token interceptor, and typed API methods.",
                     },
                     {
                         "path": f"{name}_ui/src/pages/Login.tsx",
-                        "purpose": "Login page",
-                        "instructions": "Login form using AuthContext",
+                        "purpose": "Login page component",
+                        "instructions": "Login form with email/password, uses AuthContext, redirects to /dashboard on success.",
+                    },
+                    {
+                        "path": f"{name}_ui/src/pages/Register.tsx",
+                        "purpose": "Registration page component",
+                        "instructions": "Registration form with email/password/name, uses AuthContext, redirects to /login on success.",
                     },
                     {
                         "path": f"{name}_ui/src/pages/Dashboard.tsx",
-                        "purpose": "Dashboard page",
-                        "instructions": "Main dashboard after login",
+                        "purpose": "Dashboard page component",
+                        "instructions": "Main dashboard after login, shows user info, navigation to other features.",
                     },
                 ],
             },

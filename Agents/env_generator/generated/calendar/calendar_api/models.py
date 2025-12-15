@@ -1,166 +1,98 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import List, Optional
 
 from sqlalchemy import (
     Boolean,
     Column,
+    Date,
     DateTime,
+    Enum,
     ForeignKey,
+    Integer,
     String,
     Text,
+    Time,
     UniqueConstraint,
     Index,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from calendar_api.database import Base
-
-
-def _uuid_str() -> str:
-    return str(uuid.uuid4())
+from .database import Base
 
 
 class User(Base):
-    """Represents an authenticated user of the calendar application."""
+    """
+    Application user.
+
+    Includes core authentication and profile fields. Password is stored as a hash.
+    """
 
     __tablename__ = "users"
 
-    id = Column(
-        String(36),
-        primary_key=True,
-        default=_uuid_str,
-        unique=True,
-        nullable=False,
+    id: str = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    email: str = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash: str = Column(String(255), nullable=False)
+    name: Optional[str] = Column(String(100), nullable=True)
+    created_at: datetime = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    password_hash = Column(String(255), nullable=False)
-
-    first_name = Column(String(100), nullable=True)
-    last_name = Column(String(100), nullable=True)
-    timezone = Column(String(64), nullable=False, default="UTC")
-
-    is_active = Column(Boolean, nullable=False, default=True)
-    is_verified = Column(Boolean, nullable=False, default=False)
-
-    created_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-        onupdate=func.now(),
-    )
-    last_login_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    auth_sessions = relationship(
-        "AuthSession",
-        back_populates="user",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
-    )
-    calendars = relationship(
+    calendars: List["Calendar"] = relationship(
         "Calendar",
         back_populates="owner",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
-    attending_events = relationship(
-        "EventAttendee",
+    events_created: List["Event"] = relationship(
+        "Event",
+        back_populates="creator",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        foreign_keys="Event.creator_id",
+    )
+    notifications: List["Notification"] = relationship(
+        "Notification",
         back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
 
     def __repr__(self) -> str:
-        return f"<User id={self.id} email={self.email!r}>"
-
-
-class AuthSession(Base):
-    """Represents an authenticated session or refresh token for a user."""
-
-    __tablename__ = "auth_sessions"
-
-    id = Column(
-        String(36),
-        primary_key=True,
-        default=_uuid_str,
-        unique=True,
-        nullable=False,
-    )
-    user_id = Column(
-        String(36),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-
-    refresh_token = Column(String(512), nullable=False, unique=True, index=True)
-    user_agent = Column(String(512), nullable=True)
-    ip_address = Column(String(64), nullable=True)
-
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    revoked_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-    )
-
-    # Relationships
-    user = relationship("User", back_populates="auth_sessions")
-
-    def __repr__(self) -> str:
-        return f"<AuthSession id={self.id} user_id={self.user_id}>"
+        return f"<User id={self.id!r} email={self.email!r}>"
 
 
 class Calendar(Base):
-    """Logical collection of events, typically owned by a user."""
+    """
+    A calendar that groups events and is owned by a user.
+    """
 
     __tablename__ = "calendars"
 
-    id = Column(
-        String(36),
-        primary_key=True,
-        default=_uuid_str,
-        unique=True,
-        nullable=False,
-    )
-    owner_id = Column(
+    id: str = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    owner_id: str = Column(
         String(36),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-
-    name = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
-    color = Column(String(32), nullable=True)
-    is_default = Column(Boolean, nullable=False, default=False)
-    is_shared = Column(Boolean, nullable=False, default=False)
-
-    created_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
+    name: str = Column(String(200), nullable=False)
+    description: Optional[str] = Column(Text, nullable=True)
+    color: Optional[str] = Column(String(20), nullable=True)
+    is_public: bool = Column(Boolean, nullable=False, default=False)
+    created_at: datetime = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-    updated_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-        onupdate=func.now(),
+    updated_at: Optional[datetime] = Column(
+        DateTime(timezone=True), nullable=True, onupdate=func.now()
     )
 
-    # Relationships
-    owner = relationship("User", back_populates="calendars")
-    events = relationship(
+    owner: User = relationship("User", back_populates="calendars")
+    events: List["Event"] = relationship(
         "Event",
         back_populates="calendar",
         cascade="all, delete-orphan",
@@ -168,66 +100,66 @@ class Calendar(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("owner_id", "name", name="uq_calendars_owner_name"),
+        Index("ix_calendars_owner_id_name", "owner_id", "name"),
     )
 
     def __repr__(self) -> str:
-        return f"<Calendar id={self.id} name={self.name!r} owner_id={self.owner_id}>"
+        return f"<Calendar id={self.id!r} name={self.name!r}>"
 
 
 class Event(Base):
-    """Represents an event within a calendar."""
+    """
+    A calendar event with time range and optional recurrence.
+    """
 
     __tablename__ = "events"
 
-    id = Column(
-        String(36),
-        primary_key=True,
-        default=_uuid_str,
-        unique=True,
-        nullable=False,
-    )
-    calendar_id = Column(
+    id: str = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    calendar_id: str = Column(
         String(36),
         ForeignKey("calendars.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-
-    title = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
-    location = Column(String(255), nullable=True)
-
-    start_at = Column(DateTime(timezone=True), nullable=False, index=True)
-    end_at = Column(DateTime(timezone=True), nullable=False, index=True)
-    all_day = Column(Boolean, nullable=False, default=False)
-
-    # Optional recurrence rule (e.g., RFC 5545 RRULE string)
-    recurrence_rule = Column(String(1024), nullable=True)
-
-    is_cancelled = Column(Boolean, nullable=False, default=False)
-
-    created_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-        onupdate=func.now(),
+    creator_id: str = Column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
-    # Relationships
-    calendar = relationship("Calendar", back_populates="events")
-    attendees = relationship(
+    title: str = Column(String(255), nullable=False)
+    description: Optional[str] = Column(Text, nullable=True)
+    location: Optional[str] = Column(String(255), nullable=True)
+
+    start_time: datetime = Column(DateTime(timezone=True), nullable=False, index=True)
+    end_time: datetime = Column(DateTime(timezone=True), nullable=False, index=True)
+    all_day: bool = Column(Boolean, nullable=False, default=False)
+
+    # Basic recurrence support via RRULE-like string or similar
+    recurrence_rule: Optional[str] = Column(String(500), nullable=True)
+
+    is_cancelled: bool = Column(Boolean, nullable=False, default=False)
+
+    created_at: datetime = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Optional[datetime] = Column(
+        DateTime(timezone=True), nullable=True, onupdate=func.now()
+    )
+
+    calendar: Calendar = relationship("Calendar", back_populates="events")
+    creator: Optional[User] = relationship(
+        "User", back_populates="events_created", foreign_keys=[creator_id]
+    )
+
+    attendees: List["EventAttendee"] = relationship(
         "EventAttendee",
         back_populates="event",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
-    reminders = relationship(
+    reminders: List["Reminder"] = relationship(
         "Reminder",
         back_populates="event",
         cascade="all, delete-orphan",
@@ -235,57 +167,40 @@ class Event(Base):
     )
 
     __table_args__ = (
-        Index("ix_events_calendar_start_at", "calendar_id", "start_at"),
+        Index("ix_events_calendar_start_time", "calendar_id", "start_time"),
     )
 
     def __repr__(self) -> str:
-        return f"<Event id={self.id} title={self.title!r} calendar_id={self.calendar_id}>"
+        return f"<Event id={self.id!r} title={self.title!r}>"
 
 
 class EventAttendee(Base):
-    """Association table between events and users, with RSVP status."""
+    """
+    Join table linking users to events with attendance status.
+    """
 
     __tablename__ = "event_attendees"
 
-    id = Column(
-        String(36),
-        primary_key=True,
-        default=_uuid_str,
-        unique=True,
-        nullable=False,
-    )
-    event_id = Column(
+    id: int = Column(Integer, primary_key=True, autoincrement=True)
+    event_id: str = Column(
         String(36),
         ForeignKey("events.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    user_id = Column(
+    user_id: str = Column(
         String(36),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
 
-    # Example RSVP statuses: "pending", "accepted", "declined", "tentative"
-    status = Column(String(32), nullable=False, default="pending")
-    is_organizer = Column(Boolean, nullable=False, default=False)
+    # e.g., "pending", "accepted", "declined", "tentative"
+    status: str = Column(String(20), nullable=False, default="pending")
+    is_organizer: bool = Column(Boolean, nullable=False, default=False)
 
-    created_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-        onupdate=func.now(),
-    )
-
-    # Relationships
-    event = relationship("Event", back_populates="attendees")
-    user = relationship("User", back_populates="attending_events")
+    event: Event = relationship("Event", back_populates="attendees")
+    user: User = relationship("User")
 
     __table_args__ = (
         UniqueConstraint(
@@ -296,53 +211,74 @@ class EventAttendee(Base):
     )
 
     def __repr__(self) -> str:
-        return (
-            f"<EventAttendee id={self.id} event_id={self.event_id} "
-            f"user_id={self.user_id} status={self.status!r}>"
-        )
+        return f"<EventAttendee event_id={self.event_id!r} user_id={self.user_id!r}>"
 
 
 class Reminder(Base):
-    """Represents a reminder associated with an event."""
+    """
+    Reminder associated with an event, to trigger notifications relative to start time.
+    """
 
     __tablename__ = "reminders"
 
-    id = Column(
-        String(36),
-        primary_key=True,
-        default=_uuid_str,
-        unique=True,
-        nullable=False,
-    )
-    event_id = Column(
+    id: int = Column(Integer, primary_key=True, autoincrement=True)
+    event_id: str = Column(
         String(36),
         ForeignKey("events.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
 
-    # Number of minutes before event.start_at when reminder should trigger
-    minutes_before = Column(
-        String(16), nullable=False
-    )  # could be int; kept string if schemas expect it
+    # minutes before event start
+    minutes_before_start: int = Column(Integer, nullable=False, default=15)
 
-    method = Column(
-        String(32),
+    method: str = Column(
+        String(20),
         nullable=False,
-        default="email",
-    )  # e.g., "email", "popup", "sms"
-
-    created_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
+        default="email",  # e.g., "email", "push"
     )
 
-    # Relationships
-    event = relationship("Event", back_populates="reminders")
+    created_at: datetime = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    event: Event = relationship("Event", back_populates="reminders")
 
     def __repr__(self) -> str:
-        return (
-            f"<Reminder id={self.id} event_id={self.event_id} "
-            f"minutes_before={self.minutes_before!r} method={self.method!r}>"
-        )
+        return f"<Reminder id={self.id!r} event_id={self.event_id!r}>"
+
+
+class Notification(Base):
+    """
+    Notification generated for a user (e.g., from reminders or shared calendar changes).
+    """
+
+    __tablename__ = "notifications"
+
+    id: int = Column(Integer, primary_key=True, autoincrement=True)
+    user_id: str = Column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    # Optional link back to an event that this notification concerns
+    event_id: Optional[str] = Column(
+        String(36),
+        ForeignKey("events.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    message: str = Column(Text, nullable=False)
+    is_read: bool = Column(Boolean, nullable=False, default=False)
+    created_at: datetime = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    user: User = relationship("User", back_populates="notifications")
+    event: Optional[Event] = relationship("Event")
+
+    def __repr__(self) -> str:
+        return f"<Notification id={self.id!r} user_id={self.user_id!r}>"

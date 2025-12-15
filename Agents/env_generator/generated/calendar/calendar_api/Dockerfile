@@ -1,25 +1,26 @@
 FROM python:3.11-slim
 
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
+# Set working directory
 WORKDIR /app
 
-# Install system dependencies only if needed; keep minimal for now
+# Install system dependencies (if needed in the future)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY openenv_adapter/requirements.txt ./openenv_adapter/requirements.txt
-RUN pip install --upgrade pip && \
-    pip install -r openenv_adapter/requirements.txt
+# Copy and install Python dependencies
+COPY calendar_api/requirements.txt ./calendar_api/requirements.txt
+RUN pip install --no-cache-dir -r calendar_api/requirements.txt
 
 # Copy application code
-COPY . .
+COPY calendar_api ./calendar_api
 
+# Expose the application port
 EXPOSE 8000
 
-# Adjust the module path and app object if they differ in main.py
-CMD ["uvicorn", "openenv_adapter.server.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default command to run the FastAPI app with Uvicorn
+CMD ["uvicorn", "calendar_api.main:app", "--host", "0.0.0.0", "--port", "8000"]

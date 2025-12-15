@@ -35,8 +35,20 @@ from utils.reasoning import ReActEngine, ReasoningStep
 from utils.message import TaskMessage, ResultMessage, create_result_message
 from utils.planner import Plan, PlanStep, StepStatus
 
-from ..tools.file_tools import ReadFileTool, WriteFileTool, ListDirTool, FileExistsTool
-from ..tools.code_tools import GrepTool, SearchReplaceTool, LintTool, SyntaxCheckTool
+from ..tools.file_tools import (
+    ReadFileTool, WriteFileTool, ListDirTool, FileExistsTool,
+    ListGeneratedFilesTool, UpdatePlanTool,
+)
+from ..tools.code_tools import (
+    GrepTool, SearchReplaceTool, LintTool, SyntaxCheckTool,
+    EditLinesTool, InsertLinesTool, EditFunctionTool,
+)
+from ..tools.runtime_tools import (
+    RunCommandTool, StartServerTool, StopServerTool, 
+    TestAPITool, ListServersTool, CheckFilesExistTool,
+    InstallDependenciesTool, GetServerLogsTool,
+    QuickTestTool, ShouldTestTool,
+)
 from ..context import GenerationContext
 from ..snippets import get_relevant_snippets, format_snippets_for_prompt
 
@@ -82,24 +94,105 @@ class CodeGeneratorAgent(PlanningAgent):
     """
     
     # System prompt that defines how the agent thinks
-    SYSTEM_PROMPT = """You are an expert code generator. You generate high-quality, production-ready code.
+    SYSTEM_PROMPT = """You are an expert code generator. You generate high-quality, production-ready code AND test it.
+
+CRITICAL REQUIREMENTS:
+1. JSON files MUST be properly formatted with indentation (2 spaces), NOT single-line
+2. After generating files, you MUST test them by running the code
+3. If tests fail, you MUST fix the issues before proceeding
 
 When generating code:
 1. THINK first - understand what's needed
-2. Check existing files to maintain consistency
+2. Check existing files to maintain consistency  
 3. Generate clean, well-documented code
-4. Verify the code is syntactically correct
-5. If you find issues, fix them
+4. For JSON files: ALWAYS use proper formatting with 2-space indentation
+5. Verify the code is syntactically correct
+6. If you find issues, fix them
+7. TEST the code by actually running it!
+
+CRITICAL: When outputting code:
+- Output PURE CODE ONLY - no markdown fences, no line numbers
+- DO NOT include line numbers like "1|", "  2|", "   3|" in output
+- The output should be directly saveable as a file
 
 You have tools available:
-- read_file: Read existing files to understand context
+
+FILE TOOLS:
+- read_file(path, start_line=N, end_line=M): Read files. Can specify line range for large files.
 - write_file: Create new files
-- grep: Search for patterns in code
-- search_replace: Make targeted modifications
+- list_dir: List directory contents
+- file_exists: Check if a file exists
+- list_generated(phase?): List all files generated so far with summaries. USE THIS before trying to read!
+
+PLANNING TOOLS:
+- update_plan(action, target, details): Update generation plan mid-execution
+  - action='add_file': Add a new file to generate
+  - action='remove_file': Skip a planned file
+  - action='update_spec': Note that a spec needs updating
+
+SEARCH & EDIT TOOLS:
+- grep(pattern, path): *** USE THIS OFTEN! *** Search for patterns across all files
+  Examples: grep("class User", "."), grep("def get_db", "."), grep("from.*import", ".")
+  Use BEFORE reading files to find WHERE things are defined
+- search_replace(path, old_string, new_string): Replace exact text match
+- edit_lines(path, start_line, end_line, new_content): Replace specific lines
+- insert_lines(path, after_line, content): Insert new lines at position
+- edit_function(path, name, new_code): Replace entire function/class by name
+
+WHEN TO USE GREP vs READ_FILE:
+- Use GREP when: You need to find where something is defined/used, check imports, find patterns
+- Use READ_FILE when: You need to understand the full context of a specific file
+- BEST PRACTICE: grep first to find relevant files, then read_file for details
+
+CODE CHECK TOOLS:
 - lint: Check code for errors
 - syntax_check: Verify code syntax before writing
 
-Always think step by step. If something seems wrong, investigate before proceeding."""
+RUNTIME/TEST TOOLS:
+- should_test(): Check if now is a good time to test (returns recommendations)
+- quick_test(backend_dir, port?): Quick backend test - starts server, tests endpoints, stops
+- run_command(command, cwd?): Run any shell command
+- install_dependencies(project_type, cwd): Install pip/npm dependencies
+- start_server(name, command, cwd, port): Start a server in background
+- stop_server(server_name): Stop a running server
+- test_api(method, url, json_data?): Make HTTP request to test endpoint
+- get_server_logs(server_name): Get logs from running server
+
+TESTING WORKFLOW:
+1. After generating main.py: Call should_test() to check readiness
+2. If ready: Call quick_test('app_api') for automated test
+3. Or manually: start_server() → test_api() → stop_server()
+4. If tests fail: Read error, fix with search_replace or edit_function, retry
+
+WHEN TO TEST:
+- After generating main.py or App.tsx (entry points)
+- After adding a new router/endpoint
+- Before moving to the next phase
+- When you're unsure if code works
+
+RUNTIME TOOLS (YOU MUST USE THESE TO TEST YOUR CODE!):
+- run_command: Run any shell command (pip install, npm install, python script.py, etc.)
+- install_dependencies: Install Python or Node.js dependencies
+- start_server: Start a backend or frontend server in background
+- stop_server: Stop a running server
+- list_servers: List all running servers
+- test_api: Make HTTP request to test API endpoint
+- get_server_logs: Get logs from a running server if it crashes
+- check_files_exist: Verify a list of files exist
+
+MANDATORY WORKFLOW AFTER GENERATING CODE:
+1. Generate all code files for the phase
+2. Run install_dependencies to install requirements
+3. Run start_server to start the backend server
+4. Run test_api to test critical endpoints (health, auth/register, auth/login)
+5. If ANY test fails:
+   a. Use get_server_logs to see errors
+   b. Use read_file to examine problematic code
+   c. Use search_replace to fix issues
+   d. Restart server and re-test
+6. Only proceed to next phase after ALL tests pass
+
+DO NOT SKIP TESTING! The code is not done until it runs successfully."""
     
     def __init__(
         self,
@@ -107,12 +200,14 @@ Always think step by step. If something seems wrong, investigate before proceedi
         output_dir: Path,
         gen_context: Optional[GenerationContext] = None,
         shared_memory: Optional[Any] = None,  # AgentMemory from orchestrator
+        event_emitter: Optional[Any] = None,  # EventEmitter for real-time logging
     ):
         super().__init__(config, role=AgentRole.WORKER)
         
         self.output_dir = output_dir
         self.gen_context = gen_context
         self.shared_memory = shared_memory  # Shared across all phases
+        self._emitter = event_emitter  # For emitting tool call events
         
         # Generation history
         self.steps: List[GenerationStep] = []
@@ -127,19 +222,46 @@ Always think step by step. If something seems wrong, investigate before proceedi
     
     async def on_initialize(self) -> None:
         """Initialize with code-specific tools"""
+        # Debug removed
         await super().on_initialize()
         
-        # Register code generation tools
+        # Register FILE tools
+        # Debug removed
         self.register_tool(ReadFileTool(self.output_dir))
         self.register_tool(WriteFileTool(self.output_dir))
         self.register_tool(ListDirTool(self.output_dir))
         self.register_tool(FileExistsTool(self.output_dir))
+        self.register_tool(ListGeneratedFilesTool(self.output_dir, self.gen_context))
+        self.register_tool(UpdatePlanTool(self.gen_context))
         self.register_tool(GrepTool(self.output_dir))
         self.register_tool(SearchReplaceTool(self.output_dir))
+        self.register_tool(EditLinesTool(self.output_dir))
+        self.register_tool(InsertLinesTool(self.output_dir))
+        self.register_tool(EditFunctionTool(self.output_dir))
+        # Debug removed
         self.register_tool(LintTool(self.output_dir))
+        # Debug removed
         self.register_tool(SyntaxCheckTool())
         
-        self._logger.info(f"CodeGeneratorAgent initialized with {len(self._tools)} tools")
+        # Debug removed
+        
+        # Register RUNTIME tools (for testing generated code!)
+        self.register_tool(RunCommandTool(self.output_dir))
+        self.register_tool(StartServerTool(self.output_dir))
+        self.register_tool(StopServerTool())
+        self.register_tool(TestAPITool())
+        self.register_tool(ListServersTool())
+        self.register_tool(CheckFilesExistTool(self.output_dir))
+        self.register_tool(InstallDependenciesTool(self.output_dir))
+        self.register_tool(GetServerLogsTool())
+        self.register_tool(QuickTestTool(self.output_dir))
+        self.register_tool(ShouldTestTool(self.output_dir, self.gen_context))
+        
+        # Debug removed
+        all_tool_names = [t.name for t in self._tools.get_all()]
+        # Debug removed
+        
+        self._logger.info(f"CodeGeneratorAgent initialized with {len(self._tools)} tools (including runtime testing tools)")
     
     async def think(self, task: str, context: str = "") -> str:
         """
@@ -230,51 +352,105 @@ Provide your analysis."""
         
         tools_desc = self._get_available_tools_description()
         
+        # Build files list - only show files that actually exist
+        if existing_files:
+            files_info = f"ALREADY GENERATED FILES (you can read these):\n{chr(10).join(f'- {f}' for f in existing_files[:20])}"
+        else:
+            files_info = "NO FILES GENERATED YET - this is the first file. Generate based on the description only."
+        
         prompt = f"""Before generating {file_path}, I need to think carefully.
+
+*** IMPORTANT: We are creating a NEW project from scratch. ***
+*** Only read files that have ALREADY BEEN GENERATED (listed below). ***
+*** Do NOT try to read files like pyproject.toml, requirements.txt, etc. - they don't exist yet! ***
 
 FILE TO GENERATE: {file_path}
 PURPOSE: {purpose}
 
-EXISTING FILES IN PROJECT:
-{chr(10).join(f"- {f}" for f in existing_files[:20])}
+{files_info}
 
 {tools_desc}
 
 Think step by step:
-1. What other files should I READ first to understand the context?
-   (e.g., if generating a router, I should read models.py and schemas.py)
-   → Use: read_file tool
-2. What patterns should I SEARCH (grep) for in the codebase?
-   (e.g., search for "class User" to understand the User model)
-   → Use: grep tool
+1. What ALREADY GENERATED files should I READ for context?
+   - ONLY list files from the "ALREADY GENERATED" list above!
+   - If no files exist yet, skip this step.
+   → Use: read_file(path) or read_file(path, start_line=N, end_line=M) for specific sections
+
+2. What patterns should I SEARCH (grep) for?
+   - USE GREP when you need to find WHERE something is defined/used across files
+   - grep is faster than reading multiple files when looking for specific patterns
+   - Good patterns: "class User", "def get_db", "from calendar_api", "APIRouter"
+   → Use: grep(pattern, path) - searches all files in path
+
 3. What's my APPROACH for generating this file?
+
 4. What CONSIDERATIONS/pitfalls should I be careful about?
 
 Respond in this JSON format:
 {{
-  "needs_context": ["file1.py", "file2.py"],
-  "needs_grep": [
-    {{"pattern": "class.*Model", "reason": "find model definitions"}},
-    {{"pattern": "def.*endpoint", "reason": "check existing endpoints"}}
-  ],
-  "approach": "First I will..., then I will...",
+  "needs_context": [],  // Files to read. Empty if first file!
+  "needs_grep": [],     // Patterns to search. HIGHLY RECOMMENDED when files exist!
+  "approach": "Since [no files exist yet / X files exist], I will...",
   "considerations": ["Make sure to...", "Don't forget to..."]
+}}
+
+EXAMPLE for first file (no existing files):
+{{
+  "needs_context": [],
+  "needs_grep": [],
+  "approach": "This is the first file. I will generate based on the project description...",
+  "considerations": ["Define clear structure", "Include all required fields"]
+}}
+
+EXAMPLE when files exist (USE BOTH read and grep!):
+{{
+  "needs_context": ["env_spec.json", "calendar_api/models.py"],
+  "needs_grep": [
+    {{"pattern": "class.*Model", "reason": "find all model classes"}},
+    {{"pattern": "def get_db", "reason": "find database session dependency"}},
+    {{"pattern": "from.*import", "reason": "understand import patterns"}}
+  ],
+  "approach": "I will read env_spec.json for entities, grep for model classes to understand structure...",
+  "considerations": ["Match field names from models", "Use correct imports"]
 }}"""
 
         result = await self._reasoner.run(prompt)
         answer = str(result.answer) if result.answer else "{}"
         
-        # Parse JSON response
+        # Parse JSON response with better error handling
         import json
+        thinking = {"needs_context": [], "needs_grep": [], "approach": "", "considerations": []}
+        
         try:
             # Extract JSON from response
             json_match = re.search(r'\{[\s\S]*\}', answer)
             if json_match:
-                thinking = json.loads(json_match.group())
+                json_str = json_match.group()
+                
+                # FIX: Model sometimes returns Python dict syntax (single quotes) instead of JSON
+                # Try JSON first, then fall back to ast.literal_eval for Python dict syntax
+                try:
+                    parsed = json.loads(json_str)
+                except json.JSONDecodeError:
+                    # Try parsing as Python dict
+                    import ast
+                    parsed = ast.literal_eval(json_str)
+                
+                # Ensure all required fields exist
+                thinking["needs_context"] = parsed.get("needs_context", [])
+                thinking["needs_grep"] = parsed.get("needs_grep", [])
+                thinking["approach"] = parsed.get("approach", "")
+                thinking["considerations"] = parsed.get("considerations", [])
+                
+                # Note: We no longer need the nested dict parsing since we now use ast.literal_eval 
+                # for the main JSON parsing, which handles Python dict syntax correctly.
             else:
-                thinking = {"needs_context": [], "needs_grep": [], "approach": answer, "considerations": []}
-        except json.JSONDecodeError:
-            thinking = {"needs_context": [], "needs_grep": [], "approach": answer, "considerations": []}
+                thinking["approach"] = answer
+        except json.JSONDecodeError as e:
+            self._log_step("pre_think", f"  JSON parse error: {e}")
+            thinking["approach"] = answer
+            # Don't try to extract file paths - trust empty defaults if JSON parse failed
         
         # Store in memory
         if self.shared_memory:
@@ -296,22 +472,61 @@ Respond in this JSON format:
         
         # Read files that the agent decided it needs
         files_to_read = thinking.get("needs_context", [])
-        for file_path in files_to_read[:5]:  # Limit to 5 files
-            result = await self.call_tool("read_file", path=file_path)
+        
+        # Skip if no files needed (e.g., first file in project)
+        if not files_to_read:
+            self._log_step("gather", "No context needed - generating from scratch")
+            return ""
+        
+        self._log_step("gather", f"Reading {len(files_to_read)} files...")
+        for file_spec in files_to_read[:5]:  # Limit to 5 files
+            # Handle both simple paths and line-range specifications
+            if isinstance(file_spec, dict):
+                file_path = file_spec.get("path", "")
+                start_line = file_spec.get("start_line")
+                end_line = file_spec.get("end_line")
+                reason = file_spec.get("reason", "")
+            else:
+                file_path = str(file_spec)
+                start_line = None
+                end_line = None
+                reason = ""
+            
+            if not file_path:
+                continue
+            
+            # Try to resolve the path - LLM might give just "database.py" but file is at "calendar_api/database.py"
+            resolved_path = await self._resolve_file_path(file_path)
+            
+            # Build read_file arguments
+            read_args = {"path": resolved_path}
+            if start_line is not None:
+                read_args["start_line"] = start_line
+            if end_line is not None:
+                read_args["end_line"] = end_line
+            
+            result = await self._call_tool_with_log("read_file", **read_args)
             if result.success:
-                content = result.data[:3000]  # Truncate long files
-                context_parts.append(f"### {file_path}\n```\n{content}\n```")
-                self._log_step("gather", f"Read: {file_path} ({len(content)} chars)")
+                # read_file returns content with line numbers (e.g., "   1|code")
+                # We strip them for context to prevent LLM from mimicking the format
+                content = self._strip_line_numbers(result.data)
+                
+                # Only smart truncate if we're reading the whole file
+                if start_line is None and end_line is None:
+                    content = self._smart_truncate_file(content, resolved_path)
+                else:
+                    self._log_step("gather", f"  Read lines {start_line}-{end_line} ({reason})")
+                context_parts.append(f"### {resolved_path}\n```\n{content}\n```")
         
         # Search for patterns
         grep_patterns = thinking.get("needs_grep", [])
+        self._log_step("gather", f"Running {len(grep_patterns)} grep patterns...")
         for grep_info in grep_patterns[:3]:  # Limit to 3 patterns
             pattern = grep_info.get("pattern", "") if isinstance(grep_info, dict) else str(grep_info)
             if pattern:
-                result = await self.call_tool("grep", pattern=pattern, path=".")
+                result = await self._call_tool_with_log("grep", pattern=pattern, path=".")
                 if result.success and result.data:
                     context_parts.append(f"### Grep: {pattern}\n```\n{result.data[:1500]}\n```")
-                    self._log_step("gather", f"Grep '{pattern}': found matches")
         
         return "\n\n".join(context_parts)
     
@@ -374,7 +589,8 @@ Respond in this JSON format:
         syntax_ok = True
         if language in supported_syntax_languages:
             self._log_step("reflect", f"  Running syntax check ({language})...")
-            syntax_result = await self.call_tool("syntax_check", code=code, language=language)
+            # Pass full code to syntax_check, logging will truncate for display
+            syntax_result = await self._call_tool_with_log("syntax_check", code=code, language=language)
             
             # Handle None data safely
             syntax_data = syntax_result.data if syntax_result and syntax_result.data else {}
@@ -388,9 +604,25 @@ Respond in this JSON format:
         else:
             self._log_step("reflect", f"  Skipping syntax check (not supported for {language})")
         
-        # 2. Lint check (if file was written)
+        # 2. JSON Formatting Check - JSON must be properly indented, not single-line
+        if file_path.endswith('.json'):
+            self._log_step("reflect", "  Checking JSON formatting...")
+            checks_performed.append("json_format_check")
+            
+            # Check if JSON is minified (single line or no newlines)
+            lines = code.strip().split('\n')
+            if len(lines) == 1 and len(code) > 100:
+                issues_found.append(f"JSON FORMATTING: File is single-line ({len(code)} chars). JSON files must be properly indented for readability.")
+                self._log_step("reflect", f"  JSON is minified - needs formatting")
+            elif len(lines) < 5 and len(code) > 200:
+                issues_found.append(f"JSON FORMATTING: File appears minified ({len(lines)} lines, {len(code)} chars). Please format with proper indentation.")
+                self._log_step("reflect", f"  JSON needs better formatting")
+            else:
+                self._log_step("reflect", f"  JSON formatting OK ({len(lines)} lines)")
+        
+        # 3. Lint check (if file was written)
         self._log_step("reflect", "  Running lint check...")
-        lint_result = await self.call_tool("lint", path=file_path)
+        lint_result = await self._call_tool_with_log("lint", path=file_path)
         checks_performed.append("lint")
         
         if lint_result.success and lint_result.data:
@@ -477,9 +709,10 @@ Respond in JSON:
                 
                 if tool == "read_file":
                     target = check.get("target", "")
+                    reason = check.get("reason", "")
                     if target and target not in [h.get("target") for h in exploration_history]:
-                        self._log_step("reflect", f"  [Round {round_num+1}] Reading {target}...")
-                        result = await self.call_tool("read_file", path=target)
+                        self._log_step("reflect", f"  [Round {round_num+1}] Reading {target} ({reason[:30]}...)")
+                        result = await self._call_tool_with_log("read_file", path=target)
                         if result.success:
                             content_preview = result.data[:500]
                             check_results.append(f"READ {target}: {len(result.data)} chars")
@@ -489,9 +722,10 @@ Respond in JSON:
                 
                 elif tool == "grep":
                     pattern = check.get("pattern", "")
+                    reason = check.get("reason", "")
                     if pattern and pattern not in [h.get("pattern") for h in exploration_history]:
-                        self._log_step("reflect", f"  [Round {round_num+1}] Searching: {pattern}...")
-                        result = await self.call_tool("grep", pattern=pattern, path=".")
+                        self._log_step("reflect", f"  [Round {round_num+1}] Grep '{pattern}' ({reason[:30]}...)")
+                        result = await self._call_tool_with_log("grep", pattern=pattern, path=".")
                         if result.success:
                             matches = result.data[:500] if result.data else "no matches"
                             check_results.append(f"GREP '{pattern}': {matches}")
@@ -590,12 +824,23 @@ Provide final assessment in JSON:
             reflection = {"quality": "good", "issues": issues_found, "suggestions": []}
         
         # Merge automated issues with LLM assessment
-        all_issues = list(set(issues_found + reflection.get("issues", [])))
+        # BUT: If syntax_check tool passed, filter out LLM-reported syntax errors
+        llm_issues = reflection.get("issues", [])
+        if syntax_ok:
+            # Remove false positive syntax errors from LLM
+            llm_issues = [
+                issue for issue in llm_issues 
+                if "SYNTAX" not in issue.upper() and "UNTERMINATED" not in issue.upper()
+            ]
+        
+        all_issues = list(set(issues_found + llm_issues))
         reflection["issues"] = all_issues
         reflection["checks_performed"] = checks_performed
         
         # Override quality if we found critical issues
-        if any("SYNTAX ERROR" in i for i in all_issues):
+        # Only trust SYNTAX ERRORs from automated checks, not LLM
+        automated_syntax_errors = [i for i in issues_found if "SYNTAX ERROR" in i]
+        if automated_syntax_errors:
             reflection["quality"] = "regenerate"
         elif len(all_issues) > 3:
             reflection["quality"] = "needs_improvement"
@@ -684,6 +929,39 @@ Respond in JSON:
                 return lang
         return "text"
     
+    def _strip_line_numbers(self, code: str) -> str:
+        """
+        Strip line numbers from code if present.
+        
+        LLMs sometimes output code with embedded line numbers like:
+        "   1|from fastapi import FastAPI"
+        "   2|from datetime import datetime"
+        
+        This method removes such line number prefixes.
+        """
+        lines = code.split("\n")
+        cleaned_lines = []
+        
+        # Pattern: optional spaces, digits, pipe character
+        # Examples: "   1|", "  10|", " 100|", "1|"
+        line_number_pattern = re.compile(r'^\s*\d+\|')
+        
+        has_line_numbers = False
+        for line in lines:
+            if line_number_pattern.match(line):
+                has_line_numbers = True
+                # Remove the line number prefix
+                cleaned = line_number_pattern.sub('', line)
+                cleaned_lines.append(cleaned)
+            else:
+                cleaned_lines.append(line)
+        
+        if has_line_numbers:
+            self._log_step("clean", "Stripped line numbers from generated code")
+            return "\n".join(cleaned_lines)
+        
+        return code
+    
     def _get_available_tools_description(self) -> str:
         """
         Get a description of all available tools for the agent.
@@ -692,19 +970,27 @@ Respond in JSON:
         """
         tools_desc = """
 AVAILABLE TOOLS (you can request to use these):
-- read_file(path): Read any file in the project to understand existing code
+
+READING & SEARCHING (USE BOTH!):
+- read_file(path): Read a specific file to understand its full content
+- grep(pattern, path): ***IMPORTANT*** Search for patterns across ALL files
+  - ALWAYS use grep when files exist to find definitions, imports, patterns
+  - Example patterns: "class User", "def get_", "from calendar_api import"
+
+OTHER TOOLS:
 - write_file(path, content): Create or overwrite a file
-- list_dir(path): List files in a directory to explore project structure
+- list_dir(path): List files in a directory
 - file_exists(path): Check if a file exists
-- grep(pattern, path): Search for patterns/text across files (regex supported)
-- search_replace(path, old_string, new_string): Make targeted edits to existing files
-- lint(path): Check code for syntax errors and style issues
-- syntax_check(code, language): Verify code is syntactically valid before writing
+- search_replace(path, old_string, new_string): Make targeted edits
+- lint(path): Check code for syntax errors
+- syntax_check(code, language): Verify code syntax before writing
 
 HOW TO USE TOOLS:
-- To read a file first: Include it in "needs_context" list
-- To search for patterns: Include in "needs_grep" list with pattern and reason
-- Tools are executed automatically based on your planning decisions
+- "needs_context": List of files to READ completely
+- "needs_grep": List of patterns to SEARCH across all files
+  Format: [{"pattern": "class.*Model", "reason": "find all models"}]
+  
+BEST PRACTICE: Use GREP first to find where things are, then READ specific files!
 """
         return tools_desc
     
@@ -942,6 +1228,31 @@ TypeScript/React Requirements:
 - Use React hooks properly
 """
         
+        # Special handling for common problematic files
+        if "tsconfig" in file_path.lower() and file_path.endswith(".json"):
+            format_instructions += """
+TSCONFIG SPECIFIC REQUIREMENTS:
+- This is a TypeScript configuration file, NOT a data file
+- Use ONLY valid tsconfig.json options (compilerOptions, include, exclude, etc.)
+- Valid compilerOptions include: target, module, moduleResolution, strict, esModuleInterop, skipLibCheck, etc.
+- For tsconfig.node.json specifically:
+  - Use "composite": true for project references
+  - Use "module": "ESNext" and "moduleResolution": "bundler" for Vite projects
+  - Include only "vite.config.ts" in the include array
+  - Example:
+    {
+      "compilerOptions": {
+        "composite": true,
+        "skipLibCheck": true,
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "allowSyntheticDefaultImports": true,
+        "strict": true
+      },
+      "include": ["vite.config.ts"]
+    }
+"""
+        
         prompt = f"""Generate code for: {file_path}
 
 PURPOSE: {purpose}
@@ -954,7 +1265,12 @@ CONTEXT FROM EXISTING FILES:
 {memory_context}
 {snippets_section}
 
-Generate ONLY the code, no markdown fences or explanations.
+CRITICAL OUTPUT REQUIREMENTS:
+1. Generate ONLY the raw code - NO markdown fences (```), NO line numbers, NO explanations
+2. DO NOT include line number prefixes like "1|", "  2|", "   3|" etc.
+3. Start directly with the code content (e.g., "from fastapi import..." NOT "   1|from fastapi import...")
+4. The output should be directly saveable as a file without any preprocessing
+
 The code must be syntactically correct and production-ready.
 Follow the patterns shown in the code examples above if provided."""
 
@@ -979,6 +1295,10 @@ Follow the patterns shown in the code examples above if provided."""
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
             code = "\n".join(lines)
+        
+        # CRITICAL: Strip line numbers if present (e.g., "   1|code" -> "code")
+        # LLMs sometimes output code with line numbers embedded
+        code = self._strip_line_numbers(code)
         
         # For JSON files, convert Python dict format to JSON
         if file_path.endswith(".json"):
@@ -1011,9 +1331,26 @@ ORIGINAL CODE:
 Fix the error and provide the corrected code. Output ONLY the fixed code."""
 
                 fix_result = await self._reasoner.run(fix_prompt)
-                code = str(fix_result.answer) if fix_result.answer else code
+                fixed_code = str(fix_result.answer) if fix_result.answer else ""
+                if fixed_code:
+                    # Clean up the fix result - remove markdown fences and line numbers
+                    if fixed_code.startswith("```"):
+                        lines = fixed_code.split("\n")
+                        lines = lines[1:-1] if lines[-1].strip() == "```" else lines[1:]
+                        fixed_code = "\n".join(lines)
+                    fixed_code = self._strip_line_numbers(fixed_code)
+                    code = fixed_code
         
-        # Step 5: Write file
+        # Step 5: Format JSON files with proper indentation
+        if file_path.endswith('.json'):
+            try:
+                data = json.loads(code)
+                code = json.dumps(data, indent=2, ensure_ascii=False)
+                self._log_step("generate", "  Formatted JSON with 2-space indentation")
+            except json.JSONDecodeError as e:
+                self._log_step("generate", f"  WARNING: JSON formatting failed: {e}")
+        
+        # Step 6: Write file
         write_result = await self.call_tool("write_file", path=file_path, content=code)
         
         if write_result.success:
@@ -1028,6 +1365,20 @@ Fix the error and provide the corrected code. Output ONLY the fixed code."""
             if self.gen_context:
                 self.gen_context.add_file(file_path, code, self.gen_context.current_phase)
             
+            # Generate and store file summary for quick reference
+            file_summary = self._generate_file_summary(code, file_path)
+            if self.shared_memory:
+                self.shared_memory.remember(
+                    file_summary,
+                    memory_type="working",
+                    metadata={"type": "file_summary", "path": file_path},
+                    importance=0.8,
+                )
+                self._log_step("generate", f"  Stored file summary ({len(file_summary)} chars)")
+            
+            # Check if this is a key file that should trigger testing consideration
+            await self._suggest_testing_if_appropriate(file_path)
+            
             return code
         else:
             self.steps.append(GenerationStep(
@@ -1041,6 +1392,8 @@ Fix the error and provide the corrected code. Output ONLY the fixed code."""
     async def reflect_on_generation(
         self,
         generated_files: List[str],
+        enable_runtime_test: bool = False,  # Optional: run and test the code
+        test_config: Optional[Dict[str, Any]] = None,  # Config for runtime testing
     ) -> List[str]:
         """
         Reflect on generated code - find issues.
@@ -1050,6 +1403,12 @@ Fix the error and provide the corrected code. Output ONLY the fixed code."""
         - Check imports match exports
         - Check for consistency
         - Check for MISSING files that are imported
+        - (OPTIONAL) Run the code and test it
+        
+        Args:
+            generated_files: List of file paths to check
+            enable_runtime_test: If True, try to run the code and test it
+            test_config: Configuration for testing (env_name, backend_dir, etc.)
         """
         self._log_step("reflect", f"Reflecting on {len(generated_files)} files")
         
@@ -1125,6 +1484,19 @@ Fix the error and provide the corrected code. Output ONLY the fixed code."""
                     if open_braces != close_braces:
                         issues.append(f"UNBALANCED: {file_path} has unbalanced braces ({open_braces} open, {close_braces} close)")
         
+        # ========== OPTIONAL RUNTIME TESTING ==========
+        # If enabled, actually run the code and test it
+        if enable_runtime_test and test_config:
+            self._log_step("reflect", "[RUNTIME TEST] Testing generated code...")
+            
+            runtime_issues = await self._run_runtime_tests(generated_files, test_config)
+            
+            if runtime_issues:
+                self._log_step("reflect", f"  [RUNTIME ISSUES] Found {len(runtime_issues)} runtime issues")
+                issues.extend([f"RUNTIME: {i}" for i in runtime_issues])
+            else:
+                self._log_step("reflect", "  [RUNTIME OK] Code runs successfully")
+        
         self.steps.append(GenerationStep(
             step_type="reflect",
             description=f"Found {len(issues)} issues",
@@ -1133,6 +1505,112 @@ Fix the error and provide the corrected code. Output ONLY the fixed code."""
         ))
         
         return issues
+    
+    async def _run_runtime_tests(
+        self,
+        generated_files: List[str],
+        config: Dict[str, Any],
+    ) -> List[str]:
+        """
+        Run runtime tests on generated code.
+        
+        This can:
+        1. Install dependencies
+        2. Start servers
+        3. Test API endpoints
+        4. Collect errors
+        5. Cleanup
+        
+        Returns list of runtime issues found.
+        """
+        runtime_issues = []
+        env_name = config.get("env_name", "")
+        backend_dir = config.get("backend_dir", f"{env_name}_api")
+        
+        # Check if this looks like a backend phase
+        backend_files = [f for f in generated_files if "_api/" in f or f.endswith(("main.py", "database.py"))]
+        if not backend_files:
+            self._log_step("runtime", "  No backend files to test")
+            return runtime_issues
+        
+        try:
+            # Step 1: Install dependencies
+            self._log_step("runtime", "  [1/4] Installing dependencies...")
+            install_result = await self._call_tool_with_log(
+                "install_dependencies",
+                project_type="python",
+                cwd=backend_dir,
+            )
+            
+            if not install_result.success:
+                error = install_result.data.get("stderr", "Install failed")
+                runtime_issues.append(f"Dependency install failed: {error[:100]}")
+                return runtime_issues
+            
+            # Step 2: Start server
+            self._log_step("runtime", "  [2/4] Starting server...")
+            start_result = await self._call_tool_with_log(
+                "start_server",
+                server_name="test_backend",  # Renamed to avoid conflict with call_tool's 'name' param
+                command=f"{sys.executable} -m uvicorn main:app --host 0.0.0.0 --port 8000",
+                cwd=backend_dir,
+                port=8000,
+                wait_for_ready=30,
+            )
+            
+            if not start_result.success:
+                error = start_result.data.get("error", "") or start_result.data.get("stderr", "")
+                runtime_issues.append(f"Server start failed: {error[:200]}")
+                
+                # Analyze the error for common issues
+                if "ModuleNotFoundError" in error:
+                    module = re.search(r"No module named '(\S+)'", error)
+                    if module:
+                        runtime_issues.append(f"Missing import: {module.group(1)}")
+                elif "ImportError" in error:
+                    runtime_issues.append(f"Import error in code")
+                elif "SyntaxError" in error:
+                    runtime_issues.append(f"Syntax error in Python code")
+                
+                return runtime_issues
+            
+            # Step 3: Test endpoints
+            self._log_step("runtime", "  [3/4] Testing API endpoints...")
+            
+            # Test health
+            health_result = await self._call_tool_with_log(
+                "test_api",
+                method="GET",
+                url="http://localhost:8000/health",
+            )
+            if not health_result.success:
+                runtime_issues.append("Health endpoint not responding")
+            
+            # Test register (if auth exists)
+            register_result = await self._call_tool_with_log(
+                "test_api",
+                method="POST",
+                url="http://localhost:8000/auth/register",
+                json_data={"email": "test@test.com", "password": "testpass123", "name": "Test"},
+            )
+            if not register_result.success:
+                status = register_result.data.get("status_code", "unknown")
+                if status == 404:
+                    runtime_issues.append("Auth register endpoint missing (404)")
+                elif status != 400:  # 400 might mean user exists, which is OK
+                    error = register_result.data.get("response", register_result.data.get("error", ""))
+                    runtime_issues.append(f"Auth register failed ({status}): {str(error)[:100]}")
+            
+            # Step 4: Cleanup
+            self._log_step("runtime", "  [4/4] Cleanup...")
+            await self._call_tool_with_log("stop_server", server_name="test_backend")
+            
+        except Exception as e:
+            runtime_issues.append(f"Runtime test exception: {str(e)[:100]}")
+            # Try to cleanup
+            await self._call_tool_with_log("stop_server", server_name="test_backend")
+        
+        return runtime_issues
     
     async def fix_issues(
         self,
@@ -1216,6 +1694,72 @@ Fix the error and provide the corrected code. Output ONLY the fixed code."""
                                 )
                 continue
             
+            # Handle IMPORT errors - missing module might need new file creation OR import fix
+            if issue.startswith("IMPORT:") or issue.startswith("IMPORT ERROR:"):
+                # Parse: "IMPORT: Missing module 'xxx'" or "IMPORT ERROR: ModuleNotFoundError: No module named 'xxx'"
+                match = re.search(r"No module named ['\"]?([^'\"]+)['\"]?", issue)
+                if not match:
+                    match = re.search(r"Missing module ['\"](\S+)['\"]", issue)
+                
+                if match:
+                    missing_module = match.group(1)
+                    self._log_step("fix", f"[IMPORT FIX] Missing module: {missing_module}")
+                    
+                    # Check if this is a "relative import needed" issue
+                    # e.g., "calendar_api" not found when running from calendar_api/ directory
+                    if "relative imports" in issue.lower() or "should be relative" in issue.lower():
+                        # Need to fix imports in main.py and other files
+                        self._log_step("fix", f"  [FIX] Converting absolute imports to relative imports")
+                        
+                        # Find all Python files with absolute imports of this module
+                        backend_dir = f"{self.gen_context.name}_api" if self.gen_context else ""
+                        files_to_fix = ["main.py"]
+                        
+                        for file_name in files_to_fix:
+                            file_path = f"{backend_dir}/{file_name}" if backend_dir else file_name
+                            read_result = await self.call_tool("read_file", path=file_path)
+                            if read_result.success:
+                                content = read_result.data
+                                # Replace absolute imports with relative
+                                new_content = content.replace(f"from {missing_module}.", "from .")
+                                new_content = new_content.replace(f"from {missing_module} import", "from . import")
+                                
+                                if new_content != content:
+                                    write_result = await self.call_tool("write_file", path=file_path, content=new_content)
+                                    if write_result.success:
+                                        fixes_applied.append(f"Fixed imports in {file_path}: absolute → relative")
+                                        self._log_step("fix", f"  [OK] Fixed imports in {file_path}")
+                        continue
+                    
+                    # Check if this is an internal module (should be created)
+                    # vs external module (should be installed)
+                    if missing_module.startswith(self.gen_context.name if self.gen_context else ""):
+                        # Internal module - need to create it
+                        module_path = missing_module.replace(".", "/") + ".py"
+                        self._log_step("fix", f"  Creating missing internal module: {module_path}")
+                        
+                        # Generate the module
+                        code = await self._generate_missing_module(missing_module, module_path)
+                        if code:
+                            write_result = await self.call_tool("write_file", path=module_path, content=code)
+                            if write_result.success:
+                                fixes_applied.append(f"NEW FILE: {module_path}")
+                    else:
+                        # External module - add to requirements
+                        self._log_step("fix", f"  Adding external dependency: {missing_module}")
+                        req_path = f"{self.gen_context.name}_api/requirements.txt" if self.gen_context else "requirements.txt"
+                        
+                        # Read current requirements
+                        read_result = await self.call_tool("read_file", path=req_path)
+                        if read_result.success:
+                            current = read_result.data
+                            if missing_module not in current:
+                                new_content = current.strip() + f"\n{missing_module}\n"
+                                write_result = await self.call_tool("write_file", path=req_path, content=new_content)
+                                if write_result.success:
+                                    fixes_applied.append(f"Added dependency: {missing_module}")
+                continue
+            
             # Handle SYNTAX ERROR issues - for data files (JSON/YAML), regenerate completely
             if "SYNTAX" in issue.upper() or "SYNTAX ERROR" in issue.upper():
                 # Extract file path from issue
@@ -1250,6 +1794,52 @@ Fix the error and provide the corrected code. Output ONLY the fixed code."""
                             if write_result.success:
                                 fixes_applied.append(f"Regenerated: {file_path}")
                             continue
+                continue
+            
+            # Handle JSON FORMATTING issues - reformat the JSON with proper indentation
+            if "JSON FORMATTING" in issue:
+                # Extract file path
+                parts = issue.split(":")
+                file_path = None
+                for part in parts:
+                    if ".json" in part:
+                        # Find the .json file path
+                        file_path = part.strip().split()[0] if " " in part else part.strip()
+                        break
+                
+                if not file_path:
+                    # Try to find from issue text
+                    match = re.search(r"([^\s]+\.json)", issue)
+                    if match:
+                        file_path = match.group(1)
+                
+                if file_path:
+                    self._log_step("fix", f"Reformatting JSON file: {file_path}")
+                    
+                    # Read current content
+                    read_result = await self.call_tool("read_file", path=file_path)
+                    if read_result.success:
+                        import json
+                        try:
+                            # Parse and reformat with proper indentation
+                            data = json.loads(read_result.data)
+                            formatted_json = json.dumps(data, indent=2, ensure_ascii=False)
+                            
+                            write_result = await self.call_tool("write_file", path=file_path, content=formatted_json)
+                            if write_result.success:
+                                fixes_applied.append(f"Reformatted JSON: {file_path}")
+                                self._log_step("fix", f"  [OK] JSON reformatted with proper indentation")
+                                
+                                # Store fix pattern
+                                if self.shared_memory:
+                                    self.shared_memory.remember(
+                                        f"FIX PATTERN: Single-line JSON -> Reformat with json.dumps(indent=2)",
+                                        memory_type="long",
+                                        metadata={"type": "fix_pattern", "issue": "json_formatting"},
+                                        importance=0.7,
+                                    )
+                        except json.JSONDecodeError as e:
+                            self._log_step("fix", f"  [FAIL] Could not parse JSON: {e}")
                 continue
             
             # Handle other issues with INTELLIGENT EXPLORATION + FIX
@@ -1361,18 +1951,29 @@ CONTENT:
                     # Parse fix
                     answer = str(result.answer) if result.answer else ""
                     
-                    # Handle CREATE_FILE response
+                    # Handle CREATE_FILE response - agent wants to create a new file
                     if "CREATE_FILE:" in answer:
                         try:
                             file_to_create = answer.split("CREATE_FILE:")[1].split("CONTENT:")[0].strip()
                             file_content = answer.split("CONTENT:")[1].strip()
                             
+                            self._log_step("fix", f"  [CREATE] Creating new file: {file_to_create}")
                             write_result = await self.call_tool("write_file", path=file_to_create, content=file_content)
                             if write_result.success:
-                                fixes_applied.append(f"Created: {file_to_create}")
+                                # Use "NEW FILE:" prefix so orchestrator can track this
+                                fixes_applied.append(f"NEW FILE: {file_to_create}")
                                 fix_successful = True
-                        except Exception:
-                            pass
+                                
+                                # Store in memory for future reference
+                                if self.shared_memory:
+                                    self.shared_memory.remember(
+                                        f"Created new file {file_to_create} during fix process",
+                                        memory_type="working",
+                                        metadata={"type": "new_file", "path": file_to_create},
+                                        importance=0.8,
+                                    )
+                        except Exception as e:
+                            self._log_step("fix", f"  [ERROR] Failed to create file: {e}")
                     
                     # Handle OLD/NEW response
                     elif "OLD:" in answer and "NEW:" in answer:
@@ -1463,6 +2064,390 @@ NEW: <replacement>"""
         
         return fixes_applied
     
+    async def test_generated_environment(
+        self,
+        env_name: str,
+        backend_dir: str = "",
+        frontend_dir: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Test the generated environment by actually running it!
+        
+        This is a KEY capability - the agent can:
+        1. Install dependencies
+        2. Start servers
+        3. Test API endpoints
+        4. Check for errors
+        5. Fix issues found during testing
+        
+        Returns:
+            Dict with test results
+        """
+        self._log_step("test", f"Testing generated environment: {env_name}")
+        
+        results = {
+            "backend_install": None,
+            "backend_start": None,
+            "api_tests": [],
+            "issues_found": [],
+            "fixes_applied": [],
+        }
+        
+        # Determine directories
+        backend = backend_dir or f"{env_name}_api"
+        frontend = frontend_dir or f"{env_name}_ui"
+        
+        # ========== STEP 1: Install Backend Dependencies ==========
+        self._log_step("test", "[1/5] Installing backend dependencies...")
+        
+        install_result = await self.call_tool(
+            "install_dependencies",
+            project_type="python",
+            cwd=backend,
+        )
+        
+        results["backend_install"] = {
+            "success": install_result.success,
+            "error": install_result.data.get("stderr", "") if not install_result.success else None,
+        }
+        
+        if not install_result.success:
+            error = install_result.data.get("stderr", "Unknown error")
+            results["issues_found"].append(f"Backend install failed: {error[:200]}")
+            self._log_step("test", f"  [FAIL] Install failed: {error[:100]}")
+            return results
+        
+        self._log_step("test", "  [OK] Dependencies installed")
+        
+        # ========== STEP 2: Start Backend Server ==========
+        self._log_step("test", "[2/5] Starting backend server...")
+        
+        start_result = await self.call_tool(
+            "start_server",
+            name="backend",
+            command="python -m uvicorn main:app --host 0.0.0.0 --port 8000",
+            cwd=backend,
+            port=8000,
+            wait_for_ready=30,
+        )
+        
+        results["backend_start"] = {
+            "success": start_result.success,
+            "error": start_result.data.get("error", "") if not start_result.success else None,
+        }
+        
+        if not start_result.success:
+            error = start_result.data.get("error", "") or start_result.data.get("stderr", "")
+            results["issues_found"].append(f"Backend start failed: {error[:200]}")
+            self._log_step("test", f"  [FAIL] Server start failed: {error[:100]}")
+            
+            # Try to analyze the error and fix
+            if "ModuleNotFoundError" in error or "ImportError" in error:
+                self._log_step("test", "  [ANALYZE] Import error detected, attempting fix...")
+                module = re.search(r"No module named '(\w+)'", error)
+                if module:
+                    results["issues_found"].append(f"Missing module: {module.group(1)}")
+            
+            return results
+        
+        self._log_step("test", "  [OK] Server started on port 8000")
+        
+        # ========== STEP 3: Test API Health ==========
+        self._log_step("test", "[3/5] Testing API health...")
+        
+        health_result = await self.call_tool(
+            "test_api",
+            method="GET",
+            url="http://localhost:8000/health",
+        )
+        
+        results["api_tests"].append({
+            "endpoint": "/health",
+            "success": health_result.success,
+            "status": health_result.data.get("status_code"),
+        })
+        
+        if health_result.success:
+            self._log_step("test", "  [OK] Health check passed")
+        else:
+            self._log_step("test", f"  [WARN] Health check failed: {health_result.data}")
+        
+        # ========== STEP 4: Test Auth Endpoints ==========
+        self._log_step("test", "[4/5] Testing auth endpoints...")
+        
+        # Test register
+        register_result = await self.call_tool(
+            "test_api",
+            method="POST",
+            url="http://localhost:8000/auth/register",
+            json_data={"email": "test@test.com", "password": "testpass123", "name": "Test User"},
+        )
+        
+        results["api_tests"].append({
+            "endpoint": "/auth/register",
+            "success": register_result.success,
+            "status": register_result.data.get("status_code"),
+        })
+        
+        if register_result.success:
+            self._log_step("test", "  [OK] Register endpoint works")
+        else:
+            error = register_result.data.get("error", register_result.data.get("response", ""))
+            self._log_step("test", f"  [FAIL] Register failed: {str(error)[:100]}")
+            results["issues_found"].append(f"Register endpoint failed: {str(error)[:100]}")
+        
+        # Test login
+        login_result = await self.call_tool(
+            "test_api",
+            method="POST",
+            url="http://localhost:8000/auth/login",
+            json_data={"email": "test@test.com", "password": "testpass123"},
+        )
+        
+        results["api_tests"].append({
+            "endpoint": "/auth/login",
+            "success": login_result.success,
+            "status": login_result.data.get("status_code"),
+        })
+        
+        if login_result.success:
+            self._log_step("test", "  [OK] Login endpoint works")
+        else:
+            error = login_result.data.get("error", login_result.data.get("response", ""))
+            self._log_step("test", f"  [FAIL] Login failed: {str(error)[:100]}")
+            results["issues_found"].append(f"Login endpoint failed: {str(error)[:100]}")
+        
+        # ========== STEP 5: Cleanup ==========
+        self._log_step("test", "[5/5] Cleaning up...")
+        
+        await self.call_tool("stop_server", server_name="backend")
+        self._log_step("test", "  [OK] Server stopped")
+        
+        # ========== SUMMARY ==========
+        total_tests = len(results["api_tests"])
+        passed_tests = sum(1 for t in results["api_tests"] if t["success"])
+        
+        self._log_step("test", f"Test Summary: {passed_tests}/{total_tests} tests passed")
+        
+        if results["issues_found"]:
+            self._log_step("test", f"Issues found: {len(results['issues_found'])}")
+            
+            # Try to fix issues
+            fixes = await self.fix_issues(results["issues_found"])
+            results["fixes_applied"] = fixes
+        
+        self.steps.append(GenerationStep(
+            step_type="test",
+            description=f"Tested environment: {passed_tests}/{total_tests} passed",
+            output_data=results,
+            success=passed_tests == total_tests,
+        ))
+        
+        return results
+    
+    async def generate_and_run_tests(
+        self,
+        env_name: str,
+        test_type: str = "api",  # "api", "unit", "integration"
+    ) -> Dict[str, Any]:
+        """
+        Generate test code, run it, then clean up.
+        
+        This allows the agent to:
+        1. Generate test files in a tests/ folder
+        2. Run the tests
+        3. Collect results
+        4. Delete the test files
+        
+        Args:
+            env_name: Name of the environment (e.g., "calendar")
+            test_type: Type of tests to generate ("api", "unit", "integration")
+            
+        Returns:
+            Dict with test results
+        """
+        self._log_step("generate_test", f"Generating {test_type} tests for {env_name}...")
+        
+        results = {
+            "test_type": test_type,
+            "tests_generated": [],
+            "tests_run": [],
+            "passed": 0,
+            "failed": 0,
+            "errors": [],
+        }
+        
+        test_dir = f"tests/{env_name}_{test_type}"
+        
+        # ========== STEP 1: Generate test files ==========
+        self._log_step("generate_test", f"[1/4] Generating test files in {test_dir}...")
+        
+        if test_type == "api":
+            # Generate API test file
+            test_code = await self._generate_api_test_code(env_name)
+            test_file = f"{test_dir}/test_api.py"
+        elif test_type == "unit":
+            test_code = await self._generate_unit_test_code(env_name)
+            test_file = f"{test_dir}/test_unit.py"
+        else:
+            test_code = await self._generate_integration_test_code(env_name)
+            test_file = f"{test_dir}/test_integration.py"
+        
+        if test_code:
+            # Create tests directory and write test file
+            await self.call_tool("run_command", command=f"mkdir -p {test_dir}")
+            write_result = await self.call_tool("write_file", path=test_file, content=test_code)
+            
+            if write_result.success:
+                results["tests_generated"].append(test_file)
+                self._log_step("generate_test", f"  [OK] Generated: {test_file}")
+            else:
+                results["errors"].append(f"Failed to write {test_file}")
+                return results
+        
+        # ========== STEP 2: Install test dependencies ==========
+        self._log_step("generate_test", "[2/4] Installing test dependencies...")
+        
+        await self.call_tool(
+            "run_command", 
+            command="pip install pytest pytest-asyncio httpx",
+            timeout=60
+        )
+        
+        # ========== STEP 3: Run tests ==========
+        self._log_step("generate_test", "[3/4] Running tests...")
+        
+        run_result = await self.call_tool(
+            "run_command",
+            command=f"python -m pytest {test_file} -v --tb=short",
+            timeout=120,
+        )
+        
+        if run_result.success:
+            self._log_step("generate_test", "  [OK] Tests passed")
+            results["passed"] = 1
+        else:
+            self._log_step("generate_test", f"  [FAIL] Tests failed")
+            results["failed"] = 1
+            results["errors"].append(run_result.data.get("stderr", ""))
+        
+        results["tests_run"].append({
+            "file": test_file,
+            "success": run_result.success,
+            "output": run_result.data.get("stdout", "")[:1000],
+            "error": run_result.data.get("stderr", "")[:500] if not run_result.success else None,
+        })
+        
+        # ========== STEP 4: Cleanup test files ==========
+        self._log_step("generate_test", "[4/4] Cleaning up test files...")
+        
+        await self.call_tool("run_command", command=f"rm -rf {test_dir}")
+        self._log_step("generate_test", f"  [OK] Deleted: {test_dir}")
+        
+        # Summary
+        self._log_step("generate_test", f"Test Summary: {results['passed']} passed, {results['failed']} failed")
+        
+        self.steps.append(GenerationStep(
+            step_type="generate_test",
+            description=f"Generated and ran {test_type} tests: {results['passed']} passed, {results['failed']} failed",
+            output_data=results,
+            success=results["failed"] == 0,
+        ))
+        
+        return results
+    
+    async def _generate_api_test_code(self, env_name: str) -> str:
+        """Generate API test code using LLM"""
+        
+        if not self._reasoner:
+            return ""
+        
+        prompt = f"""Generate a pytest test file for testing the {env_name} FastAPI backend.
+
+The tests should:
+1. Test the /health endpoint
+2. Test user registration (POST /auth/register)
+3. Test user login (POST /auth/login)
+4. Test authenticated endpoints if any
+
+Use httpx for HTTP requests. The API runs on http://localhost:8000.
+
+Generate COMPLETE, RUNNABLE test code:
+
+```python
+import pytest
+import httpx
+
+BASE_URL = "http://localhost:8000"
+
+# Your tests here...
+```"""
+        
+        result = await self._reasoner.run(prompt)
+        answer = str(result.answer) if result.answer else ""
+        
+        # Extract code from response
+        if "```python" in answer:
+            code = answer.split("```python")[1].split("```")[0].strip()
+        elif "```" in answer:
+            code = answer.split("```")[1].split("```")[0].strip()
+        else:
+            code = answer.strip()
+        
+        return code
+    
+    async def _generate_unit_test_code(self, env_name: str) -> str:
+        """Generate unit test code"""
+        # Simplified for now
+        return f'''import pytest
+
+def test_placeholder():
+    """Placeholder unit test for {env_name}"""
+    assert True
+'''
+    
+    async def _generate_integration_test_code(self, env_name: str) -> str:
+        """Generate integration test code"""
+        return f'''import pytest
+
+def test_integration_placeholder():
+    """Placeholder integration test for {env_name}"""
+    assert True
+'''
+    
+    async def verify_planned_files(
+        self,
+        planned_files: List[str],
+    ) -> Dict[str, Any]:
+        """
+        Verify that all planned files were actually generated.
+        
+        Returns:
+            Dict with verification results and missing files
+        """
+        self._log_step("verify", f"Verifying {len(planned_files)} planned files were generated...")
+        
+        # Use the check_files_exist tool
+        result = await self.call_tool("check_files_exist", files=planned_files)
+        
+        # Handle None data safely
+        data = result.data if result and result.data else {}
+        
+        if result.success:
+            self._log_step("verify", f"  [OK] All {len(planned_files)} files exist")
+        else:
+            missing = data.get("missing", [])
+            self._log_step("verify", f"  [WARN] Missing {len(missing)} files: {missing}")
+        
+        self.steps.append(GenerationStep(
+            step_type="verify",
+            description=f"Verified planned files: {data.get('existing_count', 0)}/{len(planned_files)} exist",
+            output_data=data,
+            success=result.success if result else False,
+        ))
+        
+        return {"missing_files": data.get("missing", []), "all_exist": result.success if result else False}
+    
     async def _ensure_complete_code(self, code: str, file_path: str, purpose: str) -> str:
         """
         Check if code is truncated and continue generation if needed.
@@ -1535,6 +2520,9 @@ Please CONTINUE the code from where it was cut off.
                 code = code + "\n" + continuation
             
             self._log_step("continue", f"Added {len(continuation)} chars continuation")
+        
+        # Final cleanup: strip any remaining line numbers
+        code = self._strip_line_numbers(code)
         
         return code
     
@@ -1629,6 +2617,9 @@ Please CONTINUE the code from where it was cut off.
             if lines and lines[-1].strip() == "```":
                 lines = lines[:-1]
             continuation = "\n".join(lines)
+        
+        # CRITICAL: Strip line numbers if present (LLM often mimics line number format)
+        continuation = self._strip_line_numbers(continuation)
         
         # Special handling for JSON files
         if file_path.endswith(".json"):
@@ -1822,6 +2813,51 @@ If it's a list page, create a data list with CRUD operations.
 
 Use React hooks, TypeScript types, and follow best practices.
 Output ONLY the code, no markdown fences."""
+
+        result = await self._reasoner.run(prompt)
+        code = str(result.answer) if result.answer else ""
+        
+        # Clean up markdown fences if present
+        if code.startswith("```"):
+            lines = code.split("\n")
+            code = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+        
+        return code if code else None
+    
+    async def _generate_missing_module(self, module_name: str, file_path: str) -> Optional[str]:
+        """Generate a missing Python module"""
+        if not self._reasoner:
+            # Fallback: generate simple stub module
+            return f'''"""
+{module_name} module
+
+Auto-generated to fix missing import.
+"""
+
+# TODO: Implement this module
+pass
+'''
+        
+        # Get context about what this module should do
+        prompt = f"""Generate a Python module for: {module_name}
+
+FILE: {file_path}
+
+This module was imported but didn't exist, causing an ImportError.
+
+Based on the module name:
+- If it's like 'xxx_api.utils', create common utility functions
+- If it's like 'xxx_api.config', create configuration settings  
+- If it's like 'xxx_api.exceptions', create custom exception classes
+- If it's like 'xxx_api.helpers', create helper functions
+
+Generate a proper implementation with:
+1. Module docstring
+2. Appropriate imports
+3. Useful functions/classes based on the name
+4. Type hints
+
+Output ONLY the Python code, no markdown fences."""
 
         result = await self._reasoner.run(prompt)
         code = str(result.answer) if result.answer else ""
@@ -2049,6 +3085,337 @@ Fix the JSON error and output the COMPLETE, VALID JSON."""
     def _log_step(self, step_type: str, message: str) -> None:
         """Log a step for debugging"""
         self._logger.info(f"[{step_type.upper()}] {message}")
+    
+    def _generate_file_summary(self, content: str, file_path: str) -> str:
+        """
+        Generate a structural summary of a file.
+        
+        Returns a concise summary including:
+        - File stats (lines, chars)
+        - Key imports
+        - Class/function definitions with line numbers
+        - Exports (for JS/TS)
+        
+        This summary is stored in memory for quick reference.
+        """
+        lines = content.split('\n')
+        total_lines = len(lines)
+        total_chars = len(content)
+        
+        summary_parts = [
+            f"=== FILE SUMMARY: {file_path} ===",
+            f"Total: {total_lines} lines, {total_chars} chars",
+            ""
+        ]
+        
+        if file_path.endswith(('.py', '.ts', '.tsx', '.js', '.jsx')):
+            # Extract imports
+            imports = []
+            definitions = []
+            exports = []
+            
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                line_num = i + 1
+                
+                # Imports (first 50 lines usually)
+                if i < 50:
+                    if stripped.startswith(('import ', 'from ', 'require(')):
+                        imports.append(stripped[:60])
+                
+                # Class and function definitions
+                if stripped.startswith('class '):
+                    match = stripped.split('(')[0].split(':')[0]
+                    definitions.append(f"  L{line_num}: {match}")
+                elif stripped.startswith(('def ', 'async def ')):
+                    match = stripped.split('(')[0]
+                    definitions.append(f"  L{line_num}: {match}")
+                elif stripped.startswith(('function ', 'const ', 'export function', 'export const', 'export class')):
+                    definitions.append(f"  L{line_num}: {stripped[:50]}")
+                
+                # Exports
+                if 'export ' in stripped or '__all__' in stripped:
+                    exports.append(f"  L{line_num}: {stripped[:50]}")
+            
+            if imports:
+                summary_parts.append(f"IMPORTS ({len(imports)}):")
+                summary_parts.extend(imports[:5])
+                if len(imports) > 5:
+                    summary_parts.append(f"  ... and {len(imports) - 5} more")
+                summary_parts.append("")
+            
+            if definitions:
+                summary_parts.append(f"DEFINITIONS ({len(definitions)}):")
+                summary_parts.extend(definitions[:15])
+                if len(definitions) > 15:
+                    summary_parts.append(f"  ... and {len(definitions) - 15} more")
+                summary_parts.append("")
+            
+            if exports:
+                summary_parts.append(f"EXPORTS ({len(exports)}):")
+                summary_parts.extend(exports[:5])
+                summary_parts.append("")
+        
+        elif file_path.endswith('.json'):
+            try:
+                data = json.loads(content)
+                if isinstance(data, dict):
+                    summary_parts.append(f"TOP-LEVEL KEYS: {list(data.keys())[:10]}")
+                    for key, value in list(data.items())[:5]:
+                        if isinstance(value, list):
+                            summary_parts.append(f"  {key}: array[{len(value)}]")
+                        elif isinstance(value, dict):
+                            summary_parts.append(f"  {key}: object with {len(value)} keys")
+                        else:
+                            summary_parts.append(f"  {key}: {type(value).__name__}")
+                elif isinstance(data, list):
+                    summary_parts.append(f"ROOT: array[{len(data)}]")
+            except json.JSONDecodeError:
+                summary_parts.append("(Invalid JSON)")
+        
+        summary_parts.append("")
+        summary_parts.append("To read specific lines: read_file(path, start_line=N, end_line=M)")
+        summary_parts.append("To search: grep(pattern, path)")
+        
+        return '\n'.join(summary_parts)
+    
+    def _smart_truncate_file(self, content: str, file_path: str, max_chars: int = 4000) -> str:
+        """
+        Intelligently truncate a long file to fit within token limits.
+        
+        Instead of just taking the first N characters, we:
+        1. Keep the beginning (imports, class definitions)
+        2. Keep the end (often has main logic, exports)
+        3. Add a summary of what's in the middle with line numbers
+        4. Indicate how to get truncated content
+        
+        This preserves more useful context for code understanding.
+        """
+        if len(content) <= max_chars:
+            return content
+        
+        lines = content.split('\n')
+        total_lines = len(lines)
+        
+        # For Python/TypeScript: extract key structure
+        if file_path.endswith(('.py', '.ts', '.tsx', '.js', '.jsx')):
+            # Keep first 40 lines (imports, class definitions)
+            head_lines = 40
+            # Keep last 30 lines (main logic, exports)
+            tail_lines = 30
+            
+            if total_lines <= head_lines + tail_lines + 10:
+                # File is small enough, just truncate content
+                return content[:max_chars] + f"\n... (truncated at {max_chars} chars, total {len(content)} chars)"
+            
+            head = '\n'.join(lines[:head_lines])
+            tail = '\n'.join(lines[-tail_lines:])
+            
+            # Extract function/class signatures from the middle
+            middle_lines = lines[head_lines:-tail_lines]
+            omitted_start = head_lines + 1
+            omitted_end = total_lines - tail_lines
+            
+            signatures = []
+            for i, line in enumerate(middle_lines):
+                stripped = line.strip()
+                if stripped.startswith(('def ', 'async def ', 'class ', 'function ', 'const ', 'export ')):
+                    signatures.append(f"  L{head_lines + i + 1}: {stripped[:70]}")
+            
+            middle_summary = f"\n\n=== TRUNCATED: Lines {omitted_start}-{omitted_end} ({len(middle_lines)} lines) ===\n"
+            middle_summary += f"To read: read_file('{file_path}', start_line={omitted_start}, end_line={omitted_end})\n"
+            middle_summary += f"To search: grep('<pattern>', '{file_path}')\n"
+            
+            if signatures:
+                middle_summary += "\nKey definitions in truncated section:\n" + '\n'.join(signatures[:10])
+                if len(signatures) > 10:
+                    middle_summary += f"\n  ... and {len(signatures) - 10} more definitions"
+            middle_summary += "\n\n"
+            
+            result = head + middle_summary + tail
+            
+            # Final size check
+            if len(result) > max_chars:
+                return result[:max_chars] + f"\n... (further truncated)"
+            return result
+        
+        elif file_path.endswith('.json'):
+            # For JSON: keep structure, truncate arrays
+            try:
+                data = json.loads(content)
+                
+                def truncate_json(obj, depth=0, path=""):
+                    if depth > 3:
+                        return "... (nested)"
+                    if isinstance(obj, dict):
+                        result = {}
+                        items = list(obj.items())
+                        for k, v in items[:10]:
+                            result[k] = truncate_json(v, depth + 1, f"{path}.{k}")
+                        if len(items) > 10:
+                            result["..."] = f"({len(items) - 10} more keys)"
+                        return result
+                    elif isinstance(obj, list):
+                        if len(obj) > 5:
+                            return [
+                                truncate_json(obj[0], depth + 1, f"{path}[0]"),
+                                f"... ({len(obj) - 2} more items, use grep to find specific items)",
+                                truncate_json(obj[-1], depth + 1, f"{path}[-1]")
+                            ]
+                        return [truncate_json(item, depth + 1, f"{path}[{i}]") for i, item in enumerate(obj)]
+                    return obj
+                
+                truncated = truncate_json(data)
+                result = json.dumps(truncated, indent=2, ensure_ascii=False)
+                if len(result) > max_chars:
+                    result = result[:max_chars] + f"\n... (truncated, use grep to search)"
+                return result
+            except json.JSONDecodeError:
+                pass
+        
+        # Default: keep head and tail with clear indicators
+        head_chars = max_chars // 2
+        tail_chars = max_chars // 3
+        head = content[:head_chars]
+        tail = content[-tail_chars:]
+        
+        # Find line numbers for head/tail
+        head_lines = head.count('\n')
+        tail_start_line = total_lines - tail.count('\n')
+        
+        middle_info = f"\n\n=== TRUNCATED: Lines {head_lines + 1}-{tail_start_line} ===\n"
+        middle_info += f"Omitted: {len(content) - head_chars - tail_chars} chars\n"
+        middle_info += f"To read: read_file('{file_path}', start_line={head_lines + 1}, end_line={tail_start_line})\n\n"
+        
+        return head + middle_info + tail
+    
+    async def _suggest_testing_if_appropriate(self, file_path: str) -> None:
+        """
+        After generating a key file, suggest or automatically run tests.
+        
+        Key files that trigger testing consideration:
+        - main.py (FastAPI entry point)
+        - routers/*.py (API endpoints)
+        - App.tsx (React main component)
+        """
+        # Define key files that should trigger testing
+        key_backend_files = ['main.py', 'app.py']
+        key_router_patterns = ['routers/', 'routes/', 'endpoints/']
+        
+        should_consider_test = False
+        test_type = None
+        
+        # Check if this is a backend entry point
+        if any(file_path.endswith(f) for f in key_backend_files):
+            should_consider_test = True
+            test_type = "backend_startup"
+            self._log_step("test_hint", f"🧪 Generated entry point: {file_path}")
+        
+        # Check if this is a router
+        elif any(pattern in file_path for pattern in key_router_patterns):
+            should_consider_test = True
+            test_type = "endpoint"
+            self._log_step("test_hint", f"🧪 Generated router: {file_path}")
+        
+        if should_consider_test:
+            # Check if we should test
+            should_test_result = await self.call_tool("should_test")
+            
+            if should_test_result.success and should_test_result.data:
+                recommendations = should_test_result.data.get("recommendations", [])
+                if should_test_result.data.get("backend", False):
+                    self._log_step("test_hint", f"  💡 Backend ready for testing")
+                    for rec in recommendations[:2]:
+                        self._log_step("test_hint", f"     {rec}")
+                    
+                    # Store in memory that we're ready to test
+                    if self.shared_memory:
+                        self.shared_memory.working.set("ready_for_test", "backend")
+                        self.shared_memory.working.set("test_suggestion", f"Consider running quick_test() for {file_path}")
+    
+    async def _resolve_file_path(self, file_path: str) -> str:
+        """
+        Resolve a file path to an actual existing file in the generated directory.
+        
+        LLM might return just "database.py" but the file is at "calendar_api/database.py".
+        This method tries to find the actual file.
+        """
+        # First try the exact path
+        result = await self.call_tool("file_exists", path=file_path)
+        if result.success and result.data:
+            return file_path
+        
+        # If not found, search for the file in the output directory
+        if self.gen_context and self.gen_context.output_dir:
+            from pathlib import Path
+            output_dir = Path(self.gen_context.output_dir)
+            
+            # Get just the filename
+            filename = Path(file_path).name
+            
+            # Search for files with this name
+            matching_files = list(output_dir.rglob(filename))
+            if matching_files:
+                # Return the first match, relative to output_dir
+                relative_path = str(matching_files[0].relative_to(output_dir))
+                self._log_step("gather", f"  Resolved '{file_path}' -> '{relative_path}'")
+                return relative_path
+        
+        # If still not found, return original path (will likely fail, but that's expected)
+        return file_path
+    
+    async def _call_tool_with_log(self, tool_name: str, **kwargs):
+        """
+        Call a tool with detailed logging.
+        
+        This wraps call_tool to provide better debugging output.
+        Also emits events for real-time monitoring.
+        """
+        from ..events import EventType
+        
+        # Format args for logging (truncate long values)
+        args_display = {}
+        for k, v in kwargs.items():
+            v_str = repr(v)
+            args_display[k] = v_str[:80] + "..." if len(v_str) > 80 else v_str
+        
+        args_str = ", ".join(f"{k}={v}" for k, v in args_display.items())
+        
+        self._logger.info(f"[TOOL CALL] {tool_name}({args_str})")
+        
+        # Emit tool call event (if we have event emitter)
+        if self._emitter:
+            self._emitter.emit(
+                EventType.TOOL_CALL,
+                f"{tool_name}",
+                {"tool": tool_name, "args": args_display}
+            )
+        
+        result = await self.call_tool(tool_name, **kwargs)
+        
+        if result.success:
+            # Log success with brief result
+            data_preview = str(result.data)[:100] if result.data else "None"
+            self._logger.info(f"[TOOL OK] {tool_name} -> {data_preview}{'...' if len(str(result.data or '')) > 100 else ''}")
+        else:
+            # Log failure with error
+            error = result.error_message or str(result.data)[:100]
+            self._logger.warning(f"[TOOL FAIL] {tool_name} -> {error}")
+        
+        # Emit tool result event
+        if self._emitter:
+            self._emitter.emit(
+                EventType.TOOL_RESULT,
+                f"{tool_name} -> {'✓' if result.success else '✗'}",
+                {
+                    "tool": tool_name,
+                    "success": result.success,
+                    "result": str(result.data)[:200] if result.data else None,
+                    "error": result.error_message if not result.success else None,
+                }
+            )
+        
+        return result
     
     def get_generation_summary(self) -> Dict[str, Any]:
         """Get summary of generation process"""

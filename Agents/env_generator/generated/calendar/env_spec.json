@@ -1,1 +1,285 @@
-{"name": "calendar_app", "version": "1.0.0", "description": "A calendar and event scheduling application with user authentication, events, invitations, and reminders.", "entities": [{"name": "User", "description": "Represents an authenticated user of the calendar application.", "fields": [{"name": "id", "type": "uuid", "required": true, "unique": true}, {"name": "email", "type": "string", "required": true, "unique": true}, {"name": "password_hash", "type": "string", "required": true}, {"name": "first_name", "type": "string", "required": false}, {"name": "last_name", "type": "string", "required": false}, {"name": "timezone", "type": "string", "required": false, "default": "UTC"}, {"name": "is_active", "type": "boolean", "required": true, "default": true}, {"name": "is_verified", "type": "boolean", "required": true, "default": false}, {"name": "created_at", "type": "datetime", "required": true}, {"name": "updated_at", "type": "datetime", "required": true}, {"name": "last_login_at", "type": "datetime", "required": false}]}, {"name": "AuthSession", "description": "Represents an authenticated session or refresh token for a user.", "fields": [{"name": "id", "type": "uuid", "required": true, "unique": true}, {"name": "user_id", "type": "uuid", "required": true, "relation": "User.id"}, {"name": "refresh_token", "type": "string", "required": true, "unique": true}, {"name": "user_agent", "type": "string", "required": false}, {"name": "ip_address", "type": "string", "required": false}, {"name": "expires_at", "type": "datetime", "required": true}, {"name": "revoked_at", "type": "datetime", "required": false}, {"name": "created_at", "type": "datetime", "required": true}]}, {"name": "Calendar", "description": "Logical collection of events, typically owned by a user.", "fields": [{"name": "id", "type": "uuid", "required": true, "unique": true}, {"name": "owner_id", "type": "uuid", "required": true, "relation": "User.id"}, {"name": "name", "type": "string", "required": true}, {"name": "description", "type": "string", "required": false}, {"name": "color", "type": "string", "required": false}, {"name": "is_primary", "type": "boolean", "required": true, "default": false}, {"name": "is_shared", "type": "boolean", "required": true, "default": false}, {"name": "timezone", "type": "string", "required": false}, {"name": "created_at", "type": "datetime", "required": true}, {"name": "updated_at", "type": "datetime", "required": true}]}, {"name": "CalendarShare", "description": "Represents sharing permissions of a calendar with another user.", "fields": [{"name": "id", "type": "uuid", "required": true, "unique": true}, {"name": "calendar_id", "type": "uuid", "required": true, "relation": "Calendar.id"}, {"name": "user_id", "type": "uuid", "required": true, "relation": "User.id"}, {"name": "role", "type": "string", "required": true, "enum": ["viewer", "editor", "owner"]}, {"name": "created_at", "type": "datetime", "required": true}, {"name": "updated_at", "type": "datetime", "required": true}]}, {"name": "Event", "description": "Represents a scheduled event on a calendar.", "fields": [{"name": "id", "type": "uuid", "required": true, "unique": true}, {"name": "calendar_id", "type": "uuid", "required": true, "relation": "Calendar.id"}, {"name": "creator_id", "type": "uuid", "required": true, "relation": "User.id"}, {"name": "title", "type": "string", "required": true}, {"name": "description", "type": "string", "required": false}, {"name": "location", "type": "string", "required": false}, {"name": "start_time", "type": "datetime", "required": true}, {"name": "end_time", "type": "datetime", "required": true}, {"name": "all_day", "type": "boolean", "required": true, "default": false}, {"name": "timezone", "type": "string", "required": false}, {"name": "status", "type": "string", "required": true, "enum": ["scheduled", "cancelled"]}, {"name": "visibility", "type": "string", "required": true, "enum": ["public", "private"]}, {"name": "recurrence_rule", "type": "string", "required": false}, {"name": "max_attendees", "type": "integer", "required": false}, {"name": "created_at", "type": "datetime", "required": true}, {"name": "updated_at", "type": "datetime", "required": true}, {"name": "cancelled_at", "type": "datetime", "required": false}]}, {"name": "EventAttendee", "description": "Represents an attendee for an event, linked to a user or external email.", "fields": [{"name": "id", "type": "uuid", "required": true, "unique": true}, {"name": "event_id", "type": "uuid", "required": true, "relation": "Event.id"}, {"name": "user_id", "type": "uuid", "required": false, "relation": "User.id"}, {"name": "email", "type": "string", "required": true}, {"name": "display_name", "type": "string", "required": false}, {"name": "response_status", "type": "string", "required": true, "enum": ["needs_action", "accepted", "declined", "tentative"]}, {"name": "is_organizer", "type": "boolean", "required": true, "default": false}, {"name": "invited_at", "type": "datetime", "required": true}, {"name": "responded_at", "type": "datetime", "required": false}]}, {"name": "Invitation", "description": "Represents an invitation sent to a user or email for an event.", "fields": [{"name": "id", "type": "uuid", "required": true, "unique": true}, {"name": "event_id", "type": "uuid", "required": true, "relation": "Event.id"}, {"name": "inviter_id", "type": "uuid", "required": true, "relation": "User.id"}, {"name": "invitee_email", "type": "string", "required": true}, {"name": "invitee_user_id", "type": "uuid", "required": false, "relation": "User.id"}, {"name": "token", "type": "string", "required": true, "unique": true}, {"name": "status", "type": "string", "required": true, "enum": ["pending", "accepted", "declined", "expired", "cancelled"]}, {"name": "sent_at", "type": "datetime", "required": true}, {"name": "responded_at", "type": "datetime", "required": false}, {"name": "expires_at", "type": "datetime", "required": true}]}, {"name": "Reminder", "description": "Represents a reminder configuration for an event.", "fields": [{"name": "id", "type": "uuid", "required": true, "unique": true}, {"name": "event_id", "type": "uuid", "required": true, "relation": "Event.id"}, {"name": "user_id", "type": "uuid", "required": true, "relation": "User.id"}, {"name": "method", "type": "string", "required": true, "enum": ["email", "push", "sms", "webhook"]}, {"name": "minutes_before_start", "type": "integer", "required": true}, {"name": "is_sent", "type": "boolean", "required": true, "default": false}, {"name": "scheduled_at", "type": "datetime", "required": true}, {"name": "sent_at", "type": "datetime", "required": false}, {"name": "created_at", "type": "datetime", "required": true}]}, {"name": "NotificationChannel", "description": "Represents a user's configured notification channel (e.g., email, SMS, webhook).", "fields": [{"name": "id", "type": "uuid", "required": true, "unique": true}, {"name": "user_id", "type": "uuid", "required": true, "relation": "User.id"}, {"name": "type", "type": "string", "required": true, "enum": ["email", "sms", "push", "webhook"]}, {"name": "address", "type": "string", "required": true}, {"name": "is_verified", "type": "boolean", "required": true, "default": false}, {"name": "created_at", "type": "datetime", "required": true}, {"name": "updated_at", "type": "datetime", "required": true}]}, {"name": "AuditLog", "description": "Tracks important security and data modification events.", "fields": [{"name": "id", "type": "uuid", "required": true, "unique": true}, {"name": "user_id", "type": "uuid", "required": false, "relation": "User.id"}, {"name": "action", "type": "string", "required": true}, {"name": "entity_type", "type": "string", "required": true}, {"name": "entity_id", "type": "string", "required": true}, {"name": "ip_address", "type": "string", "required": false}, {"name": "user_agent", "type": "string", "required": false}, {"name": "metadata", "type": "json", "required": false}, {"name": "created_at", "type": "datetime", "required": true}]}], "features": ["user_registration", "user_login", "user_logout", "password_reset", "email_verification", "jwt_authentication", "refresh_tokens", "multi_calendar_support", "primary_calendar", "calendar_sharing", "role_based_calendar_permissions", "event_creation", "event_update", "event_deletion", "event_viewing", "all_day_events", "recurring_events", "event_cancellation", "event_search", "event_time_zone_support", "attendee_management", "external_attendees_via_email", "invitations", "invitation_tokens", "invitation_accept_decline", "invitation_expiration", "reminders", "multiple_reminders_per_event", "configurable_reminder_offsets", "email_notifications", "push_notifications", "optional_sms_notifications", "webhook_notifications", "user_notification_preferences", "time_zone_handling", "day_week_month_views", "access_logs_and_auditing", "rate_limiting", "api_key_support_for_integrations", "webhook_signing_and_verification"], "api_endpoints": [{"path": "/api/v1/auth/register", "method": "POST", "description": "Register a new user account."}, {"path": "/api/v1/auth/login", "method": "POST", "description": "Authenticate user and return access/refresh tokens."}, {"path": "/api/v1/auth/logout", "method": "POST", "description": "Invalidate current session or refresh token."}, {"path": "/api/v1/auth/refresh", "method": "POST", "description": "Refresh access token using a refresh token."}, {"path": "/api/v1/auth/me", "method": "GET", "description": "Get current authenticated user profile."}, {"path": "/api/v1/auth/verify-email", "method": "POST", "description": "Verify user email using a verification token."}, {"path": "/api/v1/auth/forgot-password", "method": "POST", "description": "Initiate password reset flow."}, {"path": "/api/v1/auth/reset-password", "method": "POST", "description": "Reset password using reset token."}, {"path": "/api/v1/calendars", "method": "GET", "description": "List calendars for the authenticated user."}, {"path": "/api/v1/calendars", "method": "POST", "description": "Create a new calendar."}, {"path": "/api/v1/calendars/{calendar_id}", "method": "GET", "description": "Get a specific calendar by ID."}, {"path": "/api/v1/calendars/{calendar_id}", "method": "PATCH", "description": "Update a calendar."}, {"path": "/api/v1/calendars/{calendar_id}", "method": "DELETE", "description": "Delete a calendar."}, {"path": "/api/v1/calendars/{calendar_id}/shares", "method": "GET", "description": "List shares/permissions for a calendar."}, {"path": "/api/v1/calendars/{calendar_id}/shares", "method": "POST", "description": "Share a calendar with another user."}, {"path": "/api/v1/calendars/{calendar_id}/shares/{share_id}", "method": "PATCH", "description": "Update a calendar share (e.g., role)."}, {"path": "/api/v1/calendars/{calendar_id}/shares/{share_id}", "method": "DELETE", "description": "Remove a calendar share."}, {"path": "/api/v1/events", "method": "GET", "description": "List events for the authenticated user (optionally filtered by calendar, date range)."}, {"path": "/api/v1/calendars/{calendar_id}/events", "method": "GET", "description": "List events for a specific calendar."}, {"path": "/api/v1/calendars/{calendar_id}/events", "method": "POST", "description": "Create a new event in a calendar."}, {"path": "/api/v1/events/{event_id}", "method": "GET", "description": "Get details for a specific event."}, {"path": "/api/v1/events/{event_id}", "method": "PATCH", "description": "Update an existing event."}, {"path": "/api/v1/events/{event_id}", "method": "DELETE", "description": "Delete or cancel an event."}, {"path": "/api/v1/events/{event_id}/attendees", "method": "GET", "description": "List attendees for an event."}, {"path": "/api/v1/events/{event_id}/attendees", "method": "POST", "description": "Add an attendee to an event."}, {"path": "/api/v1/events/{event_id}/attendees/{attendee_id}", "method": "PATCH", "description": "Update attendee status (e.g., response)."}, {"path": "/api/v1/events/{event_id}/attendees/{attendee_id}", "method": "DELETE", "description": "Remove an attendee from an event."}, {"path": "/api/v1/invitations", "method": "POST", "description": "Send invitations to one or more attendees for an event."}, {"path": "/api/v1/invitations/{token}", "method": "GET", "description": "Get invitation details using token."}, {"path": "/api/v1/invitations/{token}/respond", "method": "POST", "description": "Respond to an invitation (accept/decline/tentative)."}, {"path": "/api/v1/events/{event_id}/reminders", "method": "GET", "description": "List reminders for an event."}, {"path": "/api/v1/events/{event_id}/reminders", "method": "POST", "description": "Create a reminder for an event."}, {"path": "/api/v1/reminders/{reminder_id}", "method": "PATCH", "description": "Update a reminder."}, {"path": "/api/v1/reminders/{reminder_id}", "method": "DELETE", "description": "Delete a reminder."}, {"path": "/api/v1/users/me/notification-channels", "method": "GET", "description": "List notification channels for the current user."}, {"path": "/api/v1/users/me/notification-channels", "method": "POST", "description": "Create or configure a notification channel."}, {"path": "/api/v1/users/me/notification-channels/{channel_id}", "method": "PATCH", "description": "Update a notification channel."}, {"path": "/api/v1/users/me/notification-channels/{channel_id}", "method": "DELETE", "description": "Delete a notification channel."}, {"path": "/api/v1/search/events", "method": "GET", "description": "Search events by text, date range, and other filters."}, {"path": "/api/v1/webhooks/notifications", "method": "POST", "description": "Endpoint for delivering webhook-based notifications (outgoing from system, documented for integrators)."}, {"path": "/api/v1/audit-logs", "method": "GET", "description": "List audit log entries (admin or user-scoped)."}]}
+{
+  "name": "calendar_app_environment",
+  "description": "Environment specification for a web-based calendar application, including language runtime, tooling, and environment profiles for development, testing, and production.",
+  "language": {
+    "name": "python",
+    "version": ">=3.10,<3.14",
+    "runtime": "CPython",
+    "encoding": "utf-8"
+  },
+  "platform": {
+    "os": [
+      "linux",
+      "macos"
+    ],
+    "recommended_os": "linux",
+    "min_cpu_arch": "x86_64",
+    "supported_arch": [
+      "x86_64",
+      "arm64"
+    ],
+    "shell": [
+      "bash",
+      "zsh"
+    ]
+  },
+  "package_manager": {
+    "primary": {
+      "name": "uv",
+      "alternatives": [
+        "pip",
+        "poetry"
+      ],
+      "lockfile_recommended": true
+    },
+    "python_index": {
+      "url": "https://pypi.org/simple",
+      "verify_ssl": true
+    }
+  },
+  "application": {
+    "type": "web_api_plus_frontend",
+    "description": "Calendar app with user accounts, shared calendars, events, reminders, and notifications. Backend exposes REST/JSON APIs; frontend may be SPA or server-rendered.",
+    "entrypoint_suggestion": "app.main:app",
+    "http_port_default": 8000
+  },
+  "dependencies": {
+    "runtime": [
+      {
+        "name": "fastapi",
+        "version": "^0.115",
+        "required": false,
+        "reason": "Recommended framework for building RESTful APIs for the calendar backend."
+      },
+      {
+        "name": "uvicorn",
+        "version": "^0.32",
+        "required": false,
+        "reason": "ASGI server for running the FastAPI application in development and production."
+      },
+      {
+        "name": "sqlalchemy",
+        "version": "^2.0",
+        "required": false,
+        "reason": "ORM and SQL toolkit for managing calendar-related data entities in a relational database."
+      },
+      {
+        "name": "alembic",
+        "version": "^1.13",
+        "required": false,
+        "reason": "Database migration tool for evolving the calendar schema safely."
+      },
+      {
+        "name": "pydantic",
+        "version": "^2.9",
+        "required": false,
+        "reason": "Data validation and settings management for request/response models and configuration."
+      },
+      {
+        "name": "python-dateutil",
+        "version": "^2.9",
+        "required": false,
+        "reason": "Robust date and time parsing, especially for recurring events and time zone handling."
+      },
+      {
+        "name": "pytz",
+        "version": "^2024.1",
+        "required": false,
+        "reason": "Time zone definitions for accurate calendar event scheduling across regions."
+      },
+      {
+        "name": "redis",
+        "version": "^5.0",
+        "required": false,
+        "reason": "Optional cache and background job broker for reminders and notifications."
+      }
+    ],
+    "dev": [
+      {
+        "name": "pytest",
+        "version": "^8.0",
+        "required": true,
+        "reason": "Testing framework for unit, integration, and API tests."
+      },
+      {
+        "name": "pytest-asyncio",
+        "version": "^0.24",
+        "required": false,
+        "reason": "Support for testing async API endpoints and background tasks."
+      },
+      {
+        "name": "httpx",
+        "version": "^0.27",
+        "required": false,
+        "reason": "HTTP client for integration tests of the calendar API."
+      },
+      {
+        "name": "black",
+        "version": "^24.0",
+        "required": false,
+        "reason": "Code formatter to enforce a consistent style."
+      },
+      {
+        "name": "ruff",
+        "version": "^0.7",
+        "required": false,
+        "reason": "Fast linter and import sorter for Python code quality."
+      },
+      {
+        "name": "mypy",
+        "version": "^1.13",
+        "required": false,
+        "reason": "Static type checker for catching type-related bugs early."
+      }
+    ],
+    "optional": [
+      {
+        "name": "celery",
+        "version": "^5.4",
+        "required": false,
+        "reason": "Background task processing for sending reminders and notifications."
+      },
+      {
+        "name": "jinja2",
+        "version": "^3.1",
+        "required": false,
+        "reason": "Templating for email notifications or server-rendered views."
+      }
+    ]
+  },
+  "database": {
+    "default_engine": "postgresql",
+    "supported_engines": [
+      "postgresql",
+      "sqlite"
+    ],
+    "recommended_versions": {
+      "postgresql": ">=13",
+      "sqlite": ">=3.35"
+    },
+    "migrations_tool": "alembic",
+    "connection_env_vars": [
+      "DATABASE_URL"
+    ]
+  },
+  "environments": {
+    "development": {
+      "description": "Local development environment with hot reload, debug logging, and relaxed security settings.",
+      "debug": true,
+      "logging_level": "debug",
+      "allowed_hosts": [
+        "localhost",
+        "127.0.0.1"
+      ],
+      "use_in_memory_queues": true,
+      "database_engine": "sqlite",
+      "env_file": ".env.development"
+    },
+    "test": {
+      "description": "Automated test environment with isolated database and deterministic configuration.",
+      "debug": false,
+      "logging_level": "warning",
+      "database_engine": "sqlite",
+      "run_migrations": true,
+      "env_file": ".env.test"
+    },
+    "production": {
+      "description": "Production environment for serving end users, with full security and observability.",
+      "debug": false,
+      "logging_level": "info",
+      "database_engine": "postgresql",
+      "run_migrations": true,
+      "env_file": ".env.production",
+      "replicas_recommended_min": 2,
+      "use_reverse_proxy": true
+    }
+  },
+  "tools": {
+    "formatting": {
+      "tool": "black",
+      "line_length": 88
+    },
+    "linting": {
+      "tool": "ruff",
+      "config_file_suggestion": "ruff.toml"
+    },
+    "typing": {
+      "tool": "mypy",
+      "strict_mode_recommended": true
+    },
+    "testing": {
+      "tool": "pytest",
+      "default_command": "pytest",
+      "coverage_tool": "coverage",
+      "coverage_minimum": 80
+    },
+    "task_runner": {
+      "tool": "none",
+      "notes": "A task runner such as make, tox, or nox may be added later for automation."
+    }
+  },
+  "ci": {
+    "enabled": false,
+    "recommended": true,
+    "suggested_providers": [
+      "github_actions",
+      "gitlab_ci"
+    ],
+    "basic_checks": [
+      "install_dependencies",
+      "run_linters",
+      "run_tests",
+      "build_artifacts"
+    ]
+  },
+  "containerization": {
+    "use_docker": true,
+    "base_image_suggestion": "python:3.12-slim",
+    "exposed_ports": [
+      8000
+    ],
+    "env_vars_to_pass_through": [
+      "DATABASE_URL",
+      "REDIS_URL",
+      "CALENDAR_SECRET_KEY"
+    ]
+  },
+  "security": {
+    "secret_management": "environment_variables_or_secret_manager",
+    "required_env_vars": [
+      "CALENDAR_SECRET_KEY"
+    ],
+    "https_termination": "handled_by_reverse_proxy",
+    "recommended_headers": [
+      "Strict-Transport-Security",
+      "Content-Security-Policy",
+      "X-Content-Type-Options",
+      "X-Frame-Options"
+    ]
+  },
+  "logging": {
+    "format": "structured_json",
+    "include_correlation_id": true,
+    "log_request_ids": true
+  },
+  "monitoring": {
+    "metrics": {
+      "enabled": true,
+      "suggested_tooling": [
+        "prometheus",
+        "opentelemetry"
+      ]
+    },
+    "tracing": {
+      "enabled": false,
+      "suggested_tooling": [
+        "opentelemetry"
+      ]
+    }
+  },
+  "notes": [
+    "This environment spec is framework-agnostic but biased toward a FastAPI-style Python stack.",
+    "Dependencies are recommendations and may be adjusted once the concrete architecture is finalized.",
+    "All version ranges are indicative and should be refined when the initial implementation is created."
+  ]
+}

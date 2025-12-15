@@ -3,16 +3,44 @@ import axios, {
   AxiosInstance,
   AxiosRequestConfig,
   AxiosResponse,
-} from "axios";
+} from 'axios';
 
-const TOKEN_STORAGE_KEY = "auth_token";
+// ===== Types aligned with backend schemas =====
 
-// Prefer env var, fallback to same-origin /api (matching AuthContext default)
-const API_BASE_URL: string =
-  import.meta.env.VITE_API_URL ||
-  (typeof window !== "undefined"
-    ? `${window.location.origin}/api`
-    : "/api");
+// These interfaces mirror calendar_api/schemas.py based on typical patterns.
+// Adjust as needed if backend schemas change.
+
+export interface UserBase {
+  email: string;
+  full_name?: string | null;
+}
+
+export interface UserCreate extends UserBase {
+  password: string;
+}
+
+export interface UserLogin {
+  email: string;
+  password: string;
+}
+
+export interface UserResponse extends UserBase {
+  id: number;
+  created_at: string; // ISO datetime string
+  updated_at?: string | null;
+}
+
+export interface Token {
+  access_token: string;
+  token_type: 'bearer' | string;
+  user: UserResponse;
+}
+
+export interface HealthResponse {
+  status: string;
+}
+
+// ===== API Error Wrapper =====
 
 export class ApiError<T = unknown> extends Error {
   public status: number;
@@ -20,181 +48,145 @@ export class ApiError<T = unknown> extends Error {
 
   constructor(status: number, message: string, details?: T) {
     super(message);
-    this.name = "ApiError";
+    this.name = 'ApiError';
     this.status = status;
     this.details = details;
   }
 }
 
+// ===== Axios Instance Configuration =====
+
+// Prefer an explicit env var but default to the FastAPI dev port.
+// The backend in main.py does not use a /api prefix, so we keep baseURL
+// as the root and let the dev server proxy /api -> backend if configured.
+const API_BASE_URL: string =
+  (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
+
+// LocalStorage key used to store the auth token.
+// Keep this consistent with your AuthContext implementation.
+const AUTH_TOKEN_STORAGE_KEY = 'auth_token';
+
+// Optional external token getter; if not provided, localStorage is used.
+let externalTokenGetter: (() => string | null) | null = null;
+
+export const setAuthTokenGetter = (getter: () => string | null): void => {
+  externalTokenGetter = getter;
+};
+
+const getAuthToken = (): string | null => {
+  if (externalTokenGetter) {
+    return externalTokenGetter();
+  }
+
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const stored = window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    return stored || null;
+  } catch {
+    return null;
+  }
+};
+
 const api: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
+  baseURL: '/api', // assume frontend dev server proxies /api -> API_BASE_URL
+  withCredentials: false,
 });
 
-// Attach Authorization header from localStorage on every request
-api.interceptors.request.use((config: AxiosRequestConfig) => {
-  if (typeof window === "undefined") {
+// Attach Authorization header if token is available
+api.interceptors.request.use(
+  (config: AxiosRequestConfig): AxiosRequestConfig => {
+    const token = getAuthToken();
+    if (token && config.headers) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (config.headers as any).Authorization = `Bearer ${token}`;
+    }
     return config;
-  }
-
-  const token = localStorage.getItem(TOKEN_STORAGE_KEY);
-  if (token && config.headers) {
-    // FastAPI expects `Authorization: Bearer <token>`
-    (config.headers as Record<string, string>).Authorization = `Bearer ${token}`;
-  }
-
-  return config;
-});
-
-// Optional response interceptor stub (can be extended for global error handling)
-api.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  (error: AxiosError) => {
-    // Here you could inspect error.response?.status and, for example,
-    // trigger a global logout on 401/403 via a callback or event system.
-    return Promise.reject(error);
   },
+  (error: AxiosError) => Promise.reject(error),
 );
 
-// ========= Types aligned with AuthContext and typical calendar APIs =========
-
-export interface User {
-  id: string;
-  email: string;
-  full_name?: string;
-}
-
-export interface AuthResponse {
-  access_token: string;
-  token_type: string;
-  user?: User;
-}
-
-export interface LoginCredentials {
-  email: string;
-  password: string;
-}
-
-export interface RegisterPayload {
-  email: string;
-  password: string;
-  full_name?: string;
-}
-
-// Calendar / event-related types (adjust to backend schemas if needed)
-export interface CalendarEvent {
-  id: string;
-  title: string;
-  description?: string;
-  start: string; // ISO datetime
-  end: string; // ISO datetime
-  all_day?: boolean;
-}
-
-export interface CreateEventPayload {
-  title: string;
-  description?: string;
-  start: string;
-  end: string;
-  all_day?: boolean;
-}
-
-export interface UpdateEventPayload {
-  title?: string;
-  description?: string;
-  start?: string;
-  end?: string;
-  all_day?: boolean;
-}
-
-// ========= Low-level request helper (wraps axios and normalizes errors) =====
-
-async function request<T = unknown>(
-  config: AxiosRequestConfig,
-): Promise<T> {
-  try {
-    const response: AxiosResponse<T> = await api.request<T>(config);
-    return response.data;
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status ?? 0;
-      const data = error.response?.data as
-        | { detail?: string }
-        | undefined;
+// Basic response error normalization
+api.interceptors.response.use(
+  (response: AxiosResponse): AxiosResponse => response,
+  (error: AxiosError) => {
+    if (error.response) {
+      const status = error.response.status;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = error.response.data;
       const message =
-        data?.detail ||
+        (data && (data.detail || data.message)) ||
         error.message ||
-        "Request failed. Please try again.";
+        'Request failed';
       throw new ApiError(status, message, data);
     }
 
-    throw new ApiError(0, "Unexpected error occurred", error as unknown);
-  }
+    if (error.request) {
+      throw new ApiError(0, 'Network error or no response from server');
+    }
+
+    throw new ApiError(0, error.message || 'Unknown Axios error');
+  },
+);
+
+// ===== Generic request helper (optional but useful) =====
+
+export async function request<T = unknown>(
+  config: AxiosRequestConfig,
+): Promise<T> {
+  const response = await api.request<T>(config);
+  return response.data;
 }
 
-// ====================== Auth API ============================================
+// ===== Auth API =====
 
 export const authApi = {
-  login: (credentials: LoginCredentials): Promise<AuthResponse> =>
-    request<AuthResponse>({
-      url: "/auth/login",
-      method: "POST",
-      data: credentials,
+  /**
+   * POST /auth/register
+   * Body: UserCreate
+   * Response: UserResponse
+   */
+  register: (data: UserCreate): Promise<UserResponse> =>
+    request<UserResponse>({
+      method: 'POST',
+      url: '/auth/register',
+      data,
     }),
 
-  register: (payload: RegisterPayload): Promise<AuthResponse | { id: string }> =>
-    request<AuthResponse | { id: string }>({
-      url: "/auth/register",
-      method: "POST",
-      data: payload,
+  /**
+   * POST /auth/login
+   * Body: UserLogin
+   * Response: Token
+   */
+  login: (data: UserLogin): Promise<Token> =>
+    request<Token>({
+      method: 'POST',
+      url: '/auth/login',
+      data,
     }),
 
-  me: (): Promise<User> =>
-    request<User>({
-      url: "/auth/me",
-      method: "GET",
-    }),
-};
-
-// ====================== Calendar / Events API ===============================
-
-export const calendarApi = {
-  listEvents: (): Promise<CalendarEvent[]> =>
-    request<CalendarEvent[]>({
-      url: "/events",
-      method: "GET",
-    }),
-
-  getEvent: (id: string): Promise<CalendarEvent> =>
-    request<CalendarEvent>({
-      url: `/events/${encodeURIComponent(id)}`,
-      method: "GET",
-    }),
-
-  createEvent: (payload: CreateEventPayload): Promise<CalendarEvent> =>
-    request<CalendarEvent>({
-      url: "/events",
-      method: "POST",
-      data: payload,
-    }),
-
-  updateEvent: (
-    id: string,
-    payload: UpdateEventPayload,
-  ): Promise<CalendarEvent> =>
-    request<CalendarEvent>({
-      url: `/events/${encodeURIComponent(id)}`,
-      method: "PATCH",
-      data: payload,
-    }),
-
-  deleteEvent: (id: string): Promise<void> =>
-    request<void>({
-      url: `/events/${encodeURIComponent(id)}`,
-      method: "DELETE",
+  /**
+   * GET /auth/me
+   * Requires Authorization header (handled by interceptor).
+   * Response: UserResponse
+   */
+  me: (): Promise<UserResponse> =>
+    request<UserResponse>({
+      method: 'GET',
+      url: '/auth/me',
     }),
 };
 
-export { api };
+// ===== Misc / Health API =====
+
+export const systemApi = {
+  health: (): Promise<HealthResponse> =>
+    request<HealthResponse>({
+      method: 'GET',
+      url: '/health',
+    }),
+};
+
+export default api;

@@ -1,82 +1,62 @@
 from datetime import datetime, timedelta
-from typing import Optional, Any, Dict
+from typing import Optional
 
-import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr, Field
 
-from calendar_api.database import get_db
-from calendar_api.models import User
+from ..database import get_db
+from ..models import User
+from ..schemas import UserCreate, UserLogin, UserResponse, Token
+
+import os
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# Configuration (use environment variables in production)
-SECRET_KEY = os.getenv("CALENDAR_API_SECRET_KEY", "change-this-secret-in-production")
+# Configuration - in production, use environment variables / secrets manager
+SECRET_KEY = os.getenv("CALENDAR_API_SECRET_KEY", "change-this-secret-key")
 ALGORITHM = os.getenv("CALENDAR_API_JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("CALENDAR_API_ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+ACCESS_TOKEN_EXPIRE_MINUTES = int(
+    os.getenv("CALENDAR_API_ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+)
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Bearer token security
-security = HTTPBearer()
+security = HTTPBearer(auto_error=True)
 
 
-# ===== Local Schemas for Auth =====
+def _truncate_password(password: str) -> str:
+    """
+    Truncate password to 72 bytes for bcrypt compatibility.
 
-
-class Token(BaseModel):
-    """JWT access token response."""
-
-    access_token: str
-    token_type: str = "bearer"
-
-
-class TokenPayload(BaseModel):
-    """Data stored in the JWT token."""
-
-    sub: str
-    exp: int
-
-
-class LoginRequest(BaseModel):
-    """Request body for user login."""
-
-    email: EmailStr
-    password: str = Field(..., min_length=8)
-
-
-class RegisterRequest(BaseModel):
-    """Request body for user registration."""
-
-    email: EmailStr
-    password: str = Field(..., min_length=8)
-    first_name: Optional[str] = Field(None, max_length=100)
-    last_name: Optional[str] = Field(None, max_length=100)
-    timezone: Optional[str] = Field("UTC", max_length=64)
-
-
-# ===== Utility Functions =====
+    bcrypt only uses the first 72 bytes of the password, so we ensure we never
+    pass more than that to the hasher/verification to avoid confusion.
+    """
+    # Encode to bytes, truncate, then decode ignoring errors
+    password_bytes = password.encode("utf-8")[:72]
+    return password_bytes.decode("utf-8", errors="ignore")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+    return pwd_context.verify(_truncate_password(plain_password), hashed_password)
 
 
 def get_password_hash(password: str) -> str:
     """Hash a password."""
-    return pwd_context.hash(password)
+    return pwd_context.hash(_truncate_password(password))
 
 
-def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT access token."""
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.utcnow() + (
+        expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -85,7 +65,7 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
-    """Get the current authenticated user from a JWT token."""
+    """Get current authenticated user from JWT token."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -101,95 +81,59 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
 
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None or not user.is_active:
+    user: Optional[User] = db.query(User).filter(User.id == user_id).first()
+    if user is None:
         raise credentials_exception
 
     return user
 
 
-# ===== Endpoints =====
-
-
-@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
-async def register_user(
-    payload: RegisterRequest,
-    db: Session = Depends(get_db),
-) -> Token:
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def register_user(user_in: UserCreate, db: Session = Depends(get_db)) -> User:
     """
-    Register a new user and return an access token.
+    Create a new user account.
+
+    - Ensures email uniqueness
+    - Hashes the password before storing
     """
-    existing = db.query(User).filter(User.email == payload.email).first()
+    existing = db.query(User).filter(User.email == user_in.email).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A user with this email already exists.",
+            detail="Email is already registered",
         )
 
     user = User(
-        email=payload.email,
-        password_hash=get_password_hash(payload.password),
-        first_name=payload.first_name,
-        last_name=payload.last_name,
-        timezone=payload.timezone or "UTC",
-        is_active=True,
-        is_verified=False,
+        email=user_in.email,
+        name=user_in.name,
+        password_hash=get_password_hash(user_in.password),
     )
-
     db.add(user)
     db.commit()
     db.refresh(user)
-
-    access_token = create_access_token({"sub": user.id})
-    return Token(access_token=access_token)
+    return user
 
 
 @router.post("/login", response_model=Token)
-async def login(
-    payload: LoginRequest,
-    db: Session = Depends(get_db),
-) -> Token:
+async def login(user_in: UserLogin, db: Session = Depends(get_db)) -> Token:
     """
-    Authenticate a user and return an access token.
+    Authenticate a user and return a JWT access token.
     """
-    user = db.query(User).filter(User.email == payload.email).first()
-    if not user or not verify_password(payload.password, user.password_hash):
+    user: Optional[User] = db.query(User).filter(User.email == user_in.email).first()
+    if not user or not verify_password(user_in.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password.",
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive.",
-        )
-
-    # Update last login timestamp
-    user.last_login_at = datetime.utcnow()
-    db.add(user)
-    db.commit()
-
-    access_token = create_access_token({"sub": user.id})
+    access_token = create_access_token(data={"sub": user.id})
     return Token(access_token=access_token)
 
 
-@router.get("/me")
-async def read_current_user(user: User = Depends(get_current_user)) -> Dict[str, Any]:
+@router.get("/me", response_model=UserResponse)
+async def read_me(current_user: User = Depends(get_current_user)) -> User:
     """
-    Return basic information about the current authenticated user.
-    This avoids a hard dependency on specific user response schemas.
+    Get the currently authenticated user's profile.
     """
-    return {
-        "id": user.id,
-        "email": user.email,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "timezone": user.timezone,
-        "is_active": user.is_active,
-        "is_verified": user.is_verified,
-        "created_at": user.created_at,
-        "updated_at": user.updated_at,
-        "last_login_at": user.last_login_at,
-    }
+    return current_user

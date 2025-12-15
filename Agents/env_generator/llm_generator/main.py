@@ -66,6 +66,11 @@ async def main():
         action="store_true",
         help="Resume from previous checkpoint if available",
     )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Enable testing after code generation (optional)",
+    )
     
     args = parser.parse_args()
     
@@ -123,6 +128,7 @@ async def main():
         event_emitter=emitter,
         verbose=args.verbose,
         resume=args.resume,
+        enable_testing=args.test,  # Optional: run tests after generation
     )
     
     await orchestrator.initialize()

@@ -6,40 +6,42 @@ from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
-# Database URL from environment or default to SQLite
-DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./calendar.db")
+# Database URL from environment or default to SQLite database file
+DEFAULT_DB_NAME = "calendar"
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///./{DEFAULT_DB_NAME}.db")
 
-# Create engine
+# Create engine, with special handling for SQLite
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(
         DATABASE_URL,
         connect_args={"check_same_thread": False},
-        future=True,
     )
 else:
-    engine = create_engine(DATABASE_URL, future=True)
+    engine = create_engine(DATABASE_URL)
 
 # Session factory
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine,
-    class_=Session,
-    expire_on_commit=False,
-    future=True,
-)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)
 
 # Base class for models
-Base = declarative_base()
+# Note: __allow_unmapped__ = True allows legacy type annotations without Mapped[]
+class _Base:
+    __allow_unmapped__ = True
+
+Base = declarative_base(cls=_Base)
 
 
 def get_db() -> Generator[Session, None, None]:
     """
-    Yield a SQLAlchemy Session, ensuring it is closed afterwards.
+    Yield a database session and ensure it is closed afterwards.
 
-    Designed to be used as a dependency in frameworks like FastAPI.
+    Intended for use as a dependency in web frameworks (e.g., FastAPI),
+    but can also be used directly in scripts/tests:
+
+        with next(get_db()) as db:
+            ...
+
     """
-    db: Session = SessionLocal()
+    db = SessionLocal()
     try:
         yield db
     finally:
@@ -50,9 +52,12 @@ def init_db() -> None:
     """
     Initialize database tables.
 
-    This will create all tables defined on the metadata of Base if they
-    do not already exist.
+    This function imports models that inherit from Base (if needed)
+    and then creates all tables defined on Base.metadata.
     """
-    from calendar_api import models  # noqa: F401  - ensure models are imported
+    # Import models here if they are not imported elsewhere to ensure
+    # they are registered with SQLAlchemy's metadata before creation.
+    # Example:
+    # from . import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
