@@ -13,10 +13,15 @@ from .file_tools import (
     WriteFileTool,
     ListDirTool,
     FileExistsTool,
+    ListGeneratedFilesTool,
+    UpdatePlanTool,
 )
 from .code_tools import (
     GrepTool,
     SearchReplaceTool,
+    EditLinesTool,
+    InsertLinesTool,
+    EditFunctionTool,
     LintTool,
     SyntaxCheckTool,
 )

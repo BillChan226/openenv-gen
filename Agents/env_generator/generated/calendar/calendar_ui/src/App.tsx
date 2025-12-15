@@ -3,33 +3,58 @@ import {
   BrowserRouter,
   Routes,
   Route,
-  Navigate,
+  Link,
 } from "react-router-dom";
 
-const Login: React.FC = () => {
+const HomePage: React.FC = () => {
   return (
-    <main style={{ padding: "2rem" }}>
-      <h1>Login</h1>
-      <p>Please log in to access your calendar.</p>
-    </main>
+    <div className="page page-home">
+      <h1>Calendar App</h1>
+      <p>Welcome to the calendar application.</p>
+      <nav>
+        <ul>
+          <li>
+            <Link to="/login">Log in</Link>
+          </li>
+          <li>
+            <Link to="/register">Register</Link>
+          </li>
+          <li>
+            <Link to="/dashboard">Dashboard</Link>
+          </li>
+        </ul>
+      </nav>
+    </div>
   );
 };
 
-const Register: React.FC = () => {
+const LoginPage: React.FC = () => {
   return (
-    <main style={{ padding: "2rem" }}>
+    <div className="page page-login">
+      <h1>Log In</h1>
+      <p>This is a placeholder login page.</p>
+      <Link to="/">Back to home</Link>
+    </div>
+  );
+};
+
+const RegisterPage: React.FC = () => {
+  return (
+    <div className="page page-register">
       <h1>Register</h1>
-      <p>Create an account to start using the calendar.</p>
-    </main>
+      <p>This is a placeholder registration page.</p>
+      <Link to="/">Back to home</Link>
+    </div>
   );
 };
 
-const Dashboard: React.FC = () => {
+const DashboardPage: React.FC = () => {
   return (
-    <main style={{ padding: "2rem" }}>
+    <div className="page page-dashboard">
       <h1>Dashboard</h1>
-      <p>Welcome to your calendar dashboard.</p>
-    </main>
+      <p>This is a placeholder dashboard for the calendar.</p>
+      <Link to="/">Back to home</Link>
+    </div>
   );
 };
 
@@ -37,16 +62,13 @@ const App: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        {/* Fallback for unknown routes */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
       </Routes>
     </BrowserRouter>
   );
 };
 
 export default App;
-tsx

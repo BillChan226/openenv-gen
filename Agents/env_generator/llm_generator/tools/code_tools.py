@@ -249,6 +249,309 @@ class SearchReplaceTool(BaseTool):
             return ToolResult.fail(f"Error replacing: {e}")
 
 
+class EditLinesTool(BaseTool):
+    """
+    Edit specific lines in a file.
+    
+    More precise than search_replace when you know exactly which lines to change.
+    """
+    
+    def __init__(self, base_dir: Optional[Path] = None):
+        super().__init__()
+        self.base_dir = base_dir or Path.cwd()
+    
+    @property
+    def definition(self) -> ToolDefinition:
+        return ToolDefinition(
+            name="edit_lines",
+            description="Replace lines N to M in a file with new content. Use when you know exact line numbers.",
+            category=ToolCategory.CODE,
+            parameters=[
+                ToolParameter(
+                    name="path",
+                    param_type=str,
+                    description="File path to modify",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="start_line",
+                    param_type=int,
+                    description="Start line number (1-indexed, inclusive)",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="end_line",
+                    param_type=int,
+                    description="End line number (1-indexed, inclusive)",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="new_content",
+                    param_type=str,
+                    description="New content to replace the lines with",
+                    required=True,
+                ),
+            ],
+            returns="Success message with lines modified",
+            examples=[
+                {"input": {"path": "src/main.py", "start_line": 10, "end_line": 15, "new_content": "def new_function():\n    pass"},
+                 "output": "Replaced lines 10-15 in src/main.py"},
+            ],
+            tags=["edit", "lines", "modify"],
+        )
+    
+    async def execute(
+        self,
+        path: str,
+        start_line: int,
+        end_line: int,
+        new_content: str,
+        **kwargs
+    ) -> ToolResult:
+        try:
+            file_path = self.base_dir / path
+            
+            if not file_path.exists():
+                return ToolResult.fail(f"File not found: {path}")
+            
+            lines = file_path.read_text(encoding="utf-8").split('\n')
+            total_lines = len(lines)
+            
+            # Validate line numbers
+            if start_line < 1 or end_line < 1:
+                return ToolResult.fail("Line numbers must be >= 1")
+            if start_line > end_line:
+                return ToolResult.fail("start_line must be <= end_line")
+            if start_line > total_lines:
+                return ToolResult.fail(f"start_line ({start_line}) exceeds file length ({total_lines})")
+            
+            # Convert to 0-indexed
+            start_idx = start_line - 1
+            end_idx = min(end_line, total_lines)  # Clamp to file length
+            
+            # Build new content
+            new_lines = new_content.split('\n')
+            result_lines = lines[:start_idx] + new_lines + lines[end_idx:]
+            
+            # Write back
+            file_path.write_text('\n'.join(result_lines), encoding="utf-8")
+            
+            return ToolResult.ok({
+                "message": f"Replaced lines {start_line}-{end_line} in {path}",
+                "old_lines": end_line - start_line + 1,
+                "new_lines": len(new_lines),
+            })
+            
+        except Exception as e:
+            return ToolResult.fail(f"Error editing lines: {e}")
+
+
+class InsertLinesTool(BaseTool):
+    """
+    Insert lines at a specific position in a file.
+    
+    Useful for adding new functions, imports, or code blocks.
+    """
+    
+    def __init__(self, base_dir: Optional[Path] = None):
+        super().__init__()
+        self.base_dir = base_dir or Path.cwd()
+    
+    @property
+    def definition(self) -> ToolDefinition:
+        return ToolDefinition(
+            name="insert_lines",
+            description="Insert new lines at a specific position in a file (after line N).",
+            category=ToolCategory.CODE,
+            parameters=[
+                ToolParameter(
+                    name="path",
+                    param_type=str,
+                    description="File path to modify",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="after_line",
+                    param_type=int,
+                    description="Insert after this line number (0 = insert at beginning)",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="content",
+                    param_type=str,
+                    description="Content to insert",
+                    required=True,
+                ),
+            ],
+            returns="Success message",
+            examples=[
+                {"input": {"path": "src/main.py", "after_line": 5, "content": "import os"},
+                 "output": "Inserted 1 line(s) after line 5 in src/main.py"},
+            ],
+            tags=["edit", "insert", "add"],
+        )
+    
+    async def execute(
+        self,
+        path: str,
+        after_line: int,
+        content: str,
+        **kwargs
+    ) -> ToolResult:
+        try:
+            file_path = self.base_dir / path
+            
+            if not file_path.exists():
+                return ToolResult.fail(f"File not found: {path}")
+            
+            lines = file_path.read_text(encoding="utf-8").split('\n')
+            total_lines = len(lines)
+            
+            if after_line < 0:
+                return ToolResult.fail("after_line must be >= 0")
+            if after_line > total_lines:
+                after_line = total_lines  # Append at end
+            
+            # Insert
+            new_lines = content.split('\n')
+            result_lines = lines[:after_line] + new_lines + lines[after_line:]
+            
+            # Write back
+            file_path.write_text('\n'.join(result_lines), encoding="utf-8")
+            
+            return ToolResult.ok(f"Inserted {len(new_lines)} line(s) after line {after_line} in {path}")
+            
+        except Exception as e:
+            return ToolResult.fail(f"Error inserting lines: {e}")
+
+
+class EditFunctionTool(BaseTool):
+    """
+    Edit a specific function or class in a file.
+    
+    Finds the function/class by name and replaces its entire body.
+    More intuitive than line numbers for code modifications.
+    """
+    
+    def __init__(self, base_dir: Optional[Path] = None):
+        super().__init__()
+        self.base_dir = base_dir or Path.cwd()
+    
+    @property
+    def definition(self) -> ToolDefinition:
+        return ToolDefinition(
+            name="edit_function",
+            description="Replace an entire function or class definition by name. Finds it and replaces with new code.",
+            category=ToolCategory.CODE,
+            parameters=[
+                ToolParameter(
+                    name="path",
+                    param_type=str,
+                    description="File path to modify",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="name",
+                    param_type=str,
+                    description="Function or class name to find and replace",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="new_code",
+                    param_type=str,
+                    description="Complete new function/class definition including signature",
+                    required=True,
+                ),
+            ],
+            returns="Success message with location modified",
+            examples=[
+                {"input": {
+                    "path": "src/main.py",
+                    "name": "process_data",
+                    "new_code": "def process_data(data):\n    # New implementation\n    return data * 2"
+                 },
+                 "output": "Replaced function 'process_data' at lines 15-25 in src/main.py"},
+            ],
+            tags=["edit", "function", "class", "modify"],
+        )
+    
+    async def execute(
+        self,
+        path: str,
+        name: str,
+        new_code: str,
+        **kwargs
+    ) -> ToolResult:
+        try:
+            file_path = self.base_dir / path
+            
+            if not file_path.exists():
+                return ToolResult.fail(f"File not found: {path}")
+            
+            content = file_path.read_text(encoding="utf-8")
+            lines = content.split('\n')
+            
+            # Find the function/class definition
+            start_line = None
+            end_line = None
+            indent_level = None
+            
+            # Patterns to match
+            patterns = [
+                f"def {name}(",
+                f"async def {name}(",
+                f"class {name}(",
+                f"class {name}:",
+            ]
+            
+            for i, line in enumerate(lines):
+                stripped = line.lstrip()
+                
+                # Check if this is the target definition
+                if start_line is None:
+                    for pattern in patterns:
+                        if stripped.startswith(pattern):
+                            start_line = i
+                            indent_level = len(line) - len(stripped)
+                            break
+                
+                # Find the end of the definition (next line with same or less indentation)
+                elif start_line is not None and i > start_line:
+                    if stripped and not stripped.startswith('#'):
+                        current_indent = len(line) - len(stripped)
+                        if current_indent <= indent_level:
+                            end_line = i
+                            break
+            
+            if start_line is None:
+                return ToolResult.fail(f"Could not find function/class '{name}' in {path}")
+            
+            # If we didn't find end, it goes to EOF
+            if end_line is None:
+                end_line = len(lines)
+            
+            # Build new content
+            new_lines = new_code.split('\n')
+            # Preserve original indentation
+            if indent_level > 0:
+                indent = ' ' * indent_level
+                new_lines = [indent + line if line.strip() else line for line in new_lines]
+            
+            result_lines = lines[:start_line] + new_lines + lines[end_line:]
+            
+            # Write back
+            file_path.write_text('\n'.join(result_lines), encoding="utf-8")
+            
+            return ToolResult.ok({
+                "message": f"Replaced '{name}' at lines {start_line + 1}-{end_line} in {path}",
+                "old_lines": end_line - start_line,
+                "new_lines": len(new_lines),
+            })
+            
+        except Exception as e:
+            return ToolResult.fail(f"Error editing function: {e}")
+
+
 class LintTool(BaseTool):
     """
     Lint/check code for errors.

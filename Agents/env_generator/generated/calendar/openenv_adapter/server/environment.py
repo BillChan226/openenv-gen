@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, List, TypeVar, Generic
+
 import requests
 
+from openenv_adapter.models import (
+    TAction,
+    TObservation,
+    TState,
+)
 
-# --- Base abstractions -----------------------------------------------------
 
-
-class Environment:
-    """
-    Minimal base Environment pattern.
-
-    Concrete environments should implement:
-    - reset() -> Observation
-    - step(action) -> Tuple[Observation, float, bool, Dict[str, Any]]
-    """
+# Basic protocol-style base classes.
+# These mirror the conceptual OpenEnv interfaces used in the examples.
+class BaseProtocol:
+    """Placeholder base protocol-style class."""
+    pass

@@ -1,58 +1,71 @@
 import React from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { Link } from "react-router-dom";
 
 const Dashboard: React.FC = () => {
-  const { user, isAuthenticated, isLoading, logout } = useAuth();
-
-  if (isLoading) {
-    return (
-      <main style={{ padding: "2rem" }}>
-        <p>Loading your dashboard...</p>
-      </main>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <main style={{ padding: "2rem" }}>
-        <h1>Dashboard</h1>
-        <p>You must be logged in to view this page.</p>
-      </main>
-    );
-  }
+  // In a fuller implementation, user data would come from an AuthContext
+  // or a similar provider. For now, this is a simple placeholder.
+  const mockUser = {
+    name: "Calendar User",
+    email: "user@example.com",
+  };
 
   return (
-    <main style={{ padding: "2rem" }}>
-      <header style={{ marginBottom: "1.5rem" }}>
-        <h1>Dashboard</h1>
-        <p>
-          Welcome{" "}
-          {user?.full_name && user.full_name.trim().length > 0
-            ? user.full_name
-            : user?.email}
-          !
-        </p>
-        <button
-          type="button"
-          onClick={logout}
-          style={{
-            marginTop: "0.75rem",
-            padding: "0.5rem 1rem",
-            cursor: "pointer",
-          }}
-        >
-          Logout
-        </button>
+    <div className="page page-dashboard">
+      <header className="dashboard-header">
+        <div className="dashboard-header-left">
+          <h1>Dashboard</h1>
+          <p className="dashboard-subtitle">
+            Welcome back, {mockUser.name}! Here&apos;s a quick overview of your calendar.
+          </p>
+        </div>
+        <div className="dashboard-header-right">
+          <div className="user-summary">
+            <span className="user-name">{mockUser.name}</span>
+            <span className="user-email">{mockUser.email}</span>
+          </div>
+          {/* Placeholder for a future logout button or user menu */}
+        </div>
       </header>
 
-      <section>
-        <h2>Your Calendar Overview</h2>
-        <p>
-          This is the main dashboard area. Future enhancements can include your
-          upcoming events, a monthly calendar view, and quick actions.
-        </p>
-      </section>
-    </main>
+      <main className="dashboard-main">
+        <section className="dashboard-section">
+          <h2>Quick Navigation</h2>
+          <nav className="dashboard-nav">
+            <ul>
+              <li>
+                <Link to="/calendar">View Calendar</Link>
+              </li>
+              <li>
+                <Link to="/events/new">Create Event</Link>
+              </li>
+              <li>
+                <Link to="/settings">Account Settings</Link>
+              </li>
+            </ul>
+          </nav>
+        </section>
+
+        <section className="dashboard-section">
+          <h2>Upcoming Events</h2>
+          <p>
+            Upcoming events will be shown here once the events API and calendar
+            views are wired up.
+          </p>
+        </section>
+
+        <section className="dashboard-section">
+          <h2>Shared Calendars</h2>
+          <p>
+            Shared calendars and team schedules will appear here in a future
+            iteration.
+          </p>
+        </section>
+      </main>
+
+      <footer className="dashboard-footer">
+        <Link to="/">Back to home</Link>
+      </footer>
+    </div>
   );
 };
 

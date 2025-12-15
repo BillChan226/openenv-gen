@@ -4,36 +4,44 @@ services:
   calendar_api:
     build:
       context: .
-      dockerfile: calendar_api/Dockerfile
+      dockerfile: Dockerfile.api
     container_name: calendar_api
+    environment:
+      DATABASE_URL: "sqlite:///./calendar.db"
     ports:
       - "8000:8000"
-    environment:
-      # Adjust or extend environment variables as needed
-      # Example: API_CORS_ORIGINS: "http://localhost:8080"
-      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./calendar_api:/app/calendar_api
+      - calendar_api_data:/app
     networks:
       - calendar_net
+    command: >
+      uvicorn calendar_api.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
 
   calendar_ui:
     build:
       context: .
-      dockerfile: calendar_ui/Dockerfile
+      dockerfile: Dockerfile.ui
     container_name: calendar_ui
-    ports:
-      - "8080:80"
-    depends_on:
-      - calendar_api
     environment:
-      # If the UI needs to know the API URL at build/runtime, configure it here
-      # Example for many SPA setups:
-      # VITE_API_URL: "http://calendar_api:8000"
-      # REACT_APP_API_URL: "http://calendar_api:8000"
-      # NEXT_PUBLIC_API_URL: "http://calendar_api:8000"
-      API_URL: "http://calendar_api:8000"
+      VITE_API_BASE_URL: "http://calendar_api:8000"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./calendar_ui:/app/calendar_ui
+      - /app/node_modules
     networks:
       - calendar_net
+    command: >
+      npm run dev
+      -- --host 0.0.0.0
+      --port 5173
 
 networks:
   calendar_net:
     driver: bridge
+volumes:
+  calendar_api_data: {}

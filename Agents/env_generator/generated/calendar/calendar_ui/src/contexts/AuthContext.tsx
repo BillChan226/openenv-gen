@@ -1,34 +1,16 @@
 import React, {
   createContext,
   useContext,
-  useState,
   useEffect,
-  useMemo,
+  useState,
   ReactNode,
 } from "react";
-import axios, { AxiosError } from "axios";
 
 interface User {
   id: string;
   email: string;
-  full_name?: string;
-}
-
-interface AuthResponse {
-  access_token: string;
-  token_type: string;
-  user?: User;
-}
-
-interface LoginCredentials {
-  email: string;
-  password: string;
-}
-
-interface RegisterPayload {
-  email: string;
-  password: string;
-  full_name?: string;
+  name?: string | null;
+  created_at?: string;
 }
 
 interface AuthContextType {
@@ -36,57 +18,73 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<void>;
+  register: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => void;
-  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const TOKEN_STORAGE_KEY = "auth_token";
-const API_BASE_URL = "/api"; // adjust if backend is served from a different base path
-
-const api = axios.create({
-  baseURL: API_BASE_URL,
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_STORAGE_KEY);
-  if (token && config.headers) {
-    // FastAPI expects `Authorization: Bearer <token>`
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
 
 interface AuthProviderProps {
   children: ReactNode;
 }
 
+const TOKEN_STORAGE_KEY = "auth_token";
+
+const getApiBaseUrl = (): string => {
+  // Prefer an environment variable if available, otherwise default to same-origin /api
+  if (typeof import.meta !== "undefined" && (import.meta as any).env) {
+    const envBase =
+      (import.meta as any).env.VITE_API_BASE_URL ||
+      (import.meta as any).env.API_BASE_URL;
+    if (envBase) {
+      return envBase.replace(/\/+$/, "");
+    }
+  }
+  return "/api";
+};
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(
-    typeof window !== "undefined" ? localStorage.getItem(TOKEN_STORAGE_KEY) : null,
-  );
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+    return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+  });
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Initialize auth state from stored token and fetch current user if possible
+  const apiBaseUrl = getApiBaseUrl();
+
   useEffect(() => {
-    const initializeAuth = async () => {
+    const initAuth = async () => {
       if (!token) {
         setIsLoading(false);
         return;
       }
 
       try {
-        const response = await api.get<User>("/auth/me");
-        setUser(response.data);
+        const response = await fetch(`${apiBaseUrl}/auth/me`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          if (typeof window !== "undefined") {
+            window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+          }
+          setToken(null);
+          setUser(null);
+        } else {
+          const userData: User = await response.json();
+          setUser(userData);
+        }
       } catch {
-        // Token might be invalid/expired
-        localStorage.removeItem(TOKEN_STORAGE_KEY);
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+        }
         setToken(null);
         setUser(null);
       } finally {
@@ -94,104 +92,114 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     };
 
-    void initializeAuth();
-  }, [token]);
-
-  const handleAuthError = (err: unknown, defaultMessage: string): never => {
-    let message = defaultMessage;
-
-    if (axios.isAxiosError(err)) {
-      const axiosError = err as AxiosError<{ detail?: string }>;
-      if (axiosError.response?.data?.detail) {
-        message = axiosError.response.data.detail;
-      } else if (axiosError.message) {
-        message = axiosError.message;
-      }
-    } else if (err instanceof Error && err.message) {
-      message = err.message;
-    }
-
-    setError(message);
-    throw new Error(message);
-  };
+    void initAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, apiBaseUrl]);
 
   const login = async (email: string, password: string): Promise<void> => {
-    setError(null);
-    try {
-      const response = await api.post<AuthResponse>("/auth/login", {
-        email,
-        password,
-      } as LoginCredentials);
+    const response = await fetch(`${apiBaseUrl}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    });
 
-      const { access_token, user: userData } = response.data;
+    const data = await response.json().catch(() => ({}));
 
-      localStorage.setItem(TOKEN_STORAGE_KEY, access_token);
-      setToken(access_token);
-      if (userData) {
-        setUser(userData);
-      } else {
-        // Fallback: fetch user info if not included in login response
-        try {
-          const meResponse = await api.get<User>("/auth/me");
-          setUser(meResponse.data);
-        } catch {
-          setUser(null);
+    if (!response.ok) {
+      const message =
+        (data && (data.detail as string | undefined)) || "Login failed";
+      throw new Error(message);
+    }
+
+    const accessToken: string | undefined = data.access_token;
+    if (!accessToken) {
+      throw new Error("Invalid response from server: missing access token");
+    }
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+    }
+    setToken(accessToken);
+
+    // If backend also returns user object, set it; otherwise fetch /me
+    if (data.user) {
+      setUser(data.user as User);
+    } else {
+      try {
+        const meResponse = await fetch(`${apiBaseUrl}/auth/me`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        if (meResponse.ok) {
+          const userData: User = await meResponse.json();
+          setUser(userData);
         }
+      } catch {
+        // If /me fails, still consider user authenticated with token
       }
-    } catch (err) {
-      handleAuthError(err, "Login failed");
     }
   };
 
-  const register = async (payload: RegisterPayload): Promise<void> => {
-    setError(null);
-    try {
-      await api.post("/auth/register", payload);
-      // Auto-login after successful registration
-      await login(payload.email, payload.password);
-    } catch (err) {
-      handleAuthError(err, "Registration failed");
+  const register = async (
+    email: string,
+    password: string,
+    name?: string
+  ): Promise<void> => {
+    const response = await fetch(`${apiBaseUrl}/auth/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password, name }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const message =
+        (data && (data.detail as string | undefined)) ||
+        "Registration failed";
+      throw new Error(message);
     }
+
+    // Auto-login after successful registration
+    await login(email, password);
   };
 
   const logout = (): void => {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
     setToken(null);
     setUser(null);
-    setError(null);
   };
 
-  const clearError = (): void => {
-    setError(null);
+  const value: AuthContextType = {
+    user,
+    token,
+    isAuthenticated: !!token,
+    isLoading,
+    login,
+    register,
+    logout,
   };
 
-  const value: AuthContextType = useMemo(
-    () => ({
-      user,
-      token,
-      isAuthenticated: Boolean(token),
-      isLoading,
-      error,
-      login,
-      register,
-      logout,
-      clearError,
-    }),
-    [user, token, isLoading, error],
+  return (
+    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
   );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
 tsx
-
-export default AuthProvider;
-export default AuthProvider;
-export { AuthProvider };
+tsx
+tsx

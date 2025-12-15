@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -8,55 +8,55 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class UserBase(BaseModel):
-    """Shared user properties exposed via API."""
+    """Shared user properties exposed to or accepted from clients."""
 
     email: EmailStr
-    first_name: Optional[str] = Field(None, max_length=100)
-    last_name: Optional[str] = Field(None, max_length=100)
-    timezone: str = Field(default="UTC", max_length=64)
-    is_active: bool = True
-    is_verified: bool = False
+    name: Optional[str] = None
 
 
-class UserCreate(BaseModel):
-    """Properties required to create a new user."""
+class UserCreate(UserBase):
+    """Properties required to register a new user."""
+
+    password: str = Field(..., min_length=8)
+
+
+class UserLogin(BaseModel):
+    """Credentials used for logging in."""
 
     email: EmailStr
     password: str = Field(..., min_length=8)
-    first_name: Optional[str] = Field(None, max_length=100)
-    last_name: Optional[str] = Field(None, max_length=100)
-    timezone: Optional[str] = Field(default="UTC", max_length=64)
 
 
 class UserUpdate(BaseModel):
-    """Properties allowed to be updated for an existing user."""
+    """User fields that can be updated (all optional)."""
 
     email: Optional[EmailStr] = None
-    password: Optional[str] = Field(None, min_length=8)
-    first_name: Optional[str] = Field(None, max_length=100)
-    last_name: Optional[str] = Field(None, max_length=100)
-    timezone: Optional[str] = Field(None, max_length=64)
-    is_active: Optional[bool] = None
-    is_verified: Optional[bool] = None
+    name: Optional[str] = None
+    password: Optional[str] = Field(default=None, min_length=8)
 
 
 class UserResponse(UserBase):
-    """User representation returned to clients."""
+    """User data returned to clients."""
 
     id: str
     created_at: datetime
-    updated_at: datetime
-    last_login_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
 
-class UserListResponse(BaseModel):
-    """Paginated list of users."""
+# ===== Auth / Token Schemas =====
 
-    items: List[UserResponse]
-    total: int
-    page: int
-    page_size: int
-    pages: int
+
+class Token(BaseModel):
+    """Access token returned after successful authentication."""
+
+    access_token: str
+    token_type: str = "bearer"
+
+
+class TokenPayload(BaseModel):
+    """Data encoded inside access tokens (e.g., JWT)."""
+
+    sub: Optional[str] = None  # user id
+    exp: Optional[int] = None  # expiration timestamp (Unix epoch)

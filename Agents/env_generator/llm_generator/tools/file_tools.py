@@ -12,6 +12,7 @@ from typing import Optional
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 from utils.tool import BaseTool, ToolDefinition, ToolParameter, ToolResult, ToolCategory
+from typing import Dict, List, Any
 
 
 class ReadFileTool(BaseTool):
@@ -261,4 +262,206 @@ class FileExistsTool(BaseTool):
             "is_directory": is_dir,
             "path": str(file_path),
         })
+
+
+class ListGeneratedFilesTool(BaseTool):
+    """
+    List all files that have been generated so far.
+    
+    This helps the agent know what's available to read/reference
+    and what still needs to be generated.
+    """
+    
+    def __init__(self, base_dir: Optional[Path] = None, gen_context: Any = None):
+        super().__init__()
+        self.base_dir = base_dir or Path.cwd()
+        self.gen_context = gen_context  # Reference to GenerationContext
+    
+    @property
+    def definition(self) -> ToolDefinition:
+        return ToolDefinition(
+            name="list_generated",
+            description="List all files generated so far with their summaries. Use this to know what's available before trying to read files.",
+            category=ToolCategory.FILE_SYSTEM,
+            parameters=[
+                ToolParameter(
+                    name="phase",
+                    param_type=str,
+                    description="Filter by phase (design/backend/frontend/openenv/docker). Leave empty for all.",
+                    required=False,
+                    default=None,
+                ),
+                ToolParameter(
+                    name="include_summary",
+                    param_type=bool,
+                    description="Include file structure summaries (default: True)",
+                    required=False,
+                    default=True,
+                ),
+            ],
+            returns="List of generated files with metadata",
+            tags=["files", "list", "generated"],
+        )
+    
+    async def execute(
+        self,
+        phase: Optional[str] = None,
+        include_summary: bool = True,
+        **kwargs
+    ) -> ToolResult:
+        try:
+            generated_files = []
+            
+            # Get from GenerationContext if available
+            if self.gen_context and hasattr(self.gen_context, 'files'):
+                for path, info in self.gen_context.files.items():
+                    file_phase = info.get('phase', 'unknown') if isinstance(info, dict) else 'unknown'
+                    
+                    if phase and file_phase != phase:
+                        continue
+                    
+                    file_info = {
+                        "path": path,
+                        "phase": file_phase,
+                        "exists": (self.base_dir / path).exists(),
+                    }
+                    
+                    # Add line count if file exists
+                    full_path = self.base_dir / path
+                    if full_path.exists():
+                        try:
+                            content = full_path.read_text(encoding='utf-8')
+                            file_info["lines"] = len(content.split('\n'))
+                            file_info["chars"] = len(content)
+                            
+                            # Quick structure summary
+                            if include_summary:
+                                if path.endswith('.py'):
+                                    classes = len([l for l in content.split('\n') if l.strip().startswith('class ')])
+                                    functions = len([l for l in content.split('\n') if l.strip().startswith(('def ', 'async def '))])
+                                    file_info["structure"] = f"{classes} classes, {functions} functions"
+                                elif path.endswith(('.ts', '.tsx')):
+                                    exports = len([l for l in content.split('\n') if 'export ' in l])
+                                    file_info["structure"] = f"{exports} exports"
+                                elif path.endswith('.json'):
+                                    import json
+                                    try:
+                                        data = json.loads(content)
+                                        if isinstance(data, dict):
+                                            file_info["structure"] = f"keys: {list(data.keys())[:5]}"
+                                    except:
+                                        pass
+                        except:
+                            pass
+                    
+                    generated_files.append(file_info)
+            
+            # Fallback: scan directory
+            if not generated_files:
+                for file_path in self.base_dir.rglob('*'):
+                    if file_path.is_file() and not any(x in str(file_path) for x in ['node_modules', '.checkpoint', '__pycache__']):
+                        rel_path = str(file_path.relative_to(self.base_dir))
+                        generated_files.append({
+                            "path": rel_path,
+                            "phase": "unknown",
+                            "exists": True,
+                            "lines": len(file_path.read_text(encoding='utf-8', errors='ignore').split('\n')),
+                        })
+            
+            # Sort by phase order
+            phase_order = {'design': 0, 'backend': 1, 'frontend': 2, 'openenv': 3, 'docker': 4, 'unknown': 5}
+            generated_files.sort(key=lambda x: (phase_order.get(x.get('phase', 'unknown'), 5), x['path']))
+            
+            return ToolResult.ok({
+                "total_files": len(generated_files),
+                "files": generated_files,
+                "by_phase": {
+                    p: len([f for f in generated_files if f.get('phase') == p])
+                    for p in set(f.get('phase', 'unknown') for f in generated_files)
+                },
+            })
+            
+        except Exception as e:
+            return ToolResult.fail(f"Error listing generated files: {e}")
+
+
+class UpdatePlanTool(BaseTool):
+    """
+    Update the generation plan mid-execution.
+    
+    Allows the agent to revise its plan based on what it learns
+    during generation.
+    """
+    
+    def __init__(self, gen_context: Any = None):
+        super().__init__()
+        self.gen_context = gen_context
+    
+    @property
+    def definition(self) -> ToolDefinition:
+        return ToolDefinition(
+            name="update_plan",
+            description="Update the generation plan. Use when you realize the plan needs changes based on what you've learned.",
+            category=ToolCategory.CUSTOM,
+            parameters=[
+                ToolParameter(
+                    name="action",
+                    param_type=str,
+                    description="Action: 'add_file', 'remove_file', 'reorder', 'update_spec'",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="target",
+                    param_type=str,
+                    description="Target file path or spec to update",
+                    required=True,
+                ),
+                ToolParameter(
+                    name="details",
+                    param_type=str,
+                    description="Details of the update (new file purpose, reason for removal, etc.)",
+                    required=False,
+                    default="",
+                ),
+            ],
+            returns="Confirmation of plan update",
+            tags=["plan", "update", "revise"],
+        )
+    
+    async def execute(
+        self,
+        action: str,
+        target: str,
+        details: str = "",
+        **kwargs
+    ) -> ToolResult:
+        try:
+            if not self.gen_context:
+                return ToolResult.fail("No generation context available")
+            
+            if action == "add_file":
+                # Add file to pending generation
+                if hasattr(self.gen_context, 'pending_files'):
+                    self.gen_context.pending_files.append({
+                        "path": target,
+                        "purpose": details,
+                        "added_dynamically": True,
+                    })
+                return ToolResult.ok(f"Added '{target}' to pending files: {details}")
+            
+            elif action == "remove_file":
+                # Mark file as not needed
+                if hasattr(self.gen_context, 'skipped_files'):
+                    self.gen_context.skipped_files.append(target)
+                return ToolResult.ok(f"Marked '{target}' as skipped: {details}")
+            
+            elif action == "update_spec":
+                # Update env_spec or other spec
+                return ToolResult.ok(f"Plan update noted for '{target}': {details}. Use edit_function or search_replace to modify.")
+            
+            else:
+                return ToolResult.fail(f"Unknown action: {action}. Use 'add_file', 'remove_file', or 'update_spec'")
+            
+        except Exception as e:
+            return ToolResult.fail(f"Error updating plan: {e}")
 
