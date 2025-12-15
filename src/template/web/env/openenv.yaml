@@ -1,0 +1,28 @@
+# OpenEnv Configuration for {{ENV_NAME}}
+name: "{{ENV_NAME}}"
+version: "0.1.0"
+description: "{{ENV_DESCRIPTION}}"
+
+# Environment type
+type: "web"
+
+# Entry points
+server:
+  module: "env.server.app"
+  app: "app"
+
+client:
+  module: "env.client"
+  class: "WebEnvClient"
+
+# Docker configuration
+docker:
+  image: "{{ENV_NAME}}:latest"
+  build_context: "."
+  dockerfile: "env/server/Dockerfile"
+
+# Dependencies
+dependencies:
+  - "frontend"
+  - "backend"
+  - "database"

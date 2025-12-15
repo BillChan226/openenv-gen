@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  database:
+    build:
+      context: ../app/database
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: {{ENV_NAME}}_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - {{ENV_NAME}}_network
+
+  # Node.js Backend
+  backend:
+    build:
+      context: ../app/backend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_NAME: {{ENV_NAME}}_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      JWT_SECRET: your-secret-key-change-in-production
+    ports:
+      - "5000:5000"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - {{ENV_NAME}}_network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ../app/frontend
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_URL: http://backend:5000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - {{ENV_NAME}}_network
+
+  # OpenEnv Environment Server
+  env_server:
+    build:
+      context: ..
+      dockerfile: env/server/Dockerfile
+    environment:
+      APP_URL: http://frontend:3000
+      API_URL: http://backend:5000
+      HEADLESS: "true"
+      VIEWPORT_WIDTH: 1280
+      VIEWPORT_HEIGHT: 720
+      TIMEOUT: 10000
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - {{ENV_NAME}}_network
+
+networks:
+  {{ENV_NAME}}_network:
+    driver: bridge
+
+volumes:
+  db_data:
