@@ -1,76 +1,80 @@
-"""HTTP Client for the {{ENV_NAME}} environment.
+"""Client for the {{ENV_NAME}} environment.
 
-Provides a client interface for interacting with the environment server.
+This module provides access to the BrowserGym-registered environment.
+
+Usage:
+    from env.client import make_env, list_tasks
+
+    # Create environment for a specific task
+    env = make_env("login")  # Creates browsergym/{{ENV_NAME}}.login
+    obs, info = env.reset()
+
+    # Take actions
+    obs, reward, terminated, truncated, info = env.step("click('submit-btn')")
+
+    env.close()
+
+    # Or use gymnasium directly
+    import gymnasium as gym
+    env = gym.make("browsergym/{{ENV_NAME}}.login")
 """
 
-from typing import Any, Dict
+import gymnasium as gym
 
-from openenv_core.client_types import StepResult
-from openenv_core.http_env_client import HTTPEnvClient
+# Re-export BrowserGym types for convenience
+from envs.browsergym_env import (
+    BrowserGymAction,
+    BrowserGymObservation,
+    BrowserGymState,
+)
 
-from .models import WebAction, WebObservation, WebState
 
+def make_env(
+    task_id: str,
+    headless: bool = True,
+    **kwargs,
+) -> gym.Env:
+    """Create a BrowserGym environment for a {{ENV_NAME}} task.
 
-class WebEnvClient(HTTPEnvClient[WebAction, WebObservation]):
-    """HTTP client for the generated web environment.
+    Args:
+        task_id: Task identifier (e.g., "login", "create-repo")
+        headless: Run browser in headless mode
+        **kwargs: Additional arguments passed to gym.make()
 
-    Usage:
-        # From Docker image
-        client = WebEnvClient.from_docker_image("{{ENV_NAME}}:latest")
+    Returns:
+        Gymnasium environment
 
-        # From running server
-        client = WebEnvClient(base_url="http://localhost:8000")
-
-        # Interact with environment
-        result = client.reset()
-        result = client.step(WebAction(action_str="click('login-btn')"))
-        client.close()
+    Example:
+        env = make_env("login")
+        obs, info = env.reset()
+        obs, reward, terminated, truncated, info = env.step("click('login-btn')")
+        env.close()
     """
+    # Ensure tasks are registered
+    from env.server.environment import register_all_tasks
+    try:
+        register_all_tasks()
+    except Exception:
+        pass  # Already registered or tasks not available
 
-    def _step_payload(self, action: WebAction) -> Dict[str, Any]:
-        """Convert action to JSON payload for the server."""
-        return {
-            "action_str": action.to_action_str(),
-            "action_type": action.action_type,
-            "selector": action.selector,
-            "value": action.value,
-            "metadata": action.metadata,
-        }
+    env_id = f"browsergym/{{ENV_NAME}}.{task_id}"
+    return gym.make(env_id, headless=headless, **kwargs)
 
-    def _parse_result(self, payload: Dict[str, Any]) -> StepResult[WebObservation]:
-        """Parse server response into StepResult."""
-        obs_data = payload.get("observation", {})
 
-        observation = WebObservation(
-            text=obs_data.get("text", ""),
-            url=obs_data.get("url", ""),
-            screenshot=obs_data.get("screenshot"),
-            goal=obs_data.get("goal", ""),
-            html=obs_data.get("html", ""),
-            axtree_txt=obs_data.get("axtree_txt", ""),
-            error=obs_data.get("error", ""),
-            last_action_error=obs_data.get("last_action_error", False),
-            done=payload.get("done", False),
-            reward=payload.get("reward"),
-            metadata=obs_data.get("metadata", {}),
-        )
+def list_tasks() -> list[dict]:
+    """List all available tasks for {{ENV_NAME}}.
 
-        return StepResult(
-            observation=observation,
-            reward=payload.get("reward"),
-            done=payload.get("done", False),
-        )
+    Returns:
+        List of task info dicts with id, name, goal, difficulty
+    """
+    from tasks import list_tasks as _list_tasks
+    return _list_tasks()
 
-    def _parse_state(self, payload: Dict[str, Any]) -> WebState:
-        """Parse server state response."""
-        return WebState(
-            episode_id=payload.get("episode_id"),
-            step_count=payload.get("step_count", 0),
-            task_id=payload.get("task_id"),
-            task_name=payload.get("task_name", ""),
-            goal=payload.get("goal", ""),
-            current_url=payload.get("current_url", ""),
-            max_steps=payload.get("max_steps"),
-            cum_reward=payload.get("cum_reward", 0.0),
-            db_state=payload.get("db_state", {}),
-        )
+
+__all__ = [
+    "make_env",
+    "list_tasks",
+    "BrowserGymAction",
+    "BrowserGymObservation",
+    "BrowserGymState",
+]

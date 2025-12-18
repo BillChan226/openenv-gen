@@ -1,4 +1,4 @@
-"""Base task class for {{ENV_NAME}} environment.
+"""Base task class for github-web environment.
 
 Defines the interface for all task definitions.
 """

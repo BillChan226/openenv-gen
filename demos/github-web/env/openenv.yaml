@@ -1,5 +1,5 @@
-# OpenEnv Configuration for {{ENV_NAME}}
-name: "{{ENV_NAME}}"
+# OpenEnv Configuration for github-web
+name: "github-web"
 version: "0.1.0"
 description: "{{ENV_DESCRIPTION}}"
 
@@ -17,7 +17,7 @@ client:
 
 # Docker configuration
 docker:
-  image: "{{ENV_NAME}}:latest"
+  image: "github-web:latest"
   build_context: "."
   dockerfile: "env/server/Dockerfile"
 

@@ -1,46 +1,43 @@
-"""FastAPI server for the {{ENV_NAME}} environment."""
+"""FastAPI server for the {{ENV_NAME}} environment.
+
+This environment is registered into BrowserGym as browsergym/{{ENV_NAME}}.{task_id}.
+
+Usage:
+    # Register and use via BrowserGym
+    import gymnasium as gym
+    from env.server.environment import register_all_tasks
+
+    register_all_tasks()
+    env = gym.make("browsergym/{{ENV_NAME}}.login")
+    obs, info = env.reset()
+    # ... interact with environment
+    env.close()
+"""
 
 import os
 
-from openenv_core.env_server.http_server import create_app
-
-from ..models import WebAction, WebObservation
-from .environment import WebEnvironment
+# Import to trigger auto-registration of tasks
+from .environment import register_all_tasks, WebTask
 
 # Configuration from environment variables
-app_url = os.environ.get("APP_URL", "http://frontend:3000")
-api_url = os.environ.get("API_URL", "http://backend:5000")
-headless = os.environ.get("HEADLESS", "true").lower() == "true"
-viewport_width = int(os.environ.get("VIEWPORT_WIDTH", "1280"))
-viewport_height = int(os.environ.get("VIEWPORT_HEIGHT", "720"))
-timeout = float(os.environ.get("TIMEOUT", "10000"))
-task_name = os.environ.get("TASK_NAME")
-port = int(os.environ.get("PORT", "8000"))
-
-# Create environment
-env = WebEnvironment(
-    app_url=app_url,
-    api_url=api_url,
-    headless=headless,
-    viewport_width=viewport_width,
-    viewport_height=viewport_height,
-    timeout=timeout,
-    task_name=task_name,
-)
-
-# Create FastAPI app
-app = create_app(
-    env,
-    WebAction,
-    WebObservation,
-    env_name="{{ENV_NAME}}",
-)
+APP_URL = os.environ.get("APP_URL", "http://frontend:3000")
+API_URL = os.environ.get("API_URL", "http://backend:5000")
 
 
 def main():
-    """Entry point for running the server."""
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    """Entry point for registering tasks and starting the environment."""
+    # Register all tasks from the task registry
+    register_all_tasks(app_url=APP_URL, api_url=API_URL)
+    print(f"✓ Registered {{ENV_NAME}} tasks into BrowserGym")
+    print(f"✓ App URL: {APP_URL}")
+    print(f"✓ API URL: {API_URL}")
+
+    # List registered tasks
+    from tasks import list_tasks
+    tasks = list_tasks()
+    print(f"✓ Available tasks ({len(tasks)}):")
+    for task in tasks:
+        print(f"  - browsergym/{{ENV_NAME}}.{task['id']}: {task['goal'][:50]}...")
 
 
 if __name__ == "__main__":

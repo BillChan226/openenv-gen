@@ -1,4 +1,4 @@
-"""Task registry for {{ENV_NAME}} environment.
+"""Task registry for github-web environment.
 
 Manages registration and retrieval of task definitions.
 """

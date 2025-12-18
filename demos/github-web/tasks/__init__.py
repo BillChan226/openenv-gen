@@ -1,4 +1,4 @@
-"""Task definitions for {{ENV_NAME}} environment.
+"""Task definitions for github-web environment.
 
 This module provides the task registry and base classes for defining
 training/evaluation tasks.

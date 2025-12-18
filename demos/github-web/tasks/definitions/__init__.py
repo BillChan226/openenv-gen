@@ -1,4 +1,4 @@
-"""Task definitions for {{ENV_NAME}}.
+"""Task definitions for github-web.
 
 Import all task modules to register them.
 """

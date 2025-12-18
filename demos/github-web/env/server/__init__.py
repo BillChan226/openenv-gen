@@ -1,1 +1,1 @@
-"""Server module for {{ENV_NAME}} environment."""
+"""Server module for github-web environment."""

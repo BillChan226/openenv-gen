@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the {{ENV_NAME}} environment setup."""
+"""Validate the github-web environment setup."""
 
 import sys
 import requests
@@ -47,7 +47,7 @@ def check_docker_containers() -> bool:
 
 def main():
     print("=" * 50)
-    print("{{ENV_NAME}} Environment Validation")
+    print("github-web Environment Validation")
     print("=" * 50)
     print()
 
