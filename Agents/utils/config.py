@@ -54,7 +54,7 @@ class LLMConfig:
     top_p: float = 1.0
     frequency_penalty: float = 0.0
     presence_penalty: float = 0.0
-    timeout: int = 60  # seconds
+    timeout: int = 1800  # 30 minutes
     retry_attempts: int = 3
     retry_delay: float = 1.0  # seconds
     extra_params: dict = field(default_factory=dict)
@@ -235,7 +235,7 @@ class AgentConfig:
             temperature=llm_data.get("temperature", 0.7),
             max_tokens=llm_data.get("max_tokens", 4096),
             top_p=llm_data.get("top_p", 1.0),
-            timeout=llm_data.get("timeout", 60),
+            timeout=llm_data.get("timeout", 1800),
             retry_attempts=llm_data.get("retry_attempts", 3),
         )
         

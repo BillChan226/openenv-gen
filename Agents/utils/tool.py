@@ -1,344 +1,310 @@
 """
-Tool Interface Module - Defines tools that Agents can use
+Tool Interface Module - LiteLLM-compatible tool definitions
 
-Supports:
-- BaseTool: Tool base class
-- ToolRegistry: Tool registry
-- ToolResult: Tool execution result
-- Decorators: Simplify tool definition
+Inspired by OpenHands, this module provides:
+- Standard OpenAI/LiteLLM function calling format
+- Clean tool definition with ChatCompletionToolParam
+- Tool registry with categorization
+- Async execution support
 """
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Optional, Type, TypeVar, get_type_hints
-from uuid import uuid4
+from typing import Any, Callable, Optional, TypeVar
 import asyncio
 import inspect
-import functools
+from functools import wraps
 
 
 class ToolCategory(Enum):
-    """Tool category"""
-    FILE_SYSTEM = "file_system"     # File system operations
-    NETWORK = "network"             # Network operations
-    CODE = "code"                   # Code execution
-    SHELL = "shell"                 # Shell commands
-    DATA = "data"                   # Data processing
-    LLM = "llm"                     # LLM calls
-    SEARCH = "search"               # Search
-    CUSTOM = "custom"               # Custom
+    """Tool category for organization."""
+    FILE = "file"           # File operations (read, write, list)
+    CODE = "code"           # Code operations (grep, replace, lint)
+    SHELL = "shell"         # Shell commands
+    RUNTIME = "runtime"     # Runtime operations (start server, test API)
+    SEARCH = "search"       # Search operations
+    THINK = "think"         # Thinking/reasoning tools
+    AGENT = "agent"         # Agent control tools (think, finish)
+    CUSTOM = "custom"       # Custom tools
 
 
-class ToolStatus(Enum):
-    """Tool status"""
-    AVAILABLE = "available"
-    BUSY = "busy"
-    DISABLED = "disabled"
-    ERROR = "error"
-
-
-@dataclass
-class ToolParameter:
-    """Tool parameter definition"""
-    name: str
-    param_type: type
-    description: str = ""
-    required: bool = True
-    default: Any = None
-    choices: list = field(default_factory=list)  # Allowed values list
-    
-    def to_dict(self) -> dict:
-        return {
-            "name": self.name,
-            "type": self.param_type.__name__ if hasattr(self.param_type, '__name__') else str(self.param_type),
-            "description": self.description,
-            "required": self.required,
-            "default": self.default,
-            "choices": self.choices,
-        }
+class SecurityRisk(Enum):
+    """Security risk level for actions."""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
 
 
 @dataclass
 class ToolResult:
-    """Tool execution result"""
+    """Result of tool execution."""
     success: bool = True
     data: Any = None
     error_message: Optional[str] = None
-    execution_time: float = 0.0  # seconds
+    execution_time: float = 0.0
     metadata: dict = field(default_factory=dict)
     
     @classmethod
     def ok(cls, data: Any = None, **metadata) -> "ToolResult":
-        """Create success result"""
+        """Create success result."""
         return cls(success=True, data=data, metadata=metadata)
     
     @classmethod
     def fail(cls, error_message: str, **metadata) -> "ToolResult":
-        """Create failure result"""
+        """Create failure result."""
         return cls(success=False, error_message=error_message, metadata=metadata)
+    
+    def __str__(self) -> str:
+        if self.success:
+            return str(self.data) if self.data is not None else "OK"
+        return f"Error: {self.error_message}"
 
 
-@dataclass
-class ToolDefinition:
-    """Tool definition/description"""
-    name: str
-    description: str
-    category: ToolCategory = ToolCategory.CUSTOM
-    parameters: list[ToolParameter] = field(default_factory=list)
-    returns: str = ""  # Return value description
-    examples: list[dict] = field(default_factory=list)  # Usage examples
-    tags: list[str] = field(default_factory=list)
+def create_tool_param(
+    name: str,
+    description: str,
+    parameters: dict[str, dict],
+    required: list[str] = None,
+) -> dict:
+    """
+    Create a tool parameter in OpenAI/LiteLLM ChatCompletionToolParam format.
     
-    def to_dict(self) -> dict:
-        return {
-            "name": self.name,
-            "description": self.description,
-            "category": self.category.value,
-            "parameters": [p.to_dict() for p in self.parameters],
-            "returns": self.returns,
-            "examples": self.examples,
-            "tags": self.tags,
-        }
-    
-    def to_openai_function(self) -> dict:
-        """Convert to OpenAI Function Calling format"""
-        properties = {}
-        required = []
+    Args:
+        name: Tool name
+        description: Tool description
+        parameters: Dict of parameter_name -> {type, description, enum?, ...}
+                    OR a full JSON schema object with type, properties, required
+        required: List of required parameter names (ignored if parameters is full schema)
         
-        for param in self.parameters:
-            prop = {
-                "type": self._python_type_to_json(param.param_type),
-                "description": param.description,
-            }
-            if param.choices:
-                prop["enum"] = param.choices
-            properties[param.name] = prop
-            
-            if param.required:
-                required.append(param.name)
+    Returns:
+        ChatCompletionToolParam-compatible dict
         
-        return {
-            "name": self.name,
-            "description": self.description,
-            "parameters": {
-                "type": "object",
-                "properties": properties,
-                "required": required,
+    Example:
+        # Simple format (preferred):
+        tool = create_tool_param(
+            name="read_file",
+            description="Read a file from disk",
+            parameters={
+                "path": {"type": "string", "description": "File path to read"},
+                "start_line": {"type": "integer", "description": "Start line (optional)"},
             },
+            required=["path"]
+        )
+        
+        # Full schema format (also accepted):
+        tool = create_tool_param(
+            name="read_file",
+            description="Read a file from disk",
+            parameters={
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"]
+            }
+        )
+    """
+    # Check if parameters is already a full JSON schema (has "type": "object" and "properties")
+    if isinstance(parameters, dict) and parameters.get("type") == "object" and "properties" in parameters:
+        # Already full schema format, use as-is
+        params_obj = parameters
+    else:
+        # Simple properties dict, wrap it
+        params_obj = {
+            "type": "object",
+            "properties": parameters,
+            "required": required or [],
         }
     
-    @staticmethod
-    def _python_type_to_json(py_type: type) -> str:
-        """Convert Python type to JSON Schema type"""
-        type_map = {
-            str: "string",
-            int: "integer",
-            float: "number",
-            bool: "boolean",
-            list: "array",
-            dict: "object",
-        }
-        return type_map.get(py_type, "string")
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": params_obj,
+        },
+    }
 
 
 class BaseTool(ABC):
     """
-    Tool Base Class
+    Base class for all tools.
     
-    All tools must inherit this class and implement the execute method
+    Tools should:
+    1. Define their interface via the `tool_definition` property
+    2. Implement async `execute` method
+    3. Handle errors gracefully
+    
+    Example:
+        class ReadFileTool(BaseTool):
+            @property
+            def tool_definition(self) -> dict:
+                return create_tool_param(
+                    name="read_file",
+                    description="Read file contents",
+                    parameters={"path": {"type": "string", "description": "File path"}},
+                    required=["path"]
+                )
+            
+            async def execute(self, path: str, **kwargs) -> ToolResult:
+                content = Path(path).read_text()
+                return ToolResult.ok(content)
     """
     
-    def __init__(self):
-        self._status = ToolStatus.AVAILABLE
+    def __init__(self, name: str = None, category: ToolCategory = None):
         self._execution_count = 0
         self._last_executed: Optional[datetime] = None
+        self._category = category if category is not None else ToolCategory.CUSTOM
+        self._name_override = name  # For subclasses that set name directly
     
     @property
     @abstractmethod
-    def definition(self) -> ToolDefinition:
-        """Return tool definition"""
+    def tool_definition(self) -> dict:
+        """
+        Return tool definition in ChatCompletionToolParam format.
+        
+        Returns:
+            Dict with 'type' and 'function' keys
+        """
         pass
     
     @property
     def name(self) -> str:
-        return self.definition.name
+        """Get tool name from definition or override."""
+        if hasattr(self, '_name_override') and self._name_override:
+            return self._name_override
+        try:
+            return self.tool_definition.get("function", {}).get("name", "unknown")
+        except RecursionError:
+            return getattr(self, 'NAME', 'unknown')
     
     @property
     def description(self) -> str:
-        return self.definition.description
+        """Get tool description from definition."""
+        return self.tool_definition.get("function", {}).get("description", "")
     
     @property
-    def status(self) -> ToolStatus:
-        return self._status
-    
-    def set_status(self, status: ToolStatus) -> None:
-        self._status = status
-    
-    def validate_params(self, **kwargs) -> tuple[bool, str]:
-        """
-        Validate parameters
-        
-        Returns:
-            (is_valid, error_message)
-        """
-        for param in self.definition.parameters:
-            if param.required and param.name not in kwargs:
-                return False, f"Missing required parameter: {param.name}"
-            
-            if param.name in kwargs:
-                value = kwargs[param.name]
-                # Type check
-                if not isinstance(value, param.param_type):
-                    # Try type conversion
-                    try:
-                        kwargs[param.name] = param.param_type(value)
-                    except (ValueError, TypeError):
-                        return False, f"Parameter '{param.name}' should be {param.param_type.__name__}"
-                
-                # Choices check
-                if param.choices and value not in param.choices:
-                    return False, f"Parameter '{param.name}' must be one of {param.choices}"
-        
-        return True, ""
+    def category(self) -> ToolCategory:
+        """Get tool category."""
+        return self._category
     
     @abstractmethod
     async def execute(self, **kwargs) -> ToolResult:
         """
-        Execute tool
+        Execute the tool with given parameters.
         
         Args:
             **kwargs: Tool parameters
             
         Returns:
-            Execution result
+            ToolResult with success/failure and data
         """
         pass
     
     async def __call__(self, **kwargs) -> ToolResult:
-        """Make tool callable"""
-        # Validate parameters
-        valid, error = self.validate_params(**kwargs)
-        if not valid:
-            return ToolResult.fail(error)
+        """Make tool callable. Supports both sync and async execute methods."""
+        import asyncio
+        import inspect
         
-        # Check status
-        if self._status == ToolStatus.DISABLED:
-            return ToolResult.fail("Tool is disabled")
-        if self._status == ToolStatus.ERROR:
-            return ToolResult.fail("Tool is in error state")
-        
-        # Execute
         start_time = datetime.now()
-        self._status = ToolStatus.BUSY
         
         try:
-            result = await self.execute(**kwargs)
-            result.execution_time = (datetime.now() - start_time).total_seconds()
+            # Handle both sync and async execute methods
+            if inspect.iscoroutinefunction(self.execute):
+                result = await self.execute(**kwargs)
+            else:
+                # Run sync function in executor to not block event loop
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(None, lambda: self.execute(**kwargs))
+            
+            if result:
+                result.execution_time = (datetime.now() - start_time).total_seconds()
             self._execution_count += 1
             self._last_executed = datetime.now()
             return result
         except Exception as e:
             return ToolResult.fail(str(e))
-        finally:
-            self._status = ToolStatus.AVAILABLE
 
 
 class ToolRegistry:
     """
-    Tool Registry
+    Registry for managing tools.
     
-    Manages registration and lookup of all available tools
+    Provides:
+    - Tool registration and lookup
+    - Category-based filtering
+    - Export to OpenAI function format
     """
     
     def __init__(self):
         self._tools: dict[str, BaseTool] = {}
-        self._category_index: dict[ToolCategory, list[str]] = {
-            cat: [] for cat in ToolCategory
-        }
-        self._tag_index: dict[str, list[str]] = {}
+        self._categories: dict[ToolCategory, list[str]] = {cat: [] for cat in ToolCategory}
     
     def register(self, tool: BaseTool) -> None:
-        """Register tool"""
+        """Register a tool."""
         name = tool.name
         if name in self._tools:
-            raise ValueError(f"Tool '{name}' already registered")
+            # Allow re-registration (update)
+            self.unregister(name)
         
         self._tools[name] = tool
-        
-        # Update category index
-        category = tool.definition.category
-        self._category_index[category].append(name)
-        
-        # Update tag index
-        for tag in tool.definition.tags:
-            if tag not in self._tag_index:
-                self._tag_index[tag] = []
-            self._tag_index[tag].append(name)
+        self._categories[tool.category].append(name)
     
     def unregister(self, name: str) -> bool:
-        """Unregister tool"""
+        """Unregister a tool by name."""
         if name not in self._tools:
             return False
         
         tool = self._tools[name]
         del self._tools[name]
         
-        # Clean up indexes
-        category = tool.definition.category
-        if name in self._category_index[category]:
-            self._category_index[category].remove(name)
-        
-        for tag in tool.definition.tags:
-            if tag in self._tag_index and name in self._tag_index[tag]:
-                self._tag_index[tag].remove(name)
+        if name in self._categories[tool.category]:
+            self._categories[tool.category].remove(name)
         
         return True
     
     def get(self, name: str) -> Optional[BaseTool]:
-        """Get tool"""
+        """Get a tool by name."""
         return self._tools.get(name)
     
     def get_all(self) -> list[BaseTool]:
-        """Get all tools"""
+        """Get all registered tools."""
         return list(self._tools.values())
     
     def get_by_category(self, category: ToolCategory) -> list[BaseTool]:
-        """Get tools by category"""
-        names = self._category_index.get(category, [])
+        """Get tools by category."""
+        names = self._categories.get(category, [])
         return [self._tools[n] for n in names if n in self._tools]
     
-    def get_by_tag(self, tag: str) -> list[BaseTool]:
-        """Get tools by tag"""
-        names = self._tag_index.get(tag, [])
-        return [self._tools[n] for n in names if n in self._tools]
-    
-    def search(self, query: str) -> list[BaseTool]:
-        """Search tools (name or description contains query)"""
-        query = query.lower()
-        results = []
-        for tool in self._tools.values():
-            if query in tool.name.lower() or query in tool.description.lower():
-                results.append(tool)
-        return results
-    
-    def list_definitions(self) -> list[ToolDefinition]:
-        """List all tool definitions"""
-        return [tool.definition for tool in self._tools.values()]
+    def to_openai_tools(self) -> list[dict]:
+        """
+        Export all tools in OpenAI/LiteLLM format.
+        
+        Returns:
+            List of ChatCompletionToolParam dicts
+        """
+        return [tool.tool_definition for tool in self._tools.values()]
     
     def to_openai_functions(self) -> list[dict]:
-        """Export as OpenAI Function Calling format"""
-        return [tool.definition.to_openai_function() for tool in self._tools.values()]
+        """
+        Alias for to_openai_tools() for backward compatibility.
+        
+        Returns:
+            List of function dicts for OpenAI function calling
+        """
+        return self.to_openai_tools()
     
     def __contains__(self, name: str) -> bool:
         return name in self._tools
     
     def __len__(self) -> int:
         return len(self._tools)
+    
+    def __iter__(self):
+        return iter(self._tools.values())
 
 
-# ===== Tool Decorators =====
+# ===== Tool Decorator =====
 
 T = TypeVar('T')
 
@@ -347,55 +313,76 @@ def tool(
     name: str = None,
     description: str = None,
     category: ToolCategory = ToolCategory.CUSTOM,
-    tags: list[str] = None,
+    parameters: dict = None,
+    required: list[str] = None,
 ):
     """
-    Tool decorator - Convert function to tool
+    Decorator to convert a function into a tool.
     
     Usage:
-        @tool(name="read_file", description="Read file contents")
-        async def read_file(path: str) -> str:
-            '''Read file at specified path'''
-            with open(path) as f:
-                return f.read()
+        @tool(
+            name="echo",
+            description="Echo the input message",
+            parameters={"message": {"type": "string", "description": "Message to echo"}},
+            required=["message"]
+        )
+        async def echo(message: str) -> str:
+            return message
     """
-    def decorator(func: Callable) -> Type[BaseTool]:
+    def decorator(func: Callable) -> type[BaseTool]:
         func_name = name or func.__name__
-        func_description = description or func.__doc__ or ""
+        func_description = description or func.__doc__ or f"Execute {func_name}"
         
-        # Parse function signature to get parameters
-        sig = inspect.signature(func)
-        hints = get_type_hints(func) if hasattr(func, '__annotations__') else {}
+        # Auto-detect parameters from function signature if not provided
+        func_params = parameters
+        func_required = required or []
         
-        parameters = []
-        for param_name, param in sig.parameters.items():
-            if param_name in ['self', 'cls']:
-                continue
+        if func_params is None:
+            func_params = {}
+            sig = inspect.signature(func)
+            hints = {}
+            try:
+                hints = func.__annotations__
+            except AttributeError:
+                pass
             
-            param_type = hints.get(param_name, str)
-            has_default = param.default != inspect.Parameter.empty
+            type_map = {
+                str: "string",
+                int: "integer",
+                float: "number",
+                bool: "boolean",
+                list: "array",
+                dict: "object",
+            }
             
-            parameters.append(ToolParameter(
-                name=param_name,
-                param_type=param_type,
-                required=not has_default,
-                default=param.default if has_default else None,
-            ))
+            for param_name, param in sig.parameters.items():
+                if param_name in ['self', 'cls', 'kwargs']:
+                    continue
+                
+                param_type = hints.get(param_name, str)
+                json_type = type_map.get(param_type, "string")
+                
+                func_params[param_name] = {
+                    "type": json_type,
+                    "description": f"Parameter {param_name}",
+                }
+                
+                if param.default == inspect.Parameter.empty:
+                    func_required.append(param_name)
         
-        # Create tool class
         class FunctionTool(BaseTool):
             def __init__(self):
                 super().__init__()
                 self._func = func
+                self._category = category
             
             @property
-            def definition(self) -> ToolDefinition:
-                return ToolDefinition(
+            def tool_definition(self) -> dict:
+                return create_tool_param(
                     name=func_name,
                     description=func_description,
-                    category=category,
-                    parameters=parameters,
-                    tags=tags or [],
+                    parameters=func_params,
+                    required=func_required,
                 )
             
             async def execute(self, **kwargs) -> ToolResult:
@@ -414,57 +401,72 @@ def tool(
     return decorator
 
 
-# ===== Built-in Tool Examples =====
+# ===== Built-in Tools =====
 
-class EchoTool(BaseTool):
-    """Example tool - Echo input"""
+class ThinkTool(BaseTool):
+    """
+    Tool for explicit reasoning/thinking.
+    
+    Allows the agent to think through a problem without taking action.
+    Inspired by OpenHands ThinkTool.
+    """
+    
+    DESCRIPTION = """Use this tool to think through a problem before acting.
+    
+Common use cases:
+1. When exploring code and discovering bugs, brainstorm possible fixes
+2. After receiving test results, think about how to fix failures
+3. When planning complex changes, outline different approaches
+4. When debugging issues, organize your thoughts and hypotheses
+
+This tool logs your thought process but does not execute any code or make changes."""
+    
+    def __init__(self):
+        super().__init__()
+        self._category = ToolCategory.THINK
     
     @property
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="echo",
-            description="Echo the input message",
-            category=ToolCategory.CUSTOM,
-            parameters=[
-                ToolParameter(
-                    name="message",
-                    param_type=str,
-                    description="Message to echo",
-                    required=True,
-                ),
-            ],
-            returns="The echoed message",
-            examples=[
-                {"input": {"message": "Hello"}, "output": "Hello"},
-            ],
+    def tool_definition(self) -> dict:
+        return create_tool_param(
+            name="think",
+            description=self.DESCRIPTION,
+            parameters={
+                "thought": {
+                    "type": "string",
+                    "description": "The thought or reasoning to log",
+                },
+            },
+            required=["thought"],
+        )
+    
+    async def execute(self, thought: str, **kwargs) -> ToolResult:
+        # Think tool just logs and returns the thought
+        return ToolResult.ok(f"Thought: {thought}")
+
+
+class FinishTool(BaseTool):
+    """Tool to signal task completion."""
+    
+    def __init__(self):
+        super().__init__()
+        self._category = ToolCategory.CUSTOM
+    
+    @property
+    def tool_definition(self) -> dict:
+        return create_tool_param(
+            name="finish",
+            description="Signal that the task is complete. Use this when you have finished all required work.",
+            parameters={
+                "message": {
+                    "type": "string",
+                    "description": "Final message summarizing what was done",
+                },
+            },
+            required=["message"],
         )
     
     async def execute(self, message: str, **kwargs) -> ToolResult:
-        return ToolResult.ok(message)
-
-
-class SleepTool(BaseTool):
-    """Example tool - Sleep for specified time"""
-    
-    @property
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="sleep",
-            description="Sleep for specified seconds",
-            category=ToolCategory.CUSTOM,
-            parameters=[
-                ToolParameter(
-                    name="seconds",
-                    param_type=float,
-                    description="Seconds to sleep",
-                    required=True,
-                ),
-            ],
-        )
-    
-    async def execute(self, seconds: float, **kwargs) -> ToolResult:
-        await asyncio.sleep(seconds)
-        return ToolResult.ok(f"Slept for {seconds} seconds")
+        return ToolResult.ok({"finished": True, "message": message})
 
 
 # Global tool registry

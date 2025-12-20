@@ -25,20 +25,29 @@ from .config import LLMConfig, LLMProvider
 @dataclass
 class Message:
     """Chat message"""
-    role: str  # "system", "user", "assistant", "function"
-    content: str
+    role: str  # "system", "user", "assistant", "tool"
+    content: Optional[str] = None
     name: Optional[str] = None  # For function messages
     function_call: Optional[dict] = None  # For assistant function calls
     tool_calls: Optional[list] = None  # For tool calls
+    tool_call_id: Optional[str] = None  # For tool response
     
     def to_dict(self) -> dict:
-        d = {"role": self.role, "content": self.content}
+        d = {"role": self.role}
+        if self.content is not None:
+            d["content"] = self.content
         if self.name:
             d["name"] = self.name
         if self.function_call:
             d["function_call"] = self.function_call
         if self.tool_calls:
-            d["tool_calls"] = self.tool_calls
+            d["tool_calls"] = [
+                {"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                if hasattr(tc, 'id') else tc
+                for tc in self.tool_calls
+            ]
+        if self.tool_call_id:
+            d["tool_call_id"] = self.tool_call_id
         return d
     
     @classmethod
@@ -50,8 +59,13 @@ class Message:
         return cls(role="user", content=content)
     
     @classmethod
-    def assistant(cls, content: str) -> "Message":
-        return cls(role="assistant", content=content)
+    def assistant(cls, content: str = None, tool_calls: list = None) -> "Message":
+        return cls(role="assistant", content=content, tool_calls=tool_calls)
+    
+    @classmethod
+    def tool(cls, content: str, tool_call_id: str) -> "Message":
+        """Create tool response message"""
+        return cls(role="tool", content=content, tool_call_id=tool_call_id)
 
 
 @dataclass

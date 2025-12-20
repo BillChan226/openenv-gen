@@ -1,0 +1,56 @@
+## Task: Plan Project Tasks
+
+You need to break down the following goal into specific, ordered tasks.
+
+### Goal
+
+{{ goal }}
+
+### Requirements
+
+{{ requirements }}
+
+### Phases
+
+The project must be built in this order:
+1. **design** - Create design documents (spec.json, API contracts, component inventory)
+2. **database** - Create database schema and seed data
+3. **backend** - Create Express.js API
+4. **frontend** - Create React application
+5. **env** - Create OpenEnv adapter
+6. **docker** - Create Docker configuration
+
+### Instructions
+
+For each phase, create a task with:
+- Clear description of what to build
+- Specific requirements for this phase
+- List of files to generate
+- Acceptance criteria for verification
+
+### Response Format
+
+Respond with JSON:
+
+```json
+{
+  "tasks": [
+    {
+      "id": "design",
+      "type": "design",
+      "description": "...",
+      "requirements": ["..."],
+      "target_directory": "design/",
+      "file_specs": [
+        {
+          "path": "design/spec.json",
+          "purpose": "Project specification",
+          "requirements": ["..."]
+        }
+      ],
+      "acceptance_criteria": ["..."]
+    }
+  ]
+}
+```
+

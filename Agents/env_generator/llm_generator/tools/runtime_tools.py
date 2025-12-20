@@ -1,1044 +1,915 @@
 """
-Runtime Tools for Code Generation Agent
+Runtime Tools - Command execution and server management
 
-These tools allow the agent to:
-1. Run shell commands (install deps, run scripts)
-2. Start and manage servers (backend, frontend)
-3. Test API endpoints
-4. Check browser output / take screenshots
-
-Key Design: The agent can now TEST its own generated code,
-see errors, and fix them - just like a human developer.
+Uses the Runtime system for command execution.
+Inspired by OpenHands execute_bash and execute_ipython.
 """
 
 import os
-import sys
-import time
 import asyncio
 import subprocess
-import shutil
-import json
+import signal
 from pathlib import Path
-from typing import Any, Dict, Optional, List
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional
 from datetime import datetime
 
+import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-from utils.tool import BaseTool, ToolDefinition, ToolParameter, ToolResult, ToolCategory
+
+from utils.tool import BaseTool, ToolResult, create_tool_param, ToolCategory
 
 
-def find_python_executable() -> str:
-    """
-    Find a working Python executable.
-    Tries multiple options for cross-platform compatibility.
-    """
-    candidates = [
-        sys.executable,  # Current Python interpreter (most reliable)
-        "python3",
-        "python",
-        "/usr/bin/python3",
-        "/usr/local/bin/python3",
-        "/opt/homebrew/bin/python3",
-    ]
+# ===== Server Registry =====
+
+class ServerRegistry:
+    """Singleton for tracking background servers."""
     
-    for candidate in candidates:
-        if candidate == sys.executable:
-            return candidate  # Always trust sys.executable
-        if shutil.which(candidate):
-            return candidate
-    
-    # Fallback to sys.executable even if path lookup fails
-    return sys.executable
-
-
-def find_pip_executable() -> str:
-    """Find a working pip executable."""
-    python_exec = find_python_executable()
-    # Use python -m pip for reliability
-    return f"{python_exec} -m pip"
-
-
-def find_uvicorn_command() -> str:
-    """Find a working uvicorn command."""
-    python_exec = find_python_executable()
-    return f"{python_exec} -m uvicorn"
-
-
-# Global Python executable (cached)
-PYTHON_EXECUTABLE = find_python_executable()
-
-
-@dataclass
-class ProcessInfo:
-    """Info about a running process"""
-    pid: int
-    name: str
-    command: str
-    port: Optional[int] = None
-    started_at: datetime = field(default_factory=datetime.now)
-    
-    
-class ProcessManager:
-    """Manages background processes started by tools"""
     _instance = None
     
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance._processes: Dict[str, ProcessInfo] = {}
-            cls._instance._subprocesses: Dict[str, subprocess.Popen] = {}
+            cls._instance._servers = {}
         return cls._instance
     
-    def add(self, name: str, proc: subprocess.Popen, command: str, port: Optional[int] = None):
-        """Register a process"""
-        info = ProcessInfo(
-            pid=proc.pid,
-            name=name,
-            command=command,
-            port=port,
-        )
-        self._processes[name] = info
-        self._subprocesses[name] = proc
-        
-    def get(self, name: str) -> Optional[ProcessInfo]:
-        """Get process info"""
-        return self._processes.get(name)
+    def register(self, name: str, pid: int, port: int, cwd: str):
+        self._servers[name] = {
+            "pid": pid,
+            "port": port,
+            "cwd": cwd,
+            "started": datetime.now().isoformat(),
+            "logs": [],
+        }
     
-    def stop(self, name: str) -> bool:
-        """Stop a process"""
-        proc = self._subprocesses.get(name)
-        if proc:
-            try:
-                proc.terminate()
-                proc.wait(timeout=5)
-            except:
-                proc.kill()
-            del self._processes[name]
-            del self._subprocesses[name]
-            return True
-        return False
+    def unregister(self, name: str):
+        self._servers.pop(name, None)
     
-    def stop_all(self):
-        """Stop all managed processes"""
-        for name in list(self._processes.keys()):
-            self.stop(name)
-            
-    def list_running(self) -> List[ProcessInfo]:
-        """List all running processes"""
-        return list(self._processes.values())
+    def get(self, name: str) -> Optional[dict]:
+        return self._servers.get(name)
+    
+    def get_all(self) -> Dict[str, dict]:
+        return self._servers.copy()
+    
+    def add_log(self, name: str, log: str):
+        if name in self._servers:
+            self._servers[name]["logs"].append(log)
+            # Keep last 100 lines
+            self._servers[name]["logs"] = self._servers[name]["logs"][-100:]
+    
+    def get_logs(self, name: str) -> List[str]:
+        if name in self._servers:
+            return self._servers[name]["logs"]
+        return []
 
 
-# Global process manager
-_process_manager = ProcessManager()
+_server_registry = ServerRegistry()
 
 
-class RunCommandTool(BaseTool):
+# ===== Execute Bash Tool =====
+
+class ExecuteBashTool(BaseTool):
     """
-    Run a shell command and return output.
+    Execute shell commands with timeout and interaction support.
     
-    Usage: Run any shell command to install dependencies,
-    build projects, run tests, etc.
+    Based on OpenHands execute_bash.
     """
     
-    def __init__(self, working_dir: Path):
-        super().__init__()
-        self.working_dir = Path(working_dir)
+    NAME = "execute_bash"
+    
+    DESCRIPTION = """Execute a bash command in the terminal.
+
+Features:
+* Commands run in a persistent shell (state persists)
+* Default timeout: 30 seconds
+* Use is_input=True to send input to running process
+* Special inputs: "C-c" (Ctrl+C), "C-d" (EOF), "C-z" (suspend)
+* Commands run in the workspace directory
+
+IMPORTANT:
+* For long-running commands, set background=true
+* If command times out, send "C-c" to interrupt
+
+Examples:
+    execute_bash "ls -la"
+    execute_bash "python script.py" 60         # 60s timeout
+    execute_bash "npm start" 30 true           # Run in background
+    execute_bash "C-c" is_input=true           # Send Ctrl+C
+"""
+    
+    DEFAULT_TIMEOUT = 30
+    MAX_OUTPUT_LENGTH = 50000
+    
+    def __init__(self, work_dir: str = None):
+        super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
+        self.work_dir = Path(work_dir) if work_dir else Path.cwd()
+        self._current_process: Optional[subprocess.Popen] = None
     
     @property
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="run_command",
-            description="Run a shell command and return output. Use for installing deps, building, running tests.",
-            category=ToolCategory.SHELL,
-            parameters=[
-                ToolParameter(
-                    name="command",
-                    param_type=str,
-                    description="The shell command to run",
-                    required=True,
-                ),
-                ToolParameter(
-                    name="timeout",
-                    param_type=int,
-                    description="Max seconds to wait (default 120)",
-                    required=False,
-                    default=120,
-                ),
-                ToolParameter(
-                    name="cwd",
-                    param_type=str,
-                    description="Working directory (relative to output_dir)",
-                    required=False,
-                    default="",
-                ),
-            ],
-            examples=[
-                {"input": {"command": "pip install -r requirements.txt"}, "output": "..."},
-                {"input": {"command": "npm install", "cwd": "calendar_ui"}, "output": "..."},
-            ],
-            tags=["shell", "command", "run"],
+    def tool_definition(self):
+        return self.get_tool_param()
+    
+    def get_tool_param(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "Command to execute"
+                    },
+                    "timeout": {
+                        "type": "integer",
+                        "description": f"Timeout in seconds (default: {self.DEFAULT_TIMEOUT})"
+                    },
+                    "background": {
+                        "type": "boolean",
+                        "description": "Run in background (default: false)"
+                    },
+                    "is_input": {
+                        "type": "boolean",
+                        "description": "Send as input to running process (default: false)"
+                    }
+                },
+                "required": ["command"]
+            }
         )
+    
+    def execute(
+        self,
+        command: str,
+        timeout: int = None,
+        background: bool = False,
+        is_input: bool = False
+    ) -> ToolResult:
         
-    async def execute(self, command: str, timeout: int = 120, cwd: str = "", **kwargs) -> ToolResult:
-        """Execute a shell command."""
+        command = command.strip()
+        timeout = timeout or self.DEFAULT_TIMEOUT
+        
+        if not command:
+            return ToolResult(success=False, error_message="Empty command")
+        
+        # Handle input to running process
+        if is_input:
+            return self._handle_input(command)
+        
+        # Handle background execution
+        if background:
+            return self._run_background(command)
+        
+        # Regular execution with timeout
+        return self._run_command(command, timeout)
+    
+    def _run_command(self, command: str, timeout: int) -> ToolResult:
         try:
-            work_dir = self.working_dir / cwd if cwd else self.working_dir
-            
-            if not work_dir.exists():
-                return ToolResult(
-                    success=False,
-                    data={"error": f"Directory does not exist: {work_dir}"},
-                )
-            
-            # Run the command
             result = subprocess.run(
                 command,
                 shell=True,
-                cwd=str(work_dir),
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                env={**os.environ, "PYTHONPATH": str(self.working_dir)},
+                cwd=str(self.work_dir),
+                env={**os.environ, "PYTHONUNBUFFERED": "1"},
             )
+            
+            output = result.stdout + result.stderr
+            if len(output) > self.MAX_OUTPUT_LENGTH:
+                output = output[:self.MAX_OUTPUT_LENGTH] + "\n...[output truncated]..."
             
             return ToolResult(
                 success=result.returncode == 0,
                 data={
-                    "return_code": result.returncode,
-                    "stdout": result.stdout[-5000:] if len(result.stdout) > 5000 else result.stdout,
-                    "stderr": result.stderr[-2000:] if len(result.stderr) > 2000 else result.stderr,
-                    "command": command,
-                    "cwd": str(work_dir),
-                },
+                    "exit_code": result.returncode,
+                    "cwd": str(self.work_dir),
+                    "output": output or "(no output)",
+                }
             )
             
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as e:
+            output = ""
+            if e.stdout:
+                output += e.stdout if isinstance(e.stdout, str) else e.stdout.decode()
+            if e.stderr:
+                output += e.stderr if isinstance(e.stderr, str) else e.stderr.decode()
+            
             return ToolResult(
                 success=False,
-                data={"error": f"Command timed out after {timeout}s", "command": command},
+                data={
+                    "exit_code": -1, 
+                    "timed_out": True,
+                    "output": f"{output}\n[Command timed out after {timeout}s. Send 'C-c' to interrupt.]"
+                }
             )
+            
         except Exception as e:
-            return ToolResult(
-                success=False,
-                data={"error": str(e), "command": command},
-            )
-
-
-class StartServerTool(BaseTool):
-    """
-    Start a server process in the background.
+            return ToolResult(success=False, error_message=f"Execution error: {e}")
     
-    Usage: Start backend or frontend servers for testing.
-    """
-    
-    def __init__(self, working_dir: Path):
-        super().__init__()
-        self.working_dir = Path(working_dir)
-    
-    @property
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="start_server",
-            description="Start a server process in background. Returns when server is ready.",
-            category=ToolCategory.SHELL,
-            parameters=[
-                ToolParameter(
-                    name="server_name",  # Renamed from 'name' to avoid conflict with call_tool's 'name' param
-                    param_type=str,
-                    description="Unique name for this server (e.g., 'backend', 'frontend')",
-                    required=True,
-                ),
-                ToolParameter(
-                    name="command",
-                    param_type=str,
-                    description="Command to start the server",
-                    required=True,
-                ),
-                ToolParameter(
-                    name="cwd",
-                    param_type=str,
-                    description="Working directory (relative to output_dir)",
-                    required=False,
-                    default="",
-                ),
-                ToolParameter(
-                    name="port",
-                    param_type=int,
-                    description="Port the server will listen on (for health checking)",
-                    required=False,
-                    default=None,
-                ),
-                ToolParameter(
-                    name="wait_for_ready",
-                    param_type=int,
-                    description="Seconds to wait for server to be ready",
-                    required=False,
-                    default=30,
-                ),
-            ],
-            examples=[
-                {"input": {"server_name": "backend", "command": "uvicorn main:app --port 8000", "cwd": "calendar_api", "port": 8000}},
-            ],
-            tags=["server", "start", "process"],
-        )
-        
-    async def execute(
-        self,
-        server_name: str,  # Renamed from 'name'
-        command: str,
-        cwd: str = "",
-        port: Optional[int] = None,
-        wait_for_ready: int = 30,
-        **kwargs
-    ) -> ToolResult:
-        """Start a server process."""
+    def _run_background(self, command: str) -> ToolResult:
         try:
-            work_dir = self.working_dir / cwd if cwd else self.working_dir
-            
-            # Stop existing server with same name
-            if _process_manager.get(server_name):
-                _process_manager.stop(server_name)
-                
-            # Start the process
-            env = {**os.environ, "PYTHONPATH": str(self.working_dir)}
-            
-            proc = subprocess.Popen(
+            process = subprocess.Popen(
                 command,
                 shell=True,
-                cwd=str(work_dir),
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=env,
-                preexec_fn=os.setsid if os.name != 'nt' else None,
+                stderr=subprocess.STDOUT,
+                cwd=str(self.work_dir),
+                start_new_session=True,
             )
             
-            _process_manager.add(server_name, proc, command, port)
+            self._current_process = process
             
-            # Wait for server to be ready
-            if port:
-                import socket
-                ready = False
-                start_time = time.time()
-                
-                while time.time() - start_time < wait_for_ready:
-                    try:
-                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                            s.settimeout(1)
-                            s.connect(("localhost", port))
-                            ready = True
-                            break
-                    except:
-                        await asyncio.sleep(0.5)
-                        
-                if not ready:
-                    # Check if process died
-                    if proc.poll() is not None:
-                        stdout, stderr = proc.communicate()
-                        return ToolResult(
-                            success=False,
-                            data={
-                                "error": "Server process exited",
-                                "stdout": stdout.decode()[-2000:] if stdout else "",
-                                "stderr": stderr.decode()[-2000:] if stderr else "",
-                            },
-                        )
-                    return ToolResult(
-                        success=False,
-                        data={"error": f"Server did not become ready on port {port} within {wait_for_ready}s"},
-                    )
-            else:
-                # Just wait a bit for the process to start
-                await asyncio.sleep(2)
-                if proc.poll() is not None:
-                    stdout, stderr = proc.communicate()
-                    return ToolResult(
-                        success=False,
-                        data={
-                            "error": "Server process exited immediately",
-                            "stdout": stdout.decode()[-2000:] if stdout else "",
-                            "stderr": stderr.decode()[-2000:] if stderr else "",
-                        },
-                    )
-                    
             return ToolResult(
                 success=True,
                 data={
-                    "message": f"Server '{server_name}' started successfully",
-                    "pid": proc.pid,
-                    "port": port,
-                    "command": command,
-                },
+                    "pid": process.pid, 
+                    "background": True,
+                    "info": f"Started background process (PID: {process.pid})\nCommand: {command}"
+                }
             )
             
         except Exception as e:
+            return ToolResult(success=False, error_message=f"Background start failed: {e}")
+    
+    def _handle_input(self, input_str: str) -> ToolResult:
+        if input_str == "C-c":
+            # Send SIGINT
+            if self._current_process:
+                try:
+                    os.killpg(os.getpgid(self._current_process.pid), signal.SIGINT)
+                    return ToolResult(success=True, data="Sent SIGINT (Ctrl+C)")
+                except ProcessLookupError:
+                    return ToolResult(success=True, data="No running process to interrupt")
+            return ToolResult(success=True, data="No running process")
+        
+        elif input_str == "C-d":
+            if self._current_process:
+                self._current_process.stdin.close()
+                return ToolResult(success=True, data="Sent EOF (Ctrl+D)")
+            return ToolResult(success=True, data="No running process")
+        
+        elif input_str == "C-z":
+            if self._current_process:
+                try:
+                    os.killpg(os.getpgid(self._current_process.pid), signal.SIGTSTP)
+                    return ToolResult(success=True, data="Sent SIGTSTP (Ctrl+Z)")
+                except ProcessLookupError:
+                    return ToolResult(success=True, data="No running process")
+            return ToolResult(success=True, data="No running process")
+        
+        else:
+            if self._current_process and self._current_process.stdin:
+                self._current_process.stdin.write(f"{input_str}\n".encode())
+                self._current_process.stdin.flush()
+                return ToolResult(success=True, data=f"Sent input: {input_str}")
+            return ToolResult(success=False, error_message="No process to send input to")
+
+
+# ===== Execute IPython Tool =====
+
+class ExecuteIPythonTool(BaseTool):
+    """
+    Execute Python code in an IPython-like environment.
+    
+    Based on OpenHands execute_ipython_cell.
+    """
+    
+    NAME = "execute_ipython"
+    
+    DESCRIPTION = """Execute Python code in a Jupyter-like environment.
+
+Features:
+* Persistent state (variables persist between calls)
+* stdout/stderr capture
+* Exception handling with traceback
+* Magic commands: %pip, %cd, %pwd, %env
+
+Examples:
+    execute_ipython "import pandas as pd"
+    execute_ipython "df = pd.read_csv('data.csv')"
+    execute_ipython "%pip install requests"
+    execute_ipython "print(df.head())"
+"""
+    
+    def __init__(self, work_dir: str = None):
+        super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
+        self.work_dir = Path(work_dir) if work_dir else Path.cwd()
+        self._namespace = {
+            "__name__": "__main__",
+            "__builtins__": __builtins__,
+        }
+        self._cell_count = 0
+    
+    @property
+    def tool_definition(self):
+        return self.get_tool_param()
+    
+    def get_tool_param(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Python code to execute"
+                    }
+                },
+                "required": ["code"]
+            }
+        )
+    
+    def execute(self, code: str) -> ToolResult:
+        code = code.strip()
+        
+        if not code:
+            return ToolResult(success=False, error_message="Empty code")
+        
+        self._cell_count += 1
+        
+        # Handle magic commands
+        if code.startswith("%"):
+            return self._handle_magic(code)
+        
+        # Capture output
+        import io
+        from contextlib import redirect_stdout, redirect_stderr
+        
+        stdout_capture = io.StringIO()
+        stderr_capture = io.StringIO()
+        
+        result = None
+        error = False
+        
+        try:
+            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                try:
+                    # Try eval first
+                    result = eval(compile(code, f"<cell-{self._cell_count}>", "eval"), self._namespace)
+                except SyntaxError:
+                    # Fall back to exec
+                    exec(compile(code, f"<cell-{self._cell_count}>", "exec"), self._namespace)
+                    result = None
+                    
+        except Exception as e:
+            import traceback
+            error = True
+            stderr_capture.write(traceback.format_exc())
+        
+        # Build output
+        output_parts = []
+        
+        stdout = stdout_capture.getvalue()
+        stderr = stderr_capture.getvalue()
+        
+        if stdout:
+            output_parts.append(stdout.rstrip())
+        
+        if stderr:
+            output_parts.append(stderr.rstrip())
+        
+        if result is not None and not error:
+            try:
+                result_str = repr(result)
+                if len(result_str) > 1000:
+                    result_str = result_str[:1000] + "..."
+                output_parts.append(f"Out[{self._cell_count}]: {result_str}")
+            except Exception:
+                pass
+        
+        output = "\n".join(output_parts) if output_parts else "(no output)"
+        
+        # Add context
+        output += f"\n[Jupyter cwd: {self.work_dir}]"
+        
+        return ToolResult(
+            success=not error,
+            data={"cell": self._cell_count, "error": error, "output": output}
+        )
+    
+    def _handle_magic(self, code: str) -> ToolResult:
+        line = code.split('\n')[0].strip()
+        
+        if line.startswith("%pip"):
+            cmd = line[4:].strip()
+            try:
+                result = subprocess.run(
+                    [sys.executable, "-m", "pip"] + cmd.split(),
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                return ToolResult(
+                    success=result.returncode == 0,
+                    data=result.stdout + result.stderr
+                )
+            except Exception as e:
+                return ToolResult(success=False, error_message=f"pip error: {e}")
+        
+        elif line.startswith("%cd"):
+            new_dir = line[3:].strip()
+            try:
+                target = Path(new_dir).expanduser()
+                if not target.is_absolute():
+                    target = self.work_dir / target
+                
+                if target.is_dir():
+                    # DON'T change global CWD! Just update internal tracking
+                    self.work_dir = target
+                    return ToolResult(success=True, data=f"Changed to {target}")
+                else:
+                    return ToolResult(success=False, error_message=f"Not a directory: {new_dir}")
+            except Exception as e:
+                return ToolResult(success=False, error_message=f"cd error: {e}")
+        
+        elif line.startswith("%pwd"):
+            return ToolResult(success=True, data=str(self.work_dir))
+        
+        elif line.startswith("%env"):
+            rest = line[4:].strip()
+            if "=" in rest:
+                key, value = rest.split("=", 1)
+                os.environ[key.strip()] = value.strip()
+                return ToolResult(success=True, data=f"Set {key}={value}")
+            elif rest:
+                return ToolResult(success=True, data=f"{rest}={os.environ.get(rest, '')}")
+            else:
+                env_str = "\n".join(f"{k}={v}" for k, v in sorted(os.environ.items()))
+                return ToolResult(success=True, data=env_str)
+        
+        return ToolResult(success=False, error_message=f"Unknown magic: {line}")
+
+
+# ===== Start Server Tool =====
+
+class StartServerTool(BaseTool):
+    """Start a server as a background process."""
+    
+    NAME = "start_server"
+    
+    DESCRIPTION = """Start a server process in the background.
+
+The server runs independently and can be stopped later.
+Common uses:
+* Start API server: start_server api "python -m uvicorn main:app"
+* Start frontend: start_server ui "npm run dev"
+
+Parameters:
+* name: Identifier for this server
+* command: Command to run
+* port: Port number (for tracking)
+"""
+    
+    def __init__(self, work_dir: str = None):
+        super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
+        self.work_dir = Path(work_dir) if work_dir else Path.cwd()
+    
+    @property
+    def tool_definition(self):
+        return self.get_tool_param()
+    
+    def get_tool_param(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Server name/identifier"
+                    },
+                    "command": {
+                        "type": "string",
+                        "description": "Command to start the server"
+                    },
+                    "port": {
+                        "type": "integer",
+                        "description": "Port number"
+                    }
+                },
+                "required": ["name", "command", "port"]
+            }
+        )
+    
+    def execute(self, name: str, command: str, port: int) -> ToolResult:
+        # Check if already running
+        existing = _server_registry.get(name)
+        if existing:
             return ToolResult(
                 success=False,
-                data={"error": str(e)},
+                error_message=f"Server '{name}' already running on port {existing['port']}"
             )
+        
+        try:
+            # Start process
+            process = subprocess.Popen(
+                command,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=str(self.work_dir),
+                start_new_session=True,
+            )
+            
+            # Register
+            _server_registry.register(name, process.pid, port, str(self.work_dir))
+            
+            # Start log capture thread
+            import threading
+            def capture_logs():
+                for line in iter(process.stdout.readline, b''):
+                    _server_registry.add_log(name, line.decode('utf-8', errors='replace'))
+            
+            thread = threading.Thread(target=capture_logs, daemon=True)
+            thread.start()
+            
+            return ToolResult(
+                success=True,
+                data={
+                    "pid": process.pid, 
+                    "port": port,
+                    "info": f"Started server '{name}' on port {port} (PID: {process.pid})"
+                }
+            )
+            
+        except Exception as e:
+            return ToolResult(success=False, error_message=f"Failed to start server: {e}")
 
+
+# ===== Stop Server Tool =====
 
 class StopServerTool(BaseTool):
     """Stop a running server."""
     
-    def __init__(self):
-        super().__init__()
+    NAME = "stop_server"
     
-    @property
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="stop_server",
-            description="Stop a running server by name.",
-            category=ToolCategory.SHELL,
-            parameters=[
-                ToolParameter(
-                    name="server_name",  # Renamed from 'name' to avoid conflict with call_tool
-                    param_type=str,
-                    description="Name of server to stop",
-                    required=False,
-                    default="",
-                ),
-                ToolParameter(
-                    name="stop_all",  # Renamed from 'all' (reserved keyword)
-                    param_type=bool,
-                    description="If True, stop all servers",
-                    required=False,
-                    default=False,
-                ),
-            ],
-            tags=["server", "stop"],
-        )
-        
-    async def execute(self, server_name: str = "", stop_all: bool = False, **kwargs) -> ToolResult:
-        """Stop server(s)."""
-        try:
-            if stop_all:
-                _process_manager.stop_all()
-                return ToolResult(success=True, data={"message": "All servers stopped"})
-            elif server_name:
-                if _process_manager.stop(server_name):
-                    return ToolResult(success=True, data={"message": f"Server '{server_name}' stopped"})
-                else:
-                    return ToolResult(success=False, data={"error": f"Server '{server_name}' not found"})
-            else:
-                return ToolResult(success=False, data={"error": "Specify 'server_name' or 'stop_all=True'"})
-        except Exception as e:
-            return ToolResult(success=False, data={"error": str(e)})
+    DESCRIPTION = """Stop a server by name.
 
-
-class TestAPITool(BaseTool):
-    """
-    Test an HTTP API endpoint.
-    
-    Usage: Make HTTP requests to test if API is working correctly.
-    """
+Example:
+    stop_server api
+"""
     
     def __init__(self):
-        super().__init__()
+        super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
     
     @property
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="test_api",
-            description="Make HTTP request to test API endpoint. Returns status code and response.",
-            category=ToolCategory.NETWORK,
-            parameters=[
-                ToolParameter(
-                    name="method",
-                    param_type=str,
-                    description="HTTP method (GET, POST, PUT, DELETE)",
-                    required=True,
-                ),
-                ToolParameter(
-                    name="url",
-                    param_type=str,
-                    description="Full URL to request",
-                    required=True,
-                ),
-                ToolParameter(
-                    name="json_data",
-                    param_type=dict,
-                    description="JSON body for POST/PUT requests",
-                    required=False,
-                    default=None,
-                ),
-                ToolParameter(
-                    name="headers",
-                    param_type=dict,
-                    description="Custom headers",
-                    required=False,
-                    default=None,
-                ),
-                ToolParameter(
-                    name="timeout",
-                    param_type=int,
-                    description="Request timeout in seconds",
-                    required=False,
-                    default=10,
-                ),
-            ],
-            examples=[
-                {"input": {"method": "GET", "url": "http://localhost:8000/health"}},
-                {"input": {"method": "POST", "url": "http://localhost:8000/auth/register", "json_data": {"email": "test@test.com"}}},
-            ],
-            tags=["api", "http", "test"],
+    def tool_definition(self):
+        return self.get_tool_param()
+    
+    def get_tool_param(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Server name to stop"
+                    }
+                },
+                "required": ["name"]
+            }
         )
+    
+    def execute(self, name: str) -> ToolResult:
+        server = _server_registry.get(name)
         
-    async def execute(
-        self,
-        method: str,
-        url: str,
-        json_data: Optional[Dict] = None,
-        headers: Optional[Dict] = None,
-        timeout: int = 10,
-        **kwargs
-    ) -> ToolResult:
-        """Test an API endpoint."""
+        if not server:
+            return ToolResult(success=False, error_message=f"Server '{name}' not found")
+        
+        pid = server["pid"]
+        
         try:
-            import urllib.request
-            import urllib.error
-            
-            # Prepare request
-            data = None
-            if json_data:
-                data = json.dumps(json_data).encode('utf-8')
-                
-            req = urllib.request.Request(url, data=data, method=method.upper())
-            req.add_header('Content-Type', 'application/json')
-            req.add_header('Accept', 'application/json')
-            
-            if headers:
-                for key, value in headers.items():
-                    req.add_header(key, value)
-                    
-            # Make request
-            try:
-                with urllib.request.urlopen(req, timeout=timeout) as response:
-                    body = response.read().decode('utf-8')
-                    try:
-                        response_data = json.loads(body)
-                    except:
-                        response_data = body[:2000]
-                        
-                    return ToolResult(
-                        success=True,
-                        data={
-                            "status_code": response.status,
-                            "response": response_data,
-                            "headers": dict(response.headers),
-                        },
-                    )
-            except urllib.error.HTTPError as e:
-                body = e.read().decode('utf-8') if e.fp else ""
-                try:
-                    error_data = json.loads(body)
-                except:
-                    error_data = body[:1000]
-                    
-                return ToolResult(
-                    success=False,
-                    data={
-                        "status_code": e.code,
-                        "error": str(e.reason),
-                        "response": error_data,
-                    },
-                )
-            except urllib.error.URLError as e:
-                return ToolResult(
-                    success=False,
-                    data={
-                        "error": f"Connection failed: {e.reason}",
-                        "url": url,
-                    },
-                )
-                
+            os.killpg(os.getpgid(pid), signal.SIGTERM)
+            _server_registry.unregister(name)
+            return ToolResult(success=True, data=f"Stopped server '{name}' (PID: {pid})")
+        except ProcessLookupError:
+            _server_registry.unregister(name)
+            return ToolResult(success=True, data=f"Server '{name}' was not running")
         except Exception as e:
-            return ToolResult(
-                success=False,
-                data={"error": str(e)},
-            )
+            return ToolResult(success=False, error_message=f"Failed to stop server: {e}")
 
+
+# ===== List Servers Tool =====
 
 class ListServersTool(BaseTool):
     """List all running servers."""
     
+    NAME = "list_servers"
+    
+    DESCRIPTION = """List all background servers."""
+    
     def __init__(self):
-        super().__init__()
+        super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
     
     @property
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="list_servers",
-            description="List all servers that have been started.",
-            category=ToolCategory.SHELL,
-            parameters=[],
-            tags=["server", "list"],
+    def tool_definition(self):
+        return self.get_tool_param()
+    
+    def get_tool_param(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {}
+            }
         )
+    
+    def execute(self) -> ToolResult:
+        servers = _server_registry.get_all()
         
-    async def execute(self, **kwargs) -> ToolResult:
-        servers = _process_manager.list_running()
+        if not servers:
+            return ToolResult(success=True, data="No running servers")
+        
+        lines = ["Running servers:"]
+        for name, info in servers.items():
+            lines.append(f"  {name}: port={info['port']}, pid={info['pid']}, started={info['started']}")
+        
         return ToolResult(
             success=True,
-            data={
-                "servers": [
-                    {
-                        "name": s.name,
-                        "pid": s.pid,
-                        "port": s.port,
-                        "command": s.command,
-                        "running_since": s.started_at.isoformat(),
-                    }
-                    for s in servers
-                ]
-            },
+            data={"servers": servers, "info": "\n".join(lines)}
         )
 
 
-class CheckFilesExistTool(BaseTool):
-    """
-    Check if a list of files exist.
-    
-    Usage: Verify that planned files were actually generated.
-    """
-    
-    def __init__(self, working_dir: Path):
-        super().__init__()
-        self.working_dir = Path(working_dir)
-    
-    @property
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="check_files_exist",
-            description="Check if multiple files exist. Use to verify planned files were generated.",
-            category=ToolCategory.FILE_SYSTEM,
-            parameters=[
-                ToolParameter(
-                    name="files",
-                    param_type=list,
-                    description="List of file paths (relative to output_dir)",
-                    required=True,
-                ),
-            ],
-            tags=["file", "check", "verify"],
-        )
-        
-    async def execute(self, files: List[str], **kwargs) -> ToolResult:
-        """Check if files exist."""
-        results = {}
-        missing = []
-        existing = []
-        
-        for file_path in files:
-            full_path = self.working_dir / file_path
-            exists = full_path.exists()
-            results[file_path] = exists
-            if exists:
-                existing.append(file_path)
-            else:
-                missing.append(file_path)
-                
-        return ToolResult(
-            success=len(missing) == 0,
-            data={
-                "results": results,
-                "existing": existing,
-                "missing": missing,
-                "total": len(files),
-                "existing_count": len(existing),
-                "missing_count": len(missing),
-            },
-        )
-
-
-class InstallDependenciesTool(BaseTool):
-    """
-    Install project dependencies.
-    
-    Usage: Install Python or Node.js dependencies.
-    """
-    
-    def __init__(self, working_dir: Path):
-        super().__init__()
-        self.working_dir = Path(working_dir)
-    
-    @property
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="install_dependencies",
-            description="Install Python (pip) or Node.js (npm) dependencies in a directory.",
-            category=ToolCategory.SHELL,
-            parameters=[
-                ToolParameter(
-                    name="project_type",
-                    param_type=str,
-                    description="'python' or 'nodejs'",
-                    required=True,
-                    choices=["python", "nodejs"],
-                ),
-                ToolParameter(
-                    name="cwd",
-                    param_type=str,
-                    description="Working directory (relative to output_dir)",
-                    required=False,
-                    default="",
-                ),
-            ],
-            tags=["install", "dependencies", "pip", "npm"],
-        )
-        
-    async def execute(self, project_type: str, cwd: str = "", **kwargs) -> ToolResult:
-        """Install dependencies."""
-        try:
-            work_dir = self.working_dir / cwd if cwd else self.working_dir
-            
-            if project_type == "python":
-                req_file = work_dir / "requirements.txt"
-                if not req_file.exists():
-                    return ToolResult(
-                        success=False,
-                        data={"error": "requirements.txt not found"},
-                    )
-                cmd = f"python3 -m pip install -r requirements.txt"
-            elif project_type == "nodejs":
-                pkg_file = work_dir / "package.json"
-                if not pkg_file.exists():
-                    return ToolResult(
-                        success=False,
-                        data={"error": "package.json not found"},
-                    )
-                cmd = "npm install"
-            else:
-                return ToolResult(
-                    success=False,
-                    data={"error": f"Unknown project type: {project_type}. Use 'python' or 'nodejs'"},
-                )
-                
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                cwd=str(work_dir),
-                capture_output=True,
-                text=True,
-                timeout=300,  # 5 minutes for dependency install
-            )
-            
-            return ToolResult(
-                success=result.returncode == 0,
-                data={
-                    "return_code": result.returncode,
-                    "stdout": result.stdout[-3000:] if len(result.stdout) > 3000 else result.stdout,
-                    "stderr": result.stderr[-1500:] if len(result.stderr) > 1500 else result.stderr,
-                },
-            )
-            
-        except subprocess.TimeoutExpired:
-            return ToolResult(success=False, data={"error": "Dependency installation timed out"})
-        except Exception as e:
-            return ToolResult(success=False, data={"error": str(e)})
-
+# ===== Get Server Logs Tool =====
 
 class GetServerLogsTool(BaseTool):
     """Get logs from a running server."""
     
+    NAME = "get_server_logs"
+    
+    DESCRIPTION = """Get recent logs from a server.
+
+Example:
+    get_server_logs api
+    get_server_logs api 50  # Last 50 lines
+"""
+    
     def __init__(self):
-        super().__init__()
+        super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
     
     @property
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="get_server_logs",
-            description="Get recent output from a running server process.",
-            category=ToolCategory.SHELL,
-            parameters=[
-                ToolParameter(
-                    name="server_name",  # Renamed from 'name' to avoid conflict
-                    param_type=str,
-                    description="Server name",
-                    required=True,
-                ),
-                ToolParameter(
-                    name="lines",
-                    param_type=int,
-                    description="Number of lines to return",
-                    required=False,
-                    default=50,
-                ),
-            ],
-            tags=["server", "logs"],
-        )
-        
-    async def execute(self, server_name: str, lines: int = 50, **kwargs) -> ToolResult:
-        """Get server logs."""
-        proc = _process_manager._subprocesses.get(server_name)
-        if not proc:
-            return ToolResult(success=False, data={"error": f"Server '{server_name}' not found"})
-            
-        poll = proc.poll()
-        
-        if poll is not None:
-            # Process has exited
-            stdout, stderr = proc.communicate()
-            return ToolResult(
-                success=False,
-                data={
-                    "status": "exited",
-                    "return_code": poll,
-                    "stdout": stdout.decode()[-3000:] if stdout else "",
-                    "stderr": stderr.decode()[-3000:] if stderr else "",
+    def tool_definition(self):
+        return self.get_tool_param()
+    
+    def get_tool_param(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Server name"
+                    },
+                    "lines": {
+                        "type": "integer",
+                        "description": "Number of lines (default: 20)"
+                    }
                 },
-            )
-        else:
+                "required": ["name"]
+            }
+        )
+    
+    def execute(self, name: str, lines: int = 20) -> ToolResult:
+        logs = _server_registry.get_logs(name)
+        
+        if not logs:
             return ToolResult(
                 success=True,
-                data={
-                    "status": "running",
-                    "pid": proc.pid,
-                    "message": "Server is still running (logs not available in real-time)",
-                },
+                data=f"No logs for server '{name}' (or server not found)"
             )
+        
+        recent = logs[-lines:]
+        return ToolResult(
+            success=True,
+            data={"lines": len(recent), "logs": f"Logs for '{name}':\n" + "".join(recent)}
+        )
 
 
-class QuickTestTool(BaseTool):
-    """
-    Quick test for generated backend.
+# ===== Test API Tool =====
+
+class TestAPITool(BaseTool):
+    """Test an HTTP API endpoint."""
     
-    This tool allows the model to quickly verify that a FastAPI backend
-    can start and respond to basic requests.
-    """
+    NAME = "test_api"
     
-    def __init__(self, base_dir: Optional[Path] = None):
-        super().__init__()
-        self.base_dir = base_dir or Path.cwd()
+    DESCRIPTION = """Send HTTP request to test an API.
+
+Examples:
+    test_api GET http://localhost:8000/health
+    test_api POST http://localhost:8000/api/items '{"name": "test"}'
+"""
+    
+    def __init__(self):
+        super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
     
     @property
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="quick_test",
-            description="Quickly test if generated backend can start and respond. Use after generating main.py.",
-            category=ToolCategory.SHELL,
-            parameters=[
-                ToolParameter(
-                    name="backend_dir",
-                    param_type=str,
-                    description="Backend directory (e.g., 'calendar_api')",
-                    required=True,
-                ),
-                ToolParameter(
-                    name="port",
-                    param_type=int,
-                    description="Port to test on",
-                    required=False,
-                    default=8000,
-                ),
-                ToolParameter(
-                    name="endpoints",
-                    param_type=list,
-                    description="List of endpoints to test (e.g., ['/health', '/docs'])",
-                    required=False,
-                    default=["/health", "/docs"],
-                ),
-            ],
-            returns="Test results with success/failure for each endpoint",
-            tags=["test", "backend", "quick"],
+    def tool_definition(self):
+        return self.get_tool_param()
+    
+    def get_tool_param(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "method": {
+                        "type": "string",
+                        "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"],
+                        "description": "HTTP method"
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "URL to request"
+                    },
+                    "body": {
+                        "type": "string",
+                        "description": "Request body (JSON string)"
+                    },
+                    "headers": {
+                        "type": "object",
+                        "description": "HTTP headers"
+                    }
+                },
+                "required": ["method", "url"]
+            }
         )
     
-    async def execute(
+    def execute(
         self,
-        backend_dir: str,
-        port: int = 8000,
-        endpoints: list = None,
-        **kwargs
+        method: str,
+        url: str,
+        body: str = None,
+        headers: dict = None
     ) -> ToolResult:
-        """Quick test the backend."""
-        if endpoints is None:
-            endpoints = ["/health", "/docs"]
-        
-        results = {
-            "backend_dir": backend_dir,
-            "port": port,
-            "steps": [],
-            "success": False,
-        }
-        
-        full_backend_path = self.base_dir / backend_dir
-        
-        # Step 1: Check if main.py exists
-        main_py = full_backend_path / "main.py"
-        if not main_py.exists():
-            results["steps"].append({"step": "check_main", "success": False, "error": "main.py not found"})
-            return ToolResult.fail(results)
-        results["steps"].append({"step": "check_main", "success": True})
-        
-        # Step 2: Check if requirements.txt exists and install
-        req_file = full_backend_path / "requirements.txt"
-        if req_file.exists():
-            try:
-                proc = await asyncio.create_subprocess_exec(
-                    sys.executable, "-m", "pip", "install", "-r", str(req_file), "-q",
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                await asyncio.wait_for(proc.wait(), timeout=60)
-                results["steps"].append({"step": "install_deps", "success": True})
-            except Exception as e:
-                results["steps"].append({"step": "install_deps", "success": False, "error": str(e)})
-        
-        # Step 3: Try to start the server
-        server_name = f"test_{backend_dir}_{port}"
-        
-        # First stop any existing server on this port
-        await _process_manager.stop_server(server_name)
-        await asyncio.sleep(1)
         
         try:
-            # Start uvicorn from the parent directory so imports work
-            start_cmd = f"{sys.executable} -m uvicorn {backend_dir}.main:app --host 0.0.0.0 --port {port}"
+            import urllib.request
+            import urllib.error
+            import json
             
-            proc = await asyncio.create_subprocess_shell(
-                start_cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=str(self.base_dir),
+            req_headers = {"Content-Type": "application/json"}
+            if headers:
+                req_headers.update(headers)
+            
+            data = body.encode() if body else None
+            
+            request = urllib.request.Request(
+                url,
+                data=data,
+                headers=req_headers,
+                method=method,
             )
             
-            _process_manager._subprocesses[server_name] = proc
-            
-            # Wait for server to start
-            await asyncio.sleep(3)
-            
-            # Check if still running
-            if proc.returncode is not None:
-                stdout, stderr = await proc.communicate()
-                results["steps"].append({
-                    "step": "start_server",
-                    "success": False,
-                    "error": stderr.decode()[:500] if stderr else "Server exited immediately",
-                })
-                return ToolResult.fail(results)
-            
-            results["steps"].append({"step": "start_server", "success": True, "pid": proc.pid})
-            
-            # Step 4: Test endpoints
-            import httpx
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                for endpoint in endpoints:
+            try:
+                with urllib.request.urlopen(request, timeout=30) as response:
+                    status = response.status
+                    content = response.read().decode()
+                    
+                    # Try to format JSON
                     try:
-                        url = f"http://localhost:{port}{endpoint}"
-                        resp = await client.get(url)
-                        results["steps"].append({
-                            "step": f"test_{endpoint}",
-                            "success": resp.status_code < 500,
-                            "status_code": resp.status_code,
-                        })
-                    except Exception as e:
-                        results["steps"].append({
-                            "step": f"test_{endpoint}",
-                            "success": False,
-                            "error": str(e)[:100],
-                        })
-            
-            # Step 5: Stop server
-            await _process_manager.stop_server(server_name)
-            results["steps"].append({"step": "stop_server", "success": True})
-            
-            # Calculate overall success
-            failed_steps = [s for s in results["steps"] if not s.get("success", False)]
-            results["success"] = len(failed_steps) == 0
-            results["failed_count"] = len(failed_steps)
-            results["passed_count"] = len(results["steps"]) - len(failed_steps)
-            
-            if results["success"]:
-                return ToolResult.ok(results)
-            else:
-                return ToolResult(success=False, data=results)
-            
+                        content = json.dumps(json.loads(content), indent=2)
+                    except:
+                        pass
+                    
+                    return ToolResult(
+                        success=True,
+                        data={"status": status, "response": f"Status: {status}\n{content}"}
+                    )
+                    
+            except urllib.error.HTTPError as e:
+                content = e.read().decode()
+                return ToolResult(
+                    success=False,
+                    data={"status": e.code, "response": f"Status: {e.code}\n{content}"},
+                    error_message=f"HTTP Error: {e.code}"
+                )
+                
         except Exception as e:
-            # Cleanup
-            await _process_manager.stop_server(server_name)
-            results["steps"].append({"step": "error", "success": False, "error": str(e)[:200]})
-            return ToolResult.fail(results)
+            return ToolResult(success=False, error_message=f"Request failed: {e}")
 
 
-class ShouldTestTool(BaseTool):
-    """
-    Ask the model if now is a good time to test.
+# ===== Install Dependencies Tool =====
+
+class InstallDependenciesTool(BaseTool):
+    """Install project dependencies."""
     
-    This is a helper that provides context about what's been generated
-    and suggests whether testing would be valuable.
-    """
+    NAME = "install_dependencies"
     
-    def __init__(self, base_dir: Optional[Path] = None, gen_context: Any = None):
-        super().__init__()
-        self.base_dir = base_dir or Path.cwd()
-        self.gen_context = gen_context
+    DESCRIPTION = """Install dependencies for a project.
+
+Automatically detects:
+* requirements.txt -> pip install
+* package.json -> npm install
+* pyproject.toml -> pip install -e .
+"""
+    
+    def __init__(self, work_dir: str = None):
+        super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
+        self.work_dir = Path(work_dir) if work_dir else Path.cwd()
     
     @property
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
-            name="should_test",
-            description="Check if now is a good time to test. Returns recommendation based on what's generated.",
-            category=ToolCategory.CUSTOM,
-            parameters=[],
-            returns="Recommendation on whether to test and what to test",
-            tags=["test", "decision"],
+    def tool_definition(self):
+        return self.get_tool_param()
+    
+    def get_tool_param(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Project directory (default: current)"
+                    }
+                }
+            }
         )
     
-    async def execute(self, **kwargs) -> ToolResult:
-        """Check testing readiness."""
+    def execute(self, path: str = None) -> ToolResult:
+        project_dir = Path(path or self.work_dir).expanduser()
         
-        ready_for_test = {
-            "backend": False,
-            "frontend": False,
-            "recommendations": [],
-        }
+        if not project_dir.exists():
+            return ToolResult(success=False, error_message=f"Path not found: {path}")
         
-        # Check backend
-        if self.gen_context and hasattr(self.gen_context, 'files'):
-            backend_files = [f for f in self.gen_context.files.keys() if '_api/' in f]
-            has_main = any('main.py' in f for f in backend_files)
-            has_models = any('models.py' in f for f in backend_files)
-            has_routes = any('router' in f.lower() or 'auth.py' in f for f in backend_files)
-            
-            if has_main and has_models:
-                ready_for_test["backend"] = True
-                ready_for_test["recommendations"].append(
-                    "Backend has main.py and models.py - good time to test with quick_test()"
+        results = []
+        
+        # Python: requirements.txt
+        req_file = project_dir / "requirements.txt"
+        if req_file.exists():
+            try:
+                result = subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "-r", str(req_file)],
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                    cwd=str(project_dir),
                 )
-            elif has_main:
-                ready_for_test["recommendations"].append(
-                    "Backend has main.py but no models - can test server starts"
+                results.append(f"pip install: {'OK' if result.returncode == 0 else 'FAILED'}")
+                if result.returncode != 0:
+                    results.append(result.stderr)
+            except Exception as e:
+                results.append(f"pip install failed: {e}")
+        
+        # Python: pyproject.toml
+        pyproject = project_dir / "pyproject.toml"
+        if pyproject.exists() and not req_file.exists():
+            try:
+                result = subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "-e", "."],
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                    cwd=str(project_dir),
                 )
-            
-            if has_routes:
-                ready_for_test["recommendations"].append(
-                    "Routes detected - can test API endpoints after starting server"
+                results.append(f"pip install -e .: {'OK' if result.returncode == 0 else 'FAILED'}")
+            except Exception as e:
+                results.append(f"pip install failed: {e}")
+        
+        # Node.js: package.json
+        pkg_json = project_dir / "package.json"
+        if pkg_json.exists():
+            try:
+                result = subprocess.run(
+                    ["npm", "install"],
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                    cwd=str(project_dir),
                 )
+                results.append(f"npm install: {'OK' if result.returncode == 0 else 'FAILED'}")
+            except Exception as e:
+                results.append(f"npm install failed: {e}")
         
-        # Fallback: check filesystem
-        if not ready_for_test["backend"]:
-            for subdir in self.base_dir.iterdir():
-                if subdir.is_dir() and subdir.name.endswith('_api'):
-                    main_py = subdir / "main.py"
-                    if main_py.exists():
-                        ready_for_test["backend"] = True
-                        ready_for_test["recommendations"].append(
-                            f"Found {subdir.name}/main.py - can test backend"
-                        )
-                        break
-        
-        # Check frontend
-        for subdir in self.base_dir.iterdir():
-            if subdir.is_dir() and subdir.name.endswith('_ui'):
-                pkg_json = subdir / "package.json"
-                if pkg_json.exists():
-                    ready_for_test["frontend"] = True
-                    ready_for_test["recommendations"].append(
-                        f"Found {subdir.name}/package.json - can npm install and test"
-                    )
-                    break
-        
-        if not ready_for_test["recommendations"]:
-            ready_for_test["recommendations"].append(
-                "Not enough files generated yet. Continue generating before testing."
+        if not results:
+            return ToolResult(
+                success=True,
+                data="No dependency files found (requirements.txt, package.json, pyproject.toml)"
             )
         
-        return ToolResult.ok(ready_for_test)
+        return ToolResult(
+            success=True,
+            data="\n".join(results)
+        )
+
+
+# ===== Exports =====
+
+__all__ = [
+    "ExecuteBashTool",
+    "ExecuteIPythonTool",
+    "StartServerTool",
+    "StopServerTool",
+    "ListServersTool",
+    "GetServerLogsTool",
+    "TestAPITool",
+    "InstallDependenciesTool",
+    "ServerRegistry",
+]

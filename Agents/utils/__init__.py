@@ -7,31 +7,36 @@ Core Modules:
 - message: Message protocol definitions
 - config: Configuration management
 - state: State and lifecycle management
-- tool: Tool interface and registry
+- tool: Tool interface and registry (LiteLLM compatible)
 - base_agent: Agent base class
 - communication: Communication mechanisms (message bus, event system)
 
 Intelligence Modules:
 - llm: LLM client for various providers (OpenAI, Anthropic, etc.)
-- prompt: Prompt template management
-- memory: Memory systems (short-term, long-term, semantic)
+- prompt: Jinja2-based prompt template management
+- memory: Memory systems with LLM-based condensation
 - planner: Task planning and decomposition
 - reasoning: ReAct and other reasoning patterns
 
+New Modules (inspired by OpenHands):
+- stuck_detector: Detect when agent is stuck in loops
+- retry: Robust retry mechanism with exponential backoff
+- debug: Enhanced logging and debugging
+
 Usage example:
     from utils import BaseAgent, AgentConfig, TaskMessage, LLM, Planner, ReActEngine
+    from utils import StuckDetector, RetryMixin, DebugMixin
     
-    class SmartAgent(BaseAgent):
+    class SmartAgent(BaseAgent, RetryMixin, DebugMixin):
         def __init__(self, config):
             super().__init__(config)
             self.llm = LLM(config.llm)
             self.planner = Planner(config.llm)
             self.reasoner = ReActEngine(config.llm, self.tools)
+            self.stuck_detector = StuckDetector()
         
         async def process_task(self, task: TaskMessage) -> ResultMessage:
-            # Use planning + reasoning
-            plan = await self.planner.create_plan(task.task_description)
-            result = await self.reasoner.run(task.task_description)
+            # Use planning + reasoning with stuck detection
             ...
 """
 
@@ -88,15 +93,13 @@ from .state import (
     VALID_TASK_TRANSITIONS,
 )
 
-# Tool module
+# Tool module (refactored with LiteLLM support)
 from .tool import (
     # Enums
     ToolCategory,
-    ToolStatus,
+    SecurityRisk,
     # Data classes
-    ToolParameter,
     ToolResult,
-    ToolDefinition,
     # Base class
     BaseTool,
     # Registry
@@ -104,9 +107,11 @@ from .tool import (
     global_registry,
     # Decorator
     tool,
-    # Example tools
-    EchoTool,
-    SleepTool,
+    # Helper function
+    create_tool_param,
+    # Built-in tools
+    ThinkTool,
+    FinishTool,
 )
 
 # Agent base
@@ -150,38 +155,33 @@ from .llm import (
     LLM,
 )
 
-# Prompt module
+# Prompt module (refactored with Jinja2)
 from .prompt import (
     # Classes
-    PromptTemplate,
-    PromptBuilder,
-    PromptRegistry,
-    # Built-in templates
-    PLANNER_SYSTEM_PROMPT,
-    PLANNER_TEMPLATE,
-    REACT_SYSTEM_PROMPT,
-    REACT_TEMPLATE,
-    SUMMARIZER_TEMPLATE,
-    ANALYZER_TEMPLATE,
-    CODE_GENERATOR_TEMPLATE,
-    EVALUATOR_TEMPLATE,
-    # Registry
-    prompt_registry,
-    # Helpers
+    PromptManager,
+    RuntimeInfo,
+    ProjectInfo,
+    # Helper functions
     format_tools_for_prompt,
     format_history_for_prompt,
+    refine_prompt,
+    get_template,
+    # Templates library
+    TEMPLATE_LIBRARY,
+    DEFAULT_SYSTEM_PROMPT,
+    DEFAULT_USER_PROMPT,
 )
 
-# Memory module
+# Memory module (with LLM condenser)
 from .memory import (
     # Data classes
     MemoryItem,
     # Memory types
-    BaseMemory,
     ShortTermMemory,
     WorkingMemory,
     LongTermMemory,
-    SemanticMemory,
+    # LLM Condenser
+    LLMSummarizingCondenser,
     # Unified memory
     AgentMemory,
 )
@@ -216,9 +216,55 @@ from .reasoning import (
     create_react_template,
 )
 
+# ===== New Modules (OpenHands-inspired) =====
+
+# Stuck Detection
+from .stuck_detector import (
+    StuckAnalysis,
+    HistoryEvent,
+    StuckDetector,
+    create_stuck_detector,
+)
+
+# Retry Mechanism (now integrated in BaseAgent, but available for standalone use)
+from .retry import (
+    RetryConfig,
+    LLMNoResponseError,
+    LLMRateLimitError,
+    LLMContextWindowError,
+    create_retry_decorator,
+    retry_on_exception,
+    retry_llm_call,
+    DEFAULT_CONFIG as RETRY_DEFAULT_CONFIG,
+    LLM_CONFIG as RETRY_LLM_CONFIG,
+    API_CONFIG as RETRY_API_CONFIG,
+)
+
+# Debug/Logging (now integrated in BaseAgent, but available for standalone use)
+from .debug import (
+    # Loggers
+    agent_logger,
+    llm_prompt_logger,
+    llm_response_logger,
+    tool_logger,
+    event_logger,
+    # Config
+    LogConfig,
+    setup_logging,
+    truncate_content,
+    # Structured Logger
+    LoggedEvent,
+    StructuredLogger,
+    # Convenience functions
+    log_action,
+    log_observation,
+    log_error,
+    log_phase,
+)
+
 
 # Version info
-__version__ = "0.2.0"
+__version__ = "0.3.0"  # Updated version
 __author__ = "AgentForge Team"
 
 
@@ -261,18 +307,17 @@ __all__ = [
     "VALID_AGENT_TRANSITIONS",
     "VALID_TASK_TRANSITIONS",
     
-    # Tool
+    # Tool (LiteLLM compatible)
     "ToolCategory",
-    "ToolStatus",
-    "ToolParameter",
+    "SecurityRisk",
     "ToolResult",
-    "ToolDefinition",
     "BaseTool",
     "ToolRegistry",
     "global_registry",
     "tool",
-    "EchoTool",
-    "SleepTool",
+    "create_tool_param",
+    "ThinkTool",
+    "FinishTool",
     
     # Agent
     "AgentRole",
@@ -299,29 +344,24 @@ __all__ = [
     "create_llm_client",
     "LLM",
     
-    # Prompt
-    "PromptTemplate",
-    "PromptBuilder",
-    "PromptRegistry",
-    "PLANNER_SYSTEM_PROMPT",
-    "PLANNER_TEMPLATE",
-    "REACT_SYSTEM_PROMPT",
-    "REACT_TEMPLATE",
-    "SUMMARIZER_TEMPLATE",
-    "ANALYZER_TEMPLATE",
-    "CODE_GENERATOR_TEMPLATE",
-    "EVALUATOR_TEMPLATE",
-    "prompt_registry",
+    # Prompt (Jinja2)
+    "PromptManager",
+    "RuntimeInfo",
+    "ProjectInfo",
     "format_tools_for_prompt",
     "format_history_for_prompt",
+    "refine_prompt",
+    "get_template",
+    "TEMPLATE_LIBRARY",
+    "DEFAULT_SYSTEM_PROMPT",
+    "DEFAULT_USER_PROMPT",
     
-    # Memory
+    # Memory (with condenser)
     "MemoryItem",
-    "BaseMemory",
     "ShortTermMemory",
     "WorkingMemory",
     "LongTermMemory",
-    "SemanticMemory",
+    "LLMSummarizingCondenser",
     "AgentMemory",
     
     # Planner
@@ -341,4 +381,39 @@ __all__ = [
     "SelfAsk",
     "ReflectionEngine",
     "create_react_template",
+    
+    # ===== New (OpenHands-inspired) =====
+    # Stuck Detection
+    "StuckAnalysis",
+    "HistoryEvent",
+    "StuckDetector",
+    "create_stuck_detector",
+    
+    # Retry (standalone utilities)
+    "RetryConfig",
+    "LLMNoResponseError",
+    "LLMRateLimitError",
+    "LLMContextWindowError",
+    "create_retry_decorator",
+    "retry_on_exception",
+    "retry_llm_call",
+    "RETRY_DEFAULT_CONFIG",
+    "RETRY_LLM_CONFIG",
+    "RETRY_API_CONFIG",
+    
+    # Debug (standalone utilities)
+    "agent_logger",
+    "llm_prompt_logger",
+    "llm_response_logger",
+    "tool_logger",
+    "event_logger",
+    "LogConfig",
+    "setup_logging",
+    "truncate_content",
+    "LoggedEvent",
+    "StructuredLogger",
+    "log_action",
+    "log_observation",
+    "log_error",
+    "log_phase",
 ]

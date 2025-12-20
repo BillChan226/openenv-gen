@@ -1,19 +1,328 @@
 """
-Message Protocol Module - Defines communication message formats between Agents
+Message Protocol Module - Unified communication messages between Agents
 
-Supported message types:
-- TaskMessage: Task assignment messages
-- ResultMessage: Task result messages
-- StatusMessage: Status update messages
-- ErrorMessage: Error report messages
-- ControlMessage: Control commands (start, stop, pause, etc.)
+Includes:
+- Message bus messages (TaskMessage, ResultMessage, StatusMessage, etc.)
+- Code generation tasks (Task, Issue, TaskResult, VerifyResult, etc.)
 """
 
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Optional, List, Dict
 from uuid import uuid4
+
+
+# =============================================================================
+# Code Generation Task Types (for UserAgent <-> CodeAgent communication)
+# =============================================================================
+
+class TaskType(Enum):
+    """Types of code generation tasks"""
+    DESIGN = "design"           # Generate design documents
+    BACKEND = "backend"         # Generate backend code
+    FRONTEND = "frontend"       # Generate frontend code
+    DATABASE = "database"       # Generate database schema
+    ENV = "env"                 # Generate OpenEnv adapter
+    DOCKER = "docker"           # Generate Docker config
+    FIX = "fix"                 # Fix an issue
+    TEST = "test"               # Run tests
+    VERIFICATION = "verification"  # Verify environment is runnable
+
+
+class TaskStatus(Enum):
+    """Status of task execution"""
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    PARTIAL = "partial"
+    FAILED = "failed"
+
+
+class IssueSeverity(Enum):
+    """Severity levels for issues"""
+    ERROR = "error"           # Must fix - blocks functionality
+    WARNING = "warning"       # Should fix - degraded experience
+    SUGGESTION = "suggestion" # Could fix - improvement opportunity
+
+
+@dataclass
+class FileSpec:
+    """Specification for a file to be generated"""
+    path: str                           # Relative path within project
+    purpose: str                        # What this file does
+    requirements: List[str] = field(default_factory=list)
+    template: Optional[str] = None      # Optional template content
+    dependencies: List[str] = field(default_factory=list)
+
+
+@dataclass
+class Task:
+    """
+    A code generation task from User Agent to Code Agent.
+    Contains everything Code Agent needs to complete the work.
+    """
+    id: str
+    type: TaskType
+    
+    # What to do
+    description: str
+    requirements: List[str] = field(default_factory=list)
+    
+    # Where to do it (structure constraints)
+    target_directory: str = ""
+    allowed_paths: List[str] = field(default_factory=list)
+    file_specs: List[FileSpec] = field(default_factory=list)
+    
+    # Context
+    existing_files: List[str] = field(default_factory=list)
+    dependencies: Dict[str, str] = field(default_factory=dict)  # file -> content summary
+    
+    # Acceptance criteria
+    acceptance_criteria: List[str] = field(default_factory=list)
+    
+    # Priority and ordering
+    priority: int = 0
+    depends_on: List[str] = field(default_factory=list)  # Task IDs
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization"""
+        return {
+            "id": self.id,
+            "type": self.type.value,
+            "description": self.description,
+            "requirements": self.requirements,
+            "target_directory": self.target_directory,
+            "allowed_paths": self.allowed_paths,
+            "file_specs": [
+                {
+                    "path": f.path,
+                    "purpose": f.purpose,
+                    "requirements": f.requirements,
+                    "dependencies": f.dependencies,
+                }
+                for f in self.file_specs
+            ],
+            "existing_files": self.existing_files,
+            "acceptance_criteria": self.acceptance_criteria,
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Task":
+        """Create from dictionary"""
+        return cls(
+            id=data["id"],
+            type=TaskType(data["type"]),
+            description=data["description"],
+            requirements=data.get("requirements", []),
+            target_directory=data.get("target_directory", ""),
+            allowed_paths=data.get("allowed_paths", []),
+            file_specs=[
+                FileSpec(
+                    path=f["path"],
+                    purpose=f["purpose"],
+                    requirements=f.get("requirements", []),
+                    dependencies=f.get("dependencies", []),
+                )
+                for f in data.get("file_specs", [])
+            ],
+            existing_files=data.get("existing_files", []),
+            acceptance_criteria=data.get("acceptance_criteria", []),
+        )
+
+
+@dataclass
+class Issue:
+    """
+    An issue found by User Agent during verification.
+    Provides clear context for Code Agent to fix.
+    """
+    id: str
+    task_id: str              # Which task this relates to
+    severity: IssueSeverity
+    
+    # Problem description
+    title: str
+    description: str
+    error_message: Optional[str] = None
+    
+    # Location
+    file_path: Optional[str] = None
+    line_number: Optional[int] = None
+    code_snippet: Optional[str] = None
+    
+    # Fix guidance
+    suggested_fix: Optional[str] = None
+    related_files: List[str] = field(default_factory=list)
+    
+    # Verification
+    verification_command: Optional[str] = None
+    expected_result: Optional[str] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            "id": self.id,
+            "task_id": self.task_id,
+            "severity": self.severity.value,
+            "title": self.title,
+            "description": self.description,
+            "error_message": self.error_message,
+            "file_path": self.file_path,
+            "line_number": self.line_number,
+            "code_snippet": self.code_snippet,
+            "suggested_fix": self.suggested_fix,
+            "related_files": self.related_files,
+            "verification_command": self.verification_command,
+            "expected_result": self.expected_result,
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Issue":
+        """Create from dictionary"""
+        return cls(
+            id=data["id"],
+            task_id=data["task_id"],
+            severity=IssueSeverity(data["severity"]),
+            title=data["title"],
+            description=data["description"],
+            error_message=data.get("error_message"),
+            file_path=data.get("file_path"),
+            line_number=data.get("line_number"),
+            code_snippet=data.get("code_snippet"),
+            suggested_fix=data.get("suggested_fix"),
+            related_files=data.get("related_files", []),
+            verification_command=data.get("verification_command"),
+            expected_result=data.get("expected_result"),
+        )
+    
+    def format_for_agent(self) -> str:
+        """Format issue for agent consumption"""
+        lines = [
+            f"## Issue: {self.title}",
+            f"Severity: {self.severity.value.upper()}",
+            f"",
+            f"### Description",
+            self.description,
+        ]
+        
+        if self.error_message:
+            lines.extend(["", "### Error Message", "```", self.error_message, "```"])
+        
+        if self.file_path:
+            loc = f"{self.file_path}"
+            if self.line_number:
+                loc += f":{self.line_number}"
+            lines.extend(["", f"### Location", loc])
+        
+        if self.code_snippet:
+            lines.extend(["", "### Code Snippet", "```", self.code_snippet, "```"])
+        
+        if self.suggested_fix:
+            lines.extend(["", "### Suggested Fix", self.suggested_fix])
+        
+        if self.related_files:
+            lines.extend(["", "### Related Files", *[f"- {f}" for f in self.related_files]])
+        
+        return "\n".join(lines)
+
+
+@dataclass
+class CommandResult:
+    """Result of a command execution"""
+    command: str
+    exit_code: int
+    stdout: str = ""
+    stderr: str = ""
+    
+    @property
+    def success(self) -> bool:
+        return self.exit_code == 0
+
+
+@dataclass
+class TaskResult:
+    """Result from Code Agent after executing a task."""
+    task_id: str
+    status: TaskStatus
+    
+    # What was done
+    files_created: List[str] = field(default_factory=list)
+    files_modified: List[str] = field(default_factory=list)
+    
+    # Commands run
+    commands: List[Dict] = field(default_factory=list)
+    
+    # Issues encountered
+    issues: List[str] = field(default_factory=list)
+    
+    # Summary
+    summary: str = ""
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            "task_id": self.task_id,
+            "status": self.status.value,
+            "files_created": self.files_created,
+            "files_modified": self.files_modified,
+            "commands": self.commands,
+            "issues": self.issues,
+            "summary": self.summary,
+        }
+
+
+@dataclass
+class FixResult:
+    """Result from Code Agent after fixing an issue."""
+    issue_id: str
+    fixed: bool
+    
+    # What was changed
+    changes: List[str] = field(default_factory=list)
+    
+    # Verification
+    needs_verification: List[str] = field(default_factory=list)
+    
+    # Notes
+    notes: str = ""
+
+
+@dataclass
+class VerifyResult:
+    """Result from User Agent after verifying a task or fix."""
+    task_id: str
+    passed: bool
+    
+    # What was checked
+    checks_performed: List[str] = field(default_factory=list)
+    
+    # Results
+    passed_checks: List[str] = field(default_factory=list)
+    failed_checks: List[str] = field(default_factory=list)
+    
+    # Problems found
+    problems: List[str] = field(default_factory=list)
+    
+    # Overall assessment
+    summary: str = ""
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary"""
+        return {
+            "task_id": self.task_id,
+            "passed": self.passed,
+            "checks_performed": self.checks_performed,
+            "passed_checks": self.passed_checks,
+            "failed_checks": self.failed_checks,
+            "problems": self.problems,
+            "summary": self.summary,
+        }
+
+
+# =============================================================================
+# Message Bus Types (for general Agent-to-Agent communication)
+# =============================================================================
 
 
 class MessageType(Enum):

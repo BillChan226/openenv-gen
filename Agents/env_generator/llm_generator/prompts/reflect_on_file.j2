@@ -1,0 +1,61 @@
+I just generated {{ file_path }}. Review the automated check results.
+
+<AUTOMATED_CHECK_RESULTS>
+- Syntax: {{ 'PASS' if syntax_ok else 'FAIL' }}
+- Lint: {{ lint_issues_count }} issues found
+- Completeness: {{ lines_count }} lines
+</AUTOMATED_CHECK_RESULTS>
+
+{% if issues_found %}
+<ISSUES_FOUND_SO_FAR>
+{% for issue in issues_found %}
+- {{ issue }}
+{% endfor %}
+</ISSUES_FOUND_SO_FAR>
+{% else %}
+<ISSUES_FOUND_SO_FAR>
+- None yet
+</ISSUES_FOUND_SO_FAR>
+{% endif %}
+
+{% if previously_generated %}
+<PREVIOUSLY_GENERATED_FILES>
+{% for f in previously_generated %}
+- {{ f }}
+{% endfor %}
+{% if previously_generated|length > 20 %}
+... and more
+{% endif %}
+</PREVIOUSLY_GENERATED_FILES>
+{% endif %}
+
+{% if memory_context %}
+<MEMORY_CONTEXT>
+{{ memory_context }}
+</MEMORY_CONTEXT>
+{% endif %}
+
+<AVAILABLE_TOOLS>
+- view(path): Read file content
+- grep(pattern, path): Search for patterns
+</AVAILABLE_TOOLS>
+
+<INSTRUCTIONS>
+What ADDITIONAL checks should I perform? Think about:
+1. Should I READ any previously generated files to verify consistency?
+2. Should I GREP for specific patterns?
+3. Are there any imports or references to verify?
+4. Based on known fix patterns, any common issues to check?
+</INSTRUCTIONS>
+
+Respond in JSON:
+```json
+{
+  "additional_checks": [
+    {"tool": "view", "target": "path/to/file", "reason": "why"},
+    {"tool": "grep", "pattern": "some_pattern", "reason": "why"}
+  ],
+  "quick_assessment": "brief assessment based on current findings"
+}
+```
+

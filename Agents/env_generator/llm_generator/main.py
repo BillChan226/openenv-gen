@@ -11,24 +11,41 @@ Usage:
 
 import argparse
 import asyncio
-import json
+import logging
 import os
 import sys
 from pathlib import Path
 
-# Add parent to path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+# Add Agents directory to path (where utils/ is located)
+_agents_dir = Path(__file__).parent.parent.parent.absolute()
+if str(_agents_dir) not in sys.path:
+    sys.path.insert(0, str(_agents_dir))
 
-from utils.config import AgentConfig, LLMConfig, LLMProvider, LogLevel, LoggingConfig, ExecutionConfig, MemoryConfig
+# Add llm_generator directory to path for direct script execution
+_llm_generator_dir = Path(__file__).parent.absolute()
+if str(_llm_generator_dir) not in sys.path:
+    sys.path.insert(0, str(_llm_generator_dir))
 
-from .agents.orchestrator import GeneratorOrchestrator
-from .context import GenerationContext
-from .events import EventEmitter, EventType, ConsoleListener, FileLogger, RealTimeTextLogger
+from utils.config import LLMConfig, LLMProvider
+
+# Use absolute imports for direct script execution
+from agents import Coordinator
+from progress import EventEmitter, ConsoleListener, FileLogger
+
+
+def setup_logging(verbose: bool = False):
+    """Setup logging configuration."""
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[logging.StreamHandler()],
+    )
 
 
 async def main():
     parser = argparse.ArgumentParser(
-        description="Generate OpenEnv-compatible environments using LLM"
+        description="Generate OpenEnv-compatible web environments using LLM"
     )
     
     parser.add_argument(
@@ -42,19 +59,14 @@ async def main():
         help="Environment description",
     )
     parser.add_argument(
-        "--domain",
-        default="custom",
-        help="Domain type (e.g., 'calendar', 'ecommerce', 'custom')",
-    )
-    parser.add_argument(
         "--output",
         default="./generated",
         help="Output directory (default: ./generated)",
     )
     parser.add_argument(
         "--model",
-        default="gpt-5.1",
-        help="LLM model to use (default: gpt-5.1)",
+        default="gpt-4",
+        help="LLM model to use (default: gpt-4)",
     )
     parser.add_argument(
         "--verbose",
@@ -66,13 +78,12 @@ async def main():
         action="store_true",
         help="Resume from previous checkpoint if available",
     )
-    parser.add_argument(
-        "--test",
-        action="store_true",
-        help="Enable testing after code generation (optional)",
-    )
     
     args = parser.parse_args()
+    
+    # Setup logging
+    setup_logging(args.verbose)
+    logger = logging.getLogger("main")
     
     # Check for API key
     api_key = os.environ.get("OPENAI_API_KEY")
@@ -81,101 +92,63 @@ async def main():
         print("Usage: OPENAI_API_KEY=sk-... python -m llm_generator.main --name calendar")
         sys.exit(1)
     
-    # Create config
-    config = AgentConfig(
-        agent_name="EnvGenerator",
-        llm=LLMConfig(
-            provider=LLMProvider.OPENAI,
-            model_name=args.model,
-            api_key=api_key,
-            temperature=0.7,
-            max_tokens=128000,  # GPT-5.1 max is 128k completion tokens
-        ),
-        logging=LoggingConfig(
-            level=LogLevel.DEBUG if args.verbose else LogLevel.INFO,
-        ),
-        execution=ExecutionConfig(
-            max_retries=2,
-            task_timeout=300,  # 5 minutes per task
-        ),
-        memory=MemoryConfig(
-            short_term_memory_size=50,
-        ),
+    # Create LLM config
+    llm_config = LLMConfig(
+        provider=LLMProvider.OPENAI,
+        model_name=args.model,
+        api_key=api_key,
+        temperature=0.7,
+        max_tokens=4096,
+        timeout=1800,  # 30 minutes for large generations
     )
     
     # Create output directory
-    output_dir = Path(args.output)
+    output_dir = Path(args.output) / args.name
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Create event emitter for real-time progress
-    emitter = EventEmitter()
-    emitter.on_all(ConsoleListener(verbose=args.verbose))
+    logger.info(f"Starting generation: {args.name}")
+    logger.info(f"Output directory: {output_dir}")
+    logger.info(f"Model: {args.model}")
     
-    # Log to JSON file (structured)
-    json_log_file = output_dir / f"{args.name}_generation.log"
-    emitter.on_all(FileLogger(str(json_log_file)))
-    
-    # Log to text file (human-readable, can be tailed with `tail -f`)
-    text_log_file = output_dir / f"{args.name}_realtime.log"
-    emitter.on_all(RealTimeTextLogger(str(text_log_file)))
-    
-    print(f"\n📝 Real-time log: tail -f {text_log_file}\n")
-    
-    # Create and initialize orchestrator with event emitter
-    orchestrator = GeneratorOrchestrator(
-        config=config,
+    # Create coordinator
+    coordinator = Coordinator(
+        llm_config=llm_config,
         output_dir=output_dir,
-        event_emitter=emitter,
-        verbose=args.verbose,
+        enable_checkpoints=True,
+    )
+    
+    # Build requirements list
+    requirements = []
+    if args.description:
+        requirements.append(args.description)
+    
+    # Run generation
+    result = await coordinator.run(
+        goal=args.description or f"Build a {args.name} web application",
+        requirements=requirements,
         resume=args.resume,
-        enable_testing=args.test,  # Optional: run tests after generation
     )
     
-    await orchestrator.initialize()
+    # Print result
+    print("\n" + "=" * 60)
+    print("GENERATION COMPLETE")
+    print("=" * 60)
+    print(f"  Status: {'SUCCESS' if result.success else 'FAILED'}")
+    print(f"  Tasks completed: {result.tasks_completed}")
+    print(f"  Tasks failed: {result.tasks_failed}")
+    print(f"  Issues fixed: {result.issues_fixed}")
+    print(f"  Duration: {result.duration:.1f}s")
+    print(f"  Output: {result.project_path}")
+    print("=" * 60)
     
-    # Try to load learned patterns from previous generations
-    memory_file = output_dir / ".generator_memory.json"
-    if orchestrator.load_memory(str(memory_file)):
-        print(f"  Loaded learned patterns from previous sessions")
-        memory_stats = orchestrator.get_memory_stats()
-        print(f"  Fix patterns learned: {memory_stats.get('fix_patterns_learned', 0)}")
+    if result.success:
+        print("\n📋 Next Steps:")
+        print(f"  1. cd {result.project_path}")
+        print(f"  2. docker-compose -f docker/docker-compose.yml up --build")
+        print(f"  3. Open http://localhost:3000")
     
-    # Generate environment
-    result = await orchestrator.generate_environment(
-        name=args.name,
-        description=args.description or f"A {args.domain} application with full CRUD capabilities",
-        domain_type=args.domain,
-    )
-    
-    # Save learned patterns for future use
-    orchestrator.save_memory(str(memory_file))
-    
-    # Save result to file
-    result_file = output_dir / args.name / "generation_result.json"
-    with open(result_file, "w") as f:
-        json.dump(result, f, indent=2, default=str)
-    
-    # Print next steps
-    print("\n" + "="*60)
-    print("📋 Next Steps:")
-    print("="*60)
-    print(f"  1. cd {result['output_dir']}")
-    print(f"  2. Review generated code")
-    print(f"  3. docker-compose up --build")
-    print("\n  Or run locally:")
-    print(f"    # Backend: cd {args.name}_api && pip install -r requirements.txt && uvicorn main:app --reload")
-    print(f"    # Frontend: cd {args.name}_ui && npm install && npm run dev")
-    print("="*60 + "\n")
-    print(f"  📝 Real-time log: {text_log_file}")
-    print(f"  📄 JSON log: {json_log_file}")
-    print(f"  📊 Result file: {result_file}")
-    
-    # Cleanup
-    await orchestrator.cleanup()
-    
-    return 0 if result['success'] else 1
+    return 0 if result.success else 1
 
 
 if __name__ == "__main__":
     sys.exit(asyncio.run(main()))
-

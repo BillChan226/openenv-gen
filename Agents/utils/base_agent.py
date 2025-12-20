@@ -5,6 +5,11 @@ Provides:
 - BaseAgent: Base class for all Agents
 - AgentCapability: Agent capability definition
 - AgentRole: Agent role definition
+
+Enhanced Features (OpenHands-inspired):
+- Stuck detection to break infinite loops
+- Retry mechanism with exponential backoff
+- Structured debug logging for observability
 """
 
 from abc import ABC, abstractmethod
@@ -62,6 +67,11 @@ class AgentMetrics:
     average_execution_time: float = 0.0
     last_active: Optional[datetime] = None
     errors_count: int = 0
+    # New metrics for enhanced features
+    total_retries: int = 0
+    stuck_detections: int = 0
+    llm_calls: int = 0
+    tool_calls: int = 0
     
     def record_task_completion(self, execution_time: float, success: bool) -> None:
         """Record task completion"""
@@ -86,6 +96,10 @@ class AgentMetrics:
             "last_active": self.last_active.isoformat() if self.last_active else None,
             "errors_count": self.errors_count,
             "success_rate": self.tasks_completed / max(1, self.tasks_completed + self.tasks_failed),
+            "total_retries": self.total_retries,
+            "stuck_detections": self.stuck_detections,
+            "llm_calls": self.llm_calls,
+            "tool_calls": self.tool_calls,
         }
 
 
@@ -103,10 +117,18 @@ class BaseAgent(ABC):
     5. stop: Stop running
     6. cleanup: Clean up resources
     
+    Enhanced Features:
+    - Stuck detection: Automatically detects when agent is stuck in loops
+    - Retry mechanism: Exponential backoff retry for LLM and tool calls
+    - Debug logging: Structured logging for prompts, responses, and tool calls
+    
     Usage example:
         class MyAgent(BaseAgent):
             async def process_task(self, task: TaskMessage) -> ResultMessage:
-                # Process task
+                # Process task with stuck detection
+                if self.check_if_stuck():
+                    self.inject_loop_breaker()
+                
                 result = do_something(task.payload)
                 return create_result_message(
                     self.agent_id, task.header.source_agent_id,
@@ -118,6 +140,8 @@ class BaseAgent(ABC):
         self,
         config: AgentConfig,
         role: AgentRole = AgentRole.WORKER,
+        enable_stuck_detection: bool = True,
+        enable_debug_logging: bool = False,
     ):
         # Basic attributes
         self._config = config
@@ -154,6 +178,239 @@ class BaseAgent(ABC):
         
         # Logger
         self._logger = self._setup_logger()
+        
+        # ===== Enhanced Features =====
+        
+        # Stuck Detection
+        self._enable_stuck_detection = enable_stuck_detection
+        self._stuck_detector = None
+        if enable_stuck_detection:
+            self._setup_stuck_detector()
+        
+        # Debug Logging
+        self._enable_debug_logging = enable_debug_logging
+        self._debug_logger = None
+        if enable_debug_logging:
+            self._setup_debug_logging()
+        
+        # Retry configuration
+        self._retry_config = {
+            "max_retries": 3,
+            "min_wait": 1.0,
+            "max_wait": 60.0,
+            "multiplier": 2.0,
+        }
+    
+    # ===== Stuck Detection =====
+    
+    def _setup_stuck_detector(self) -> None:
+        """Initialize stuck detector."""
+        from .stuck_detector import StuckDetector
+        self._stuck_detector = StuckDetector(
+            max_history=50,
+            min_loop_detection=3,
+        )
+    
+    def record_action(self, action: str) -> None:
+        """Record an action for stuck detection."""
+        if self._stuck_detector and hasattr(self._stuck_detector, 'record_action'):
+            self._stuck_detector.record_action(action)
+    
+    def record_observation(self, observation: str) -> None:
+        """Record an observation for stuck detection."""
+        if self._stuck_detector:
+            self._stuck_detector.add_observation(observation[:500])
+    
+    def record_error(self, error: str) -> None:
+        """Record an error for stuck detection."""
+        if self._stuck_detector:
+            self._stuck_detector.add_error(error)
+    
+    def check_if_stuck(self) -> bool:
+        """
+        Check if agent is stuck in a loop.
+        
+        Returns:
+            True if stuck pattern detected
+        """
+        if not self._stuck_detector:
+            return False
+        
+        if self._stuck_detector.is_stuck():
+            self._metrics.stuck_detections += 1
+            analysis = self._stuck_detector.get_analysis()
+            self._logger.warning(
+                f"Stuck detected: {analysis.loop_type} "
+                f"(repeated {analysis.loop_repeat_times} times)"
+            )
+            return True
+        return False
+    
+    def get_loop_breaker_prompt(self) -> str:
+        """Get a prompt to help break detected loops."""
+        if self._stuck_detector:
+            return self._stuck_detector.get_loop_breaker_prompt()
+        return ""
+    
+    def clear_stuck_history(self) -> None:
+        """Clear stuck detection history."""
+        if self._stuck_detector:
+            self._stuck_detector.clear()
+    
+    # ===== Debug Logging =====
+    
+    def _setup_debug_logging(self) -> None:
+        """Initialize debug logging."""
+        from .debug import StructuredLogger
+        from pathlib import Path
+        
+        log_dir = Path(f".agent_logs/{self._name}")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.jsonl"
+        self._debug_logger = StructuredLogger(str(log_file))
+    
+    def log_prompt(self, prompt: str, model: str = "") -> None:
+        """Log an LLM prompt."""
+        if self._debug_logger:
+            self._debug_logger.log("prompt", prompt[:2000], {"model": model})
+        self._metrics.llm_calls += 1
+    
+    def log_response(self, response: str, tokens: int = 0) -> None:
+        """Log an LLM response."""
+        if self._debug_logger:
+            self._debug_logger.log("response", response[:2000], {"tokens": tokens})
+    
+    def log_tool_call(self, tool_name: str, args: dict, result: Any) -> None:
+        """Log a tool call."""
+        if self._debug_logger:
+            self._debug_logger.log(
+                "tool_call",
+                f"{tool_name}({args})",
+                {"result": str(result)[:500]}
+            )
+        self._metrics.tool_calls += 1
+        
+        # Also record for stuck detection
+        self.record_action(f"{tool_name}({list(args.keys())})")
+        if hasattr(result, 'success') and result.success:
+            self.record_observation(str(result.data)[:200] if result.data else "OK")
+        elif hasattr(result, 'error_message'):
+            self.record_error(result.error_message or "")
+    
+    def log_event(self, event_type: str, content: str, metadata: dict = None) -> None:
+        """Log a custom event."""
+        if self._debug_logger:
+            self._debug_logger.log(event_type, content, metadata or {})
+    
+    # ===== Retry Mechanism =====
+    
+    def configure_retry(
+        self,
+        max_retries: int = 3,
+        min_wait: float = 1.0,
+        max_wait: float = 60.0,
+        multiplier: float = 2.0,
+    ) -> None:
+        """Configure retry behavior."""
+        self._retry_config = {
+            "max_retries": max_retries,
+            "min_wait": min_wait,
+            "max_wait": max_wait,
+            "multiplier": multiplier,
+        }
+    
+    async def call_with_retry(
+        self,
+        func: Callable,
+        *args,
+        max_retries: int = None,
+        **kwargs,
+    ) -> Any:
+        """
+        Call a function with retry on failure.
+        
+        Args:
+            func: Async function to call
+            *args: Positional arguments
+            max_retries: Override default max retries
+            **kwargs: Keyword arguments
+            
+        Returns:
+            Function result
+            
+        Raises:
+            Last exception if all retries fail
+        """
+        max_tries = max_retries or self._retry_config["max_retries"]
+        last_error = None
+        
+        for attempt in range(max_tries):
+            try:
+                if asyncio.iscoroutinefunction(func):
+                    return await func(*args, **kwargs)
+                else:
+                    return func(*args, **kwargs)
+            except Exception as e:
+                last_error = e
+                self._metrics.total_retries += 1
+                
+                if attempt < max_tries - 1:
+                    wait_time = min(
+                        self._retry_config["max_wait"],
+                        self._retry_config["min_wait"] * (self._retry_config["multiplier"] ** attempt)
+                    )
+                    self._logger.warning(
+                        f"Retry {attempt + 1}/{max_tries} after error: {e}. "
+                        f"Waiting {wait_time:.1f}s"
+                    )
+                    await asyncio.sleep(wait_time)
+        
+        raise last_error
+    
+    async def call_tool_with_retry(
+        self,
+        tool_name: str,
+        max_retries: int = None,
+        **kwargs,
+    ) -> ToolResult:
+        """
+        Call a tool with retry on failure.
+        
+        Args:
+            tool_name: Name of the tool
+            max_retries: Override default max retries
+            **kwargs: Tool arguments
+            
+        Returns:
+            ToolResult
+        """
+        tool = self._tools.get(tool_name)
+        if not tool:
+            return ToolResult.fail(f"Tool not found: {tool_name}")
+        
+        max_tries = max_retries or self._retry_config["max_retries"]
+        last_error = None
+        
+        for attempt in range(max_tries):
+            try:
+                result = await tool(**kwargs)
+                self.log_tool_call(tool_name, kwargs, result)
+                return result
+            except Exception as e:
+                last_error = e
+                self._metrics.total_retries += 1
+                
+                if attempt < max_tries - 1:
+                    wait_time = min(
+                        self._retry_config["max_wait"],
+                        self._retry_config["min_wait"] * (self._retry_config["multiplier"] ** attempt)
+                    )
+                    self._logger.warning(
+                        f"Tool {tool_name} retry {attempt + 1}/{max_tries}: {e}"
+                    )
+                    await asyncio.sleep(wait_time)
+        
+        return ToolResult.fail(f"Tool failed after {max_tries} attempts: {last_error}")
     
     # ===== Properties =====
     
@@ -515,7 +772,9 @@ class BaseAgent(ABC):
             return ToolResult.fail(f"Tool not found: {name}")
         
         self._logger.debug(f"Calling tool: {name}")
-        return await tool(**kwargs)
+        result = await tool(**kwargs)
+        self.log_tool_call(name, kwargs, result)
+        return result
     
     async def _register_builtin_tools(self) -> None:
         """Register built-in tools - subclasses can override"""
