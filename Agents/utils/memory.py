@@ -1,26 +1,25 @@
 """
-Memory Module - Provides memory management for Agents
+Memory Module - Advanced memory management with LLM-based condensation
 
-Supports:
-- Short-term memory (conversation history)
+Inspired by OpenHands, this module provides:
+- Short-term memory (conversation buffer)
 - Long-term memory (persistent storage)
 - Working memory (current task context)
-- Semantic memory (vector-based retrieval)
+- LLM Summarizing Condenser (intelligent history compression)
 """
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Callable
 from uuid import uuid4
-import json
-import hashlib
 from collections import deque
+import json
 
 
 @dataclass
 class MemoryItem:
-    """Single memory item"""
+    """Single memory item."""
     id: str = field(default_factory=lambda: str(uuid4()))
     content: str = ""
     metadata: dict = field(default_factory=dict)
@@ -28,7 +27,6 @@ class MemoryItem:
     importance: float = 0.5  # 0.0 - 1.0
     access_count: int = 0
     last_accessed: Optional[datetime] = None
-    embedding: Optional[list[float]] = None  # Vector embedding for semantic search
     
     def to_dict(self) -> dict:
         return {
@@ -38,7 +36,6 @@ class MemoryItem:
             "timestamp": self.timestamp.isoformat(),
             "importance": self.importance,
             "access_count": self.access_count,
-            "last_accessed": self.last_accessed.isoformat() if self.last_accessed else None,
         }
     
     @classmethod
@@ -50,84 +47,56 @@ class MemoryItem:
             timestamp=datetime.fromisoformat(data["timestamp"]) if "timestamp" in data else datetime.now(),
             importance=data.get("importance", 0.5),
             access_count=data.get("access_count", 0),
-            last_accessed=datetime.fromisoformat(data["last_accessed"]) if data.get("last_accessed") else None,
         )
     
     def access(self) -> None:
-        """Record memory access"""
+        """Record memory access."""
         self.access_count += 1
         self.last_accessed = datetime.now()
+    
+    def __str__(self) -> str:
+        return self.content[:100] + "..." if len(self.content) > 100 else self.content
 
 
-class BaseMemory(ABC):
-    """Base memory interface"""
-    
-    @abstractmethod
-    def add(self, content: str, metadata: dict = None, importance: float = 0.5) -> str:
-        """Add item to memory, returns item ID"""
-        pass
-    
-    @abstractmethod
-    def get(self, item_id: str) -> Optional[MemoryItem]:
-        """Get item by ID"""
-        pass
-    
-    @abstractmethod
-    def search(self, query: str, limit: int = 5) -> list[MemoryItem]:
-        """Search memory"""
-        pass
-    
-    @abstractmethod
-    def clear(self) -> None:
-        """Clear all memory"""
-        pass
-    
-    @abstractmethod
-    def to_list(self) -> list[MemoryItem]:
-        """Get all items as list"""
-        pass
-
-
-class ShortTermMemory(BaseMemory):
+class ShortTermMemory:
     """
-    Short-term memory (conversation buffer)
+    Short-term memory (conversation buffer).
     
-    - Fixed size buffer
-    - FIFO eviction
-    - Fast access
+    - Fixed size buffer with FIFO eviction
+    - Fast access for recent items
     """
     
-    def __init__(self, max_size: int = 20):
+    def __init__(self, max_size: int = 50):
         self.max_size = max_size
         self._buffer: deque[MemoryItem] = deque(maxlen=max_size)
         self._index: dict[str, MemoryItem] = {}
     
     def add(self, content: str, metadata: dict = None, importance: float = 0.5) -> str:
+        """Add item to memory."""
         item = MemoryItem(
             content=content,
             metadata=metadata or {},
             importance=importance,
         )
         
-        # Remove oldest if at capacity
+        # Handle overflow
         if len(self._buffer) >= self.max_size:
             oldest = self._buffer[0]
-            if oldest.id in self._index:
-                del self._index[oldest.id]
+            self._index.pop(oldest.id, None)
         
         self._buffer.append(item)
         self._index[item.id] = item
-        
         return item.id
     
     def get(self, item_id: str) -> Optional[MemoryItem]:
+        """Get item by ID."""
         item = self._index.get(item_id)
         if item:
             item.access()
         return item
     
     def search(self, query: str, limit: int = 5) -> list[MemoryItem]:
-        """Simple text search"""
+        """Simple text search."""
         query_lower = query.lower()
         results = []
         
@@ -136,112 +105,32 @@ class ShortTermMemory(BaseMemory):
                 item.access()
                 results.append(item)
         
-        # Sort by relevance (simple: importance * recency)
         results.sort(key=lambda x: (x.importance, x.timestamp), reverse=True)
         return results[:limit]
     
-    def get_recent(self, n: int = 5) -> list[MemoryItem]:
-        """Get most recent items"""
+    def get_recent(self, n: int = 10) -> list[MemoryItem]:
+        """Get most recent items."""
         items = list(self._buffer)[-n:]
         items.reverse()
         return items
     
     def clear(self) -> None:
+        """Clear all memory."""
         self._buffer.clear()
         self._index.clear()
     
     def to_list(self) -> list[MemoryItem]:
+        """Get all items."""
         return list(self._buffer)
     
     def __len__(self) -> int:
         return len(self._buffer)
 
 
-class WorkingMemory:
+class LongTermMemory:
     """
-    Working memory for current task context
+    Long-term memory with persistence.
     
-    - Key-value storage
-    - Task-specific information
-    - Cleared between tasks
-    """
-    
-    def __init__(self):
-        self._storage: dict[str, Any] = {}
-        self._task_id: Optional[str] = None
-        self._history: list[dict] = []  # Action history for current task
-    
-    def set_task(self, task_id: str) -> None:
-        """Set current task and clear previous context"""
-        if self._task_id != task_id:
-            self.clear()
-            self._task_id = task_id
-    
-    def set(self, key: str, value: Any) -> None:
-        """Set a value"""
-        self._storage[key] = value
-    
-    def get(self, key: str, default: Any = None) -> Any:
-        """Get a value"""
-        return self._storage.get(key, default)
-    
-    def delete(self, key: str) -> bool:
-        """Delete a value"""
-        if key in self._storage:
-            del self._storage[key]
-            return True
-        return False
-    
-    def has(self, key: str) -> bool:
-        """Check if key exists"""
-        return key in self._storage
-    
-    def add_step(self, thought: str = None, action: str = None, 
-                 action_input: Any = None, observation: str = None) -> None:
-        """Add a step to action history"""
-        step = {}
-        if thought:
-            step["thought"] = thought
-        if action:
-            step["action"] = action
-        if action_input is not None:
-            step["action_input"] = action_input
-        if observation:
-            step["observation"] = observation
-        
-        step["timestamp"] = datetime.now().isoformat()
-        self._history.append(step)
-    
-    def get_history(self) -> list[dict]:
-        """Get action history"""
-        return self._history.copy()
-    
-    def get_last_observation(self) -> Optional[str]:
-        """Get the last observation"""
-        if self._history:
-            return self._history[-1].get("observation")
-        return None
-    
-    def clear(self) -> None:
-        """Clear working memory"""
-        self._storage.clear()
-        self._history.clear()
-        self._task_id = None
-    
-    def to_dict(self) -> dict:
-        """Export as dictionary"""
-        return {
-            "task_id": self._task_id,
-            "storage": self._storage.copy(),
-            "history": self._history.copy(),
-        }
-
-
-class LongTermMemory(BaseMemory):
-    """
-    Long-term memory with persistence
-    
-    - Persistent storage
     - Importance-based retention
     - Supports serialization
     """
@@ -251,13 +140,13 @@ class LongTermMemory(BaseMemory):
         self._memories: dict[str, MemoryItem] = {}
     
     def add(self, content: str, metadata: dict = None, importance: float = 0.5) -> str:
+        """Add item to memory."""
         item = MemoryItem(
             content=content,
             metadata=metadata or {},
             importance=importance,
         )
         
-        # Evict if at capacity (remove least important + least accessed)
         if len(self._memories) >= self.max_size:
             self._evict()
         
@@ -265,11 +154,10 @@ class LongTermMemory(BaseMemory):
         return item.id
     
     def _evict(self) -> None:
-        """Evict least valuable memory"""
+        """Evict least valuable memory."""
         if not self._memories:
             return
         
-        # Score = importance * 0.5 + recency * 0.3 + access_frequency * 0.2
         now = datetime.now()
         
         def score(item: MemoryItem) -> float:
@@ -278,44 +166,37 @@ class LongTermMemory(BaseMemory):
             frequency = min(1.0, item.access_count / 10.0)
             return item.importance * 0.5 + recency * 0.3 + frequency * 0.2
         
-        # Find lowest score
         min_item = min(self._memories.values(), key=score)
         del self._memories[min_item.id]
     
     def get(self, item_id: str) -> Optional[MemoryItem]:
+        """Get item by ID."""
         item = self._memories.get(item_id)
         if item:
             item.access()
         return item
     
     def search(self, query: str, limit: int = 5) -> list[MemoryItem]:
-        """Text search with ranking"""
+        """Text search with ranking."""
         query_lower = query.lower()
         query_words = set(query_lower.split())
         
         scored_items = []
         for item in self._memories.values():
             content_lower = item.content.lower()
-            
-            # Simple relevance scoring
             score = 0.0
             
-            # Exact match bonus
             if query_lower in content_lower:
                 score += 2.0
             
-            # Word overlap
             content_words = set(content_lower.split())
             overlap = len(query_words & content_words)
             score += overlap * 0.5
-            
-            # Importance weight
             score *= (0.5 + item.importance * 0.5)
             
             if score > 0:
                 scored_items.append((score, item))
         
-        # Sort by score
         scored_items.sort(key=lambda x: x[0], reverse=True)
         
         results = []
@@ -325,22 +206,16 @@ class LongTermMemory(BaseMemory):
         
         return results
     
-    def update_importance(self, item_id: str, importance: float) -> bool:
-        """Update item importance"""
-        item = self._memories.get(item_id)
-        if item:
-            item.importance = max(0.0, min(1.0, importance))
-            return True
-        return False
-    
     def clear(self) -> None:
+        """Clear all memory."""
         self._memories.clear()
     
     def to_list(self) -> list[MemoryItem]:
+        """Get all items."""
         return list(self._memories.values())
     
     def save(self, filepath: str) -> None:
-        """Save to file"""
+        """Save to file."""
         data = {
             "max_size": self.max_size,
             "memories": [m.to_dict() for m in self._memories.values()]
@@ -349,7 +224,7 @@ class LongTermMemory(BaseMemory):
             json.dump(data, f, indent=2)
     
     def load(self, filepath: str) -> None:
-        """Load from file"""
+        """Load from file."""
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
         
@@ -364,173 +239,270 @@ class LongTermMemory(BaseMemory):
         return len(self._memories)
 
 
-class SemanticMemory(BaseMemory):
+class WorkingMemory:
     """
-    Semantic memory with vector embeddings
+    Working memory for current task context.
     
-    - Uses embeddings for similarity search
-    - Supports various embedding backends
-    - Optional integration with vector databases
+    - Key-value storage
+    - Task-specific information
+    - Action history tracking
     """
     
-    def __init__(self, embedding_func=None, similarity_threshold: float = 0.7):
-        """
-        Args:
-            embedding_func: Async function that takes text and returns embedding vector
-            similarity_threshold: Minimum similarity for search results
-        """
-        self._memories: dict[str, MemoryItem] = {}
-        self._embedding_func = embedding_func
-        self.similarity_threshold = similarity_threshold
+    def __init__(self):
+        self._storage: dict[str, Any] = {}
+        self._task_id: Optional[str] = None
+        self._history: list[dict] = []
     
-    async def add_async(self, content: str, metadata: dict = None, importance: float = 0.5) -> str:
-        """Add with embedding (async)"""
-        item = MemoryItem(
-            content=content,
-            metadata=metadata or {},
-            importance=importance,
-        )
-        
-        if self._embedding_func:
-            item.embedding = await self._embedding_func(content)
-        
-        self._memories[item.id] = item
-        return item.id
+    def set_task(self, task_id: str) -> None:
+        """Set current task and clear previous context."""
+        if self._task_id != task_id:
+            self.clear()
+            self._task_id = task_id
     
-    def add(self, content: str, metadata: dict = None, importance: float = 0.5) -> str:
-        """Add without embedding (sync)"""
-        item = MemoryItem(
-            content=content,
-            metadata=metadata or {},
-            importance=importance,
-        )
-        self._memories[item.id] = item
-        return item.id
+    def set(self, key: str, value: Any) -> None:
+        """Set a value."""
+        self._storage[key] = value
     
-    def get(self, item_id: str) -> Optional[MemoryItem]:
-        item = self._memories.get(item_id)
-        if item:
-            item.access()
-        return item
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a value."""
+        return self._storage.get(key, default)
     
-    def search(self, query: str, limit: int = 5) -> list[MemoryItem]:
-        """Fallback text search (use search_semantic for vector search)"""
-        query_lower = query.lower()
-        results = []
-        
-        for item in self._memories.values():
-            if query_lower in item.content.lower():
-                item.access()
-                results.append(item)
-        
-        results.sort(key=lambda x: x.importance, reverse=True)
-        return results[:limit]
+    def delete(self, key: str) -> bool:
+        """Delete a value."""
+        if key in self._storage:
+            del self._storage[key]
+            return True
+        return False
     
-    async def search_semantic(self, query: str, limit: int = 5) -> list[MemoryItem]:
-        """Semantic search using embeddings"""
-        if not self._embedding_func:
-            return self.search(query, limit)
-        
-        query_embedding = await self._embedding_func(query)
-        
-        scored_items = []
-        for item in self._memories.values():
-            if item.embedding:
-                similarity = self._cosine_similarity(query_embedding, item.embedding)
-                if similarity >= self.similarity_threshold:
-                    scored_items.append((similarity, item))
-        
-        scored_items.sort(key=lambda x: x[0], reverse=True)
-        
-        results = []
-        for _, item in scored_items[:limit]:
-            item.access()
-            results.append(item)
-        
-        return results
+    def has(self, key: str) -> bool:
+        """Check if key exists."""
+        return key in self._storage
     
-    @staticmethod
-    def _cosine_similarity(a: list[float], b: list[float]) -> float:
-        """Calculate cosine similarity between two vectors"""
-        if len(a) != len(b):
-            return 0.0
-        
-        dot_product = sum(x * y for x, y in zip(a, b))
-        norm_a = sum(x * x for x in a) ** 0.5
-        norm_b = sum(x * x for x in b) ** 0.5
-        
-        if norm_a == 0 or norm_b == 0:
-            return 0.0
-        
-        return dot_product / (norm_a * norm_b)
+    def add_step(self, thought: str = None, action: str = None,
+                 action_input: Any = None, observation: str = None) -> None:
+        """Add a step to action history."""
+        step = {"timestamp": datetime.now().isoformat()}
+        if thought:
+            step["thought"] = thought
+        if action:
+            step["action"] = action
+        if action_input is not None:
+            step["action_input"] = action_input
+        if observation:
+            step["observation"] = observation
+        self._history.append(step)
+    
+    def get_history(self) -> list[dict]:
+        """Get action history."""
+        return self._history.copy()
     
     def clear(self) -> None:
-        self._memories.clear()
+        """Clear working memory."""
+        self._storage.clear()
+        self._history.clear()
+        self._task_id = None
     
-    def to_list(self) -> list[MemoryItem]:
-        return list(self._memories.values())
-    
-    def __len__(self) -> int:
-        return len(self._memories)
+    def to_dict(self) -> dict:
+        """Export as dictionary."""
+        return {
+            "task_id": self._task_id,
+            "storage": self._storage.copy(),
+            "history_length": len(self._history),
+        }
 
+
+# ===== LLM Summarizing Condenser =====
+
+CONDENSER_PROMPT = """You are maintaining a context-aware state summary for an interactive agent.
+Summarize the following events while preserving essential information.
+
+Track these categories as applicable:
+- USER_CONTEXT: Key requirements, goals, and clarifications
+- TASK_TRACKING: Active tasks with IDs and statuses  
+- COMPLETED: Tasks done with brief results
+- PENDING: Tasks still needed
+- CURRENT_STATE: Relevant state information
+- CODE_STATE: File paths, key structures (if applicable)
+- ERRORS_FIXED: Issues resolved and how
+
+PRIORITIZE:
+1. Capture key user requirements
+2. Distinguish completed vs pending tasks
+3. Keep sections concise and actionable
+4. Preserve exact task IDs and file paths
+
+<PREVIOUS_SUMMARY>
+{previous_summary}
+</PREVIOUS_SUMMARY>
+
+<EVENTS_TO_SUMMARIZE>
+{events}
+</EVENTS_TO_SUMMARIZE>
+
+Provide a concise summary:"""
+
+
+class LLMSummarizingCondenser:
+    """
+    Condenser that uses LLM to summarize forgotten events.
+    
+    Maintains a condensed history by summarizing older events when
+    the history grows too large.
+    
+    Inspired by OpenHands LLMSummarizingCondenser.
+    """
+    
+    def __init__(
+        self,
+        llm_func: Callable[[str], str],  # Async function that calls LLM
+        max_size: int = 100,
+        keep_first: int = 2,
+        max_event_length: int = 5000,
+    ):
+        """
+        Args:
+            llm_func: Async function that takes prompt and returns LLM response
+            max_size: Maximum events before condensation triggers
+            keep_first: Number of initial events to always keep
+            max_event_length: Maximum length per event in summary
+        """
+        if keep_first >= max_size // 2:
+            raise ValueError(f"keep_first ({keep_first}) must be < half of max_size ({max_size})")
+        
+        self.llm_func = llm_func
+        self.max_size = max_size
+        self.keep_first = keep_first
+        self.max_event_length = max_event_length
+        
+        self._summary: str = ""
+        self._condensation_count: int = 0
+    
+    def should_condense(self, events: list) -> bool:
+        """Check if events should be condensed."""
+        return len(events) > self.max_size
+    
+    async def condense(self, events: list[MemoryItem]) -> tuple[list[MemoryItem], str]:
+        """
+        Condense events by summarizing older ones.
+        
+        Args:
+            events: List of memory items to condense
+            
+        Returns:
+            (condensed_events, summary)
+        """
+        if not self.should_condense(events):
+            return events, self._summary
+        
+        # Keep first N and last N/2 events
+        target_size = self.max_size // 2
+        events_from_tail = target_size - self.keep_first - 1
+        
+        head_events = events[:self.keep_first]
+        tail_events = events[-events_from_tail:]
+        forgotten_events = events[self.keep_first:-events_from_tail]
+        
+        # Format events for summarization
+        events_text = "\n".join(
+            self._truncate(str(e.content)) for e in forgotten_events
+        )
+        
+        # Generate summary using LLM
+        prompt = CONDENSER_PROMPT.format(
+            previous_summary=self._summary or "No previous summary.",
+            events=events_text,
+        )
+        
+        new_summary = await self.llm_func(prompt)
+        self._summary = new_summary
+        self._condensation_count += 1
+        
+        # Create summary memory item
+        summary_item = MemoryItem(
+            content=f"[CONDENSED SUMMARY #{self._condensation_count}]\n{new_summary}",
+            metadata={"type": "condensation_summary", "count": self._condensation_count},
+            importance=0.9,
+        )
+        
+        # Return condensed events: head + summary + tail
+        condensed = head_events + [summary_item] + tail_events
+        
+        return condensed, new_summary
+    
+    def _truncate(self, content: str) -> str:
+        """Truncate content to max length."""
+        if len(content) <= self.max_event_length:
+            return content
+        return content[:self.max_event_length] + "... [truncated]"
+    
+    @property
+    def summary(self) -> str:
+        """Get current summary."""
+        return self._summary
+    
+    @property
+    def condensation_count(self) -> int:
+        """Get number of condensations performed."""
+        return self._condensation_count
+
+
+# ===== Unified Agent Memory =====
 
 class AgentMemory:
     """
-    Unified memory system for an Agent
+    Unified memory system for an Agent.
     
     Combines:
     - Short-term memory (recent conversation)
     - Working memory (current task)
     - Long-term memory (persistent knowledge)
-    - Semantic memory (optional, for retrieval)
+    - Optional LLM condenser for intelligent summarization
     """
     
     def __init__(
         self,
-        short_term_size: int = 20,
+        short_term_size: int = 50,
         long_term_size: int = 1000,
-        enable_semantic: bool = False,
-        embedding_func=None,
+        condenser_llm_func: Callable = None,
+        condenser_max_size: int = 100,
     ):
         self.short_term = ShortTermMemory(max_size=short_term_size)
         self.working = WorkingMemory()
         self.long_term = LongTermMemory(max_size=long_term_size)
         
-        if enable_semantic:
-            self.semantic = SemanticMemory(embedding_func=embedding_func)
-        else:
-            self.semantic = None
+        # Optional condenser
+        self.condenser: Optional[LLMSummarizingCondenser] = None
+        if condenser_llm_func:
+            self.condenser = LLMSummarizingCondenser(
+                llm_func=condenser_llm_func,
+                max_size=condenser_max_size,
+            )
     
-    def remember(self, content: str, memory_type: str = "short", 
+    def remember(self, content: str, memory_type: str = "short",
                  metadata: dict = None, importance: float = 0.5) -> str:
         """
-        Add a memory
+        Add a memory.
         
         Args:
             content: Memory content
-            memory_type: "short", "long", or "semantic"
+            memory_type: "short" or "long"
             metadata: Additional metadata
             importance: Importance score (0.0 - 1.0)
             
         Returns:
             Memory item ID
         """
-        if memory_type == "short":
-            return self.short_term.add(content, metadata, importance)
-        elif memory_type == "long":
+        if memory_type == "long":
             return self.long_term.add(content, metadata, importance)
-        elif memory_type == "semantic" and self.semantic:
-            return self.semantic.add(content, metadata, importance)
-        else:
-            return self.short_term.add(content, metadata, importance)
+        return self.short_term.add(content, metadata, importance)
     
     def recall(self, query: str, sources: list[str] = None, limit: int = 5) -> list[MemoryItem]:
         """
-        Search across memory systems
+        Search across memory systems.
         
         Args:
             query: Search query
-            sources: List of sources to search ("short", "long", "semantic")
+            sources: List of sources to search ("short", "long")
             limit: Maximum results per source
             
         Returns:
@@ -545,9 +517,7 @@ class AgentMemory:
         if "long" in sources:
             results.extend(self.long_term.search(query, limit))
         
-        # Note: semantic search is async, use recall_semantic for that
-        
-        # Deduplicate and sort
+        # Deduplicate
         seen_ids = set()
         unique_results = []
         for item in results:
@@ -558,63 +528,85 @@ class AgentMemory:
         unique_results.sort(key=lambda x: (x.importance, x.timestamp), reverse=True)
         return unique_results[:limit * len(sources)]
     
-    async def recall_semantic(self, query: str, limit: int = 5) -> list[MemoryItem]:
-        """Semantic search (async)"""
-        if self.semantic:
-            return await self.semantic.search_semantic(query, limit)
-        return []
+    async def condense_if_needed(self) -> bool:
+        """
+        Condense short-term memory if it's too large.
+        
+        Returns:
+            True if condensation was performed
+        """
+        if not self.condenser:
+            return False
+        
+        events = self.short_term.to_list()
+        if not self.condenser.should_condense(events):
+            return False
+        
+        condensed_events, summary = await self.condenser.condense(events)
+        
+        # Replace short-term memory with condensed version
+        self.short_term.clear()
+        for event in condensed_events:
+            self.short_term._buffer.append(event)
+            self.short_term._index[event.id] = event
+        
+        return True
     
     def get_context_string(self, max_items: int = 10) -> str:
         """
-        Get formatted context string for prompt inclusion
+        Get formatted context string for prompt inclusion.
         
         Returns:
             Formatted string with recent memories and working context
         """
         lines = []
         
+        # Condenser summary
+        if self.condenser and self.condenser.summary:
+            lines.append("## Previous Context Summary")
+            lines.append(self.condenser.summary[:500])
+            lines.append("")
+        
         # Working memory context
         if self.working._storage:
             lines.append("## Current Task Context")
-            for key, value in self.working._storage.items():
-                if key not in ["_internal"]:  # Skip internal keys
-                    lines.append(f"- {key}: {value}")
+            for key, value in list(self.working._storage.items())[:10]:
+                value_str = str(value)[:200]
+                lines.append(f"- {key}: {value_str}")
             lines.append("")
         
         # Recent history
         recent = self.short_term.get_recent(max_items)
         if recent:
-            lines.append("## Recent Conversation")
+            lines.append("## Recent Activity")
             for item in recent:
-                role = item.metadata.get("role", "memory")
-                lines.append(f"[{role}] {item.content}")
+                role = item.metadata.get("role", "system")
+                content = item.content[:150] + "..." if len(item.content) > 150 else item.content
+                lines.append(f"[{role}] {content}")
             lines.append("")
         
         return "\n".join(lines)
     
     def save(self, filepath: str) -> None:
-        """Save long-term memory to file"""
+        """Save long-term memory to file."""
         self.long_term.save(filepath)
     
     def load(self, filepath: str) -> None:
-        """Load long-term memory from file"""
+        """Load long-term memory from file."""
         self.long_term.load(filepath)
     
     def clear_all(self) -> None:
-        """Clear all memories"""
+        """Clear all memories."""
         self.short_term.clear()
         self.working.clear()
         self.long_term.clear()
-        if self.semantic:
-            self.semantic.clear()
     
     def stats(self) -> dict:
-        """Get memory statistics"""
+        """Get memory statistics."""
         return {
             "short_term_count": len(self.short_term),
             "long_term_count": len(self.long_term),
-            "semantic_count": len(self.semantic) if self.semantic else 0,
             "working_memory_keys": list(self.working._storage.keys()),
             "history_steps": len(self.working.get_history()),
+            "condensation_count": self.condenser.condensation_count if self.condenser else 0,
         }
-

@@ -1,43 +1,48 @@
 """
-LLM-Powered Environment Generator
-
-A multi-agent system for generating OpenEnv-compatible environments.
+LLM Generator - Generate OpenEnv-compatible web environments using LLM
 
 Architecture:
-- CodeGeneratorAgent: Base agent with code generation capabilities
-- BackendAgent: Generates FastAPI backend
-- FrontendAgent: Generates React frontend
-- OpenEnvAgent: Generates OpenEnv adapter
-- GeneratorOrchestrator: Coordinates all agents
+- UserAgent: Plans tasks, verifies results, reports issues
+- CodeAgent: Generates code, fixes issues
+- Coordinator: Orchestrates the interaction
 
-Based on the AgentForge framework from utils/
+Usage:
+    from llm_generator import Coordinator
+    from utils.config import LLMConfig
+    
+    coordinator = Coordinator(llm_config, output_dir)
+    result = await coordinator.run(goal="Build a calendar app")
 """
 
-from .agents.orchestrator import GeneratorOrchestrator
-from .agents.code_agent import CodeGeneratorAgent
+from .agents import UserAgent, CodeAgent, Coordinator
+from .messages import Task, TaskType, Issue, IssueSeverity, TaskResult, VerifyResult
+from .specs import PROJECT_STRUCTURE, PHASES, get_phase_spec
 from .context import GenerationContext
-from .events import EventEmitter, EventType, ConsoleListener, FileLogger
-from .checkpoint import CheckpointManager
-from .parallel import ParallelGenerator, analyze_parallelism
-from .runtime_verify import RuntimeVerifier, verify_environment
+from .progress import EventEmitter, EventType
 
 __all__ = [
-    # Core
-    "GeneratorOrchestrator",
-    "CodeGeneratorAgent", 
+    # Agents
+    "UserAgent",
+    "CodeAgent", 
+    "Coordinator",
+    
+    # Messages
+    "Task",
+    "TaskType",
+    "Issue",
+    "IssueSeverity",
+    "TaskResult",
+    "VerifyResult",
+    
+    # Specs
+    "PROJECT_STRUCTURE",
+    "PHASES",
+    "get_phase_spec",
+    
+    # Context
     "GenerationContext",
+    
     # Events
     "EventEmitter",
     "EventType",
-    "ConsoleListener",
-    "FileLogger",
-    # Checkpoint
-    "CheckpointManager",
-    # Parallel
-    "ParallelGenerator",
-    "analyze_parallelism",
-    # Runtime Verification
-    "RuntimeVerifier",
-    "verify_environment",
 ]
-

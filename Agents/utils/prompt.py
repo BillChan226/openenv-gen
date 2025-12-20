@@ -1,444 +1,466 @@
 """
-Prompt Template Module - Manages prompt templates for LLM interactions
+Prompt Template Module - Jinja2-based prompt management system
 
-Supports:
-- Template definition and rendering
-- Variable substitution
-- Prompt composition
-- Built-in templates for common patterns
+Inspired by OpenHands, this module provides:
+- Jinja2 template rendering with includes
+- Structured prompt sections with XML-like tags
+- Dynamic context injection
+- Prompt refinement and cleanup
 """
 
+import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Optional
-from string import Template
-import json
-import re
+
+from jinja2 import Environment, FileSystemLoader, Template, BaseLoader, TemplateNotFound
+
+
+class StringLoader(BaseLoader):
+    """Loader that loads templates from a dictionary of strings."""
+    
+    def __init__(self, templates: dict[str, str]):
+        self.templates = templates
+    
+    def get_source(self, environment, template):
+        if template in self.templates:
+            source = self.templates[template]
+            return source, template, lambda: True
+        raise TemplateNotFound(template)
 
 
 @dataclass
-class PromptTemplate:
+class RuntimeInfo:
+    """Runtime information for prompt context."""
+    date: str = ""
+    working_dir: str = ""
+    available_hosts: dict[str, int] = field(default_factory=dict)
+    additional_instructions: str = ""
+
+
+@dataclass 
+class ProjectInfo:
+    """Information about the project being generated."""
+    name: str = ""
+    description: str = ""
+    domain_type: str = "custom"
+    output_dir: str = ""
+
+
+class PromptManager:
     """
-    Prompt template with variable substitution
+    Manages prompt templates using Jinja2.
+    
+    This class loads templates from a directory and provides methods to render them
+    with dynamic context. Supports template includes and structured sections.
     
     Usage:
-        template = PromptTemplate(
-            name="task_planner",
-            template="Plan the following task: {task}\nConstraints: {constraints}",
-            variables=["task", "constraints"]
+        manager = PromptManager(prompt_dir="./prompts")
+        system_msg = manager.get_system_message(
+            project_info=project_info,
+            runtime_info=runtime_info
         )
-        prompt = template.render(task="Build a website", constraints="Use Python")
     """
-    name: str
-    template: str
-    description: str = ""
-    variables: list[str] = field(default_factory=list)
-    examples: list[dict] = field(default_factory=list)
     
-    def render(self, **kwargs) -> str:
+    def __init__(
+        self,
+        prompt_dir: Optional[str] = None,
+        system_prompt_filename: str = "system_prompt.j2",
+        fallback_templates: Optional[dict[str, str]] = None,
+    ):
         """
-        Render template with variables
+        Initialize PromptManager.
         
         Args:
-            **kwargs: Variable values
+            prompt_dir: Directory containing .j2 template files
+            system_prompt_filename: Name of the system prompt template file
+            fallback_templates: Dictionary of template strings to use if files not found
+        """
+        self.prompt_dir = prompt_dir
+        self.system_prompt_filename = system_prompt_filename
+        self.fallback_templates = fallback_templates or {}
+        
+        # Initialize Jinja2 environment
+        if prompt_dir and Path(prompt_dir).exists():
+            self.env = Environment(
+                loader=FileSystemLoader(prompt_dir),
+                trim_blocks=True,
+                lstrip_blocks=True,
+            )
+        elif fallback_templates:
+            self.env = Environment(
+                loader=StringLoader(fallback_templates),
+                trim_blocks=True,
+                lstrip_blocks=True,
+            )
+        else:
+            self.env = Environment(trim_blocks=True, lstrip_blocks=True)
+        
+        # Load templates
+        self._system_template: Optional[Template] = None
+        self._user_template: Optional[Template] = None
+        self._load_templates()
+    
+    def _load_templates(self) -> None:
+        """Load templates from directory or fallback."""
+        try:
+            self._system_template = self.env.get_template(self.system_prompt_filename)
+        except TemplateNotFound:
+            # Use default system prompt
+            self._system_template = self.env.from_string(DEFAULT_SYSTEM_PROMPT)
+        
+        try:
+            self._user_template = self.env.get_template("user_prompt.j2")
+        except TemplateNotFound:
+            self._user_template = self.env.from_string(DEFAULT_USER_PROMPT)
+    
+    def get_system_message(self, **context) -> str:
+        """
+        Render the system prompt template.
+        
+        Args:
+            **context: Variables to pass to the template
             
         Returns:
-            Rendered prompt string
+            Rendered system message
         """
-        result = self.template
-        for key, value in kwargs.items():
-            if isinstance(value, (dict, list)):
-                value = json.dumps(value, indent=2)
-            result = result.replace(f"{{{key}}}", str(value))
-        return result
-    
-    def validate(self, **kwargs) -> tuple[bool, list[str]]:
-        """
-        Validate that all required variables are provided
+        if not self._system_template:
+            return ""
         
+        rendered = self._system_template.render(**context).strip()
+        return refine_prompt(rendered)
+    
+    def get_user_message(self, **context) -> str:
+        """
+        Render the user prompt template.
+        
+        Args:
+            **context: Variables to pass to the template
+            
         Returns:
-            (is_valid, missing_variables)
+            Rendered user message
         """
-        missing = [v for v in self.variables if v not in kwargs]
-        return len(missing) == 0, missing
-    
-    def get_variables(self) -> list[str]:
-        """Extract variables from template"""
-        pattern = r'\{(\w+)\}'
-        return list(set(re.findall(pattern, self.template)))
-
-
-class PromptBuilder:
-    """
-    Fluent interface for building prompts
-    
-    Usage:
-        prompt = (PromptBuilder()
-            .system("You are a helpful assistant.")
-            .context("The user is working on a Python project.")
-            .task("Help them debug their code.")
-            .constraints(["Be concise", "Provide working code"])
-            .examples([{"input": "...", "output": "..."}])
-            .build())
-    """
-    
-    def __init__(self):
-        self._system: str = ""
-        self._context: str = ""
-        self._task: str = ""
-        self._constraints: list[str] = []
-        self._examples: list[dict] = []
-        self._additional: list[str] = []
-        self._format: str = ""
-    
-    def system(self, content: str) -> "PromptBuilder":
-        """Set system/role description"""
-        self._system = content
-        return self
-    
-    def context(self, content: str) -> "PromptBuilder":
-        """Add context information"""
-        self._context = content
-        return self
-    
-    def task(self, content: str) -> "PromptBuilder":
-        """Set the main task"""
-        self._task = content
-        return self
-    
-    def constraints(self, items: list[str]) -> "PromptBuilder":
-        """Add constraints/rules"""
-        self._constraints.extend(items)
-        return self
-    
-    def examples(self, items: list[dict]) -> "PromptBuilder":
-        """Add few-shot examples"""
-        self._examples.extend(items)
-        return self
-    
-    def additional(self, content: str) -> "PromptBuilder":
-        """Add additional instructions"""
-        self._additional.append(content)
-        return self
-    
-    def output_format(self, format_spec: str) -> "PromptBuilder":
-        """Specify output format"""
-        self._format = format_spec
-        return self
-    
-    def build(self) -> str:
-        """Build the final prompt"""
-        parts = []
+        if not self._user_template:
+            return ""
         
-        if self._system:
-            parts.append(self._system)
-        
-        if self._context:
-            parts.append(f"\n## Context\n{self._context}")
-        
-        if self._task:
-            parts.append(f"\n## Task\n{self._task}")
-        
-        if self._constraints:
-            constraints_text = "\n".join(f"- {c}" for c in self._constraints)
-            parts.append(f"\n## Constraints\n{constraints_text}")
-        
-        if self._examples:
-            examples_text = ""
-            for i, ex in enumerate(self._examples, 1):
-                examples_text += f"\n### Example {i}\n"
-                examples_text += f"Input: {ex.get('input', '')}\n"
-                examples_text += f"Output: {ex.get('output', '')}\n"
-            parts.append(f"\n## Examples{examples_text}")
-        
-        if self._additional:
-            additional_text = "\n".join(self._additional)
-            parts.append(f"\n## Additional Instructions\n{additional_text}")
-        
-        if self._format:
-            parts.append(f"\n## Output Format\n{self._format}")
-        
-        return "\n".join(parts)
+        return self._user_template.render(**context).strip()
     
-    def build_system_and_user(self) -> tuple[str, str]:
+    def render_template(self, template_name: str, **context) -> str:
         """
-        Build as separate system and user messages
+        Render a named template.
         
+        Args:
+            template_name: Name of the template file (e.g., "reflection.j2")
+            **context: Variables to pass to the template
+            
         Returns:
-            (system_prompt, user_prompt)
+            Rendered template string
         """
-        system = self._system or "You are a helpful AI assistant."
+        try:
+            template = self.env.get_template(template_name)
+            return template.render(**context).strip()
+        except TemplateNotFound:
+            return ""
+    
+    def render_string(self, template_string: str, **context) -> str:
+        """
+        Render a template from a string.
         
-        user_parts = []
-        
-        if self._context:
-            user_parts.append(f"Context: {self._context}")
-        
-        if self._task:
-            user_parts.append(f"Task: {self._task}")
-        
-        if self._constraints:
-            constraints_text = "\n".join(f"- {c}" for c in self._constraints)
-            user_parts.append(f"Constraints:\n{constraints_text}")
-        
-        if self._examples:
-            examples_text = ""
-            for i, ex in enumerate(self._examples, 1):
-                examples_text += f"\nExample {i}:\n"
-                examples_text += f"Input: {ex.get('input', '')}\n"
-                examples_text += f"Output: {ex.get('output', '')}\n"
-            user_parts.append(f"Examples:{examples_text}")
-        
-        if self._additional:
-            user_parts.append("\n".join(self._additional))
-        
-        if self._format:
-            user_parts.append(f"Output Format: {self._format}")
-        
-        return system, "\n\n".join(user_parts)
+        Args:
+            template_string: Jinja2 template string
+            **context: Variables to pass to the template
+            
+        Returns:
+            Rendered string
+        """
+        template = self.env.from_string(template_string)
+        return template.render(**context).strip()
 
 
-# ===== Built-in Templates =====
+def refine_prompt(prompt: str) -> str:
+    """
+    Refine and clean up a prompt string.
+    
+    - Remove excessive whitespace
+    - Normalize line endings
+    - Strip trailing spaces
+    
+    Args:
+        prompt: Raw prompt string
+        
+    Returns:
+        Cleaned prompt string
+    """
+    lines = prompt.split('\n')
+    
+    # Remove trailing whitespace from each line
+    lines = [line.rstrip() for line in lines]
+    
+    # Remove excessive blank lines (more than 2 consecutive)
+    result_lines = []
+    blank_count = 0
+    for line in lines:
+        if line == '':
+            blank_count += 1
+            if blank_count <= 2:
+                result_lines.append(line)
+        else:
+            blank_count = 0
+            result_lines.append(line)
+    
+    return '\n'.join(result_lines).strip()
 
-PLANNER_SYSTEM_PROMPT = """You are an expert task planner. Your job is to break down complex tasks into smaller, actionable steps.
 
-For each step, provide:
-1. A clear description of what needs to be done
-2. The expected outcome
-3. Any dependencies on previous steps
+# ===== Default Templates =====
 
-Always think step by step and ensure the plan is complete and executable."""
+DEFAULT_SYSTEM_PROMPT = """You are an expert code generator that creates high-quality, production-ready code.
 
-PLANNER_TEMPLATE = PromptTemplate(
-    name="task_planner",
-    description="Breaks down a complex task into actionable steps",
-    template="""Analyze and create a detailed plan for the following task:
+<ROLE>
+Your primary role is to generate clean, well-structured code files for web applications.
+You should be thorough, methodical, and prioritize code quality.
+</ROLE>
 
+<EFFICIENCY>
+* Combine multiple operations when possible
+* Use efficient patterns and avoid redundancy
+* Generate complete files rather than fragments
+</EFFICIENCY>
+
+<CODE_QUALITY>
+* Write clean, efficient code with minimal but useful comments
+* Follow language-specific conventions and best practices
+* Ensure proper error handling and edge case coverage
+* Use consistent naming conventions
+* Place imports at the top of files
+</CODE_QUALITY>
+
+<FILE_GUIDELINES>
+* Always use absolute paths when specified
+* Do not create duplicate files with different names
+* Ensure generated code is syntactically correct
+* For JSON files: Use proper formatting with 2-space indentation
+</FILE_GUIDELINES>
+
+<OUTPUT_FORMAT>
+* Output PURE CODE ONLY - no markdown fences, no line numbers
+* The output should be directly saveable as a file
+* Do not include explanatory text in code output
+</OUTPUT_FORMAT>
+
+{% if project_info %}
+<PROJECT_CONTEXT>
+Project: {{ project_info.name }}
+Description: {{ project_info.description }}
+Domain: {{ project_info.domain_type }}
+Output Directory: {{ project_info.output_dir }}
+</PROJECT_CONTEXT>
+{% endif %}
+
+{% if runtime_info %}
+<RUNTIME_INFO>
+Date: {{ runtime_info.date }}
+Working Directory: {{ runtime_info.working_dir }}
+{% if runtime_info.additional_instructions %}
+Additional Instructions: {{ runtime_info.additional_instructions }}
+{% endif %}
+</RUNTIME_INFO>
+{% endif %}
+
+{% if tools_description %}
+<AVAILABLE_TOOLS>
+{{ tools_description }}
+</AVAILABLE_TOOLS>
+{% endif %}
+
+{% if memory_context %}
+<MEMORY_CONTEXT>
+{{ memory_context }}
+</MEMORY_CONTEXT>
+{% endif %}
+"""
+
+DEFAULT_USER_PROMPT = """{% if task %}
 ## Task
-{task}
+{{ task }}
+{% endif %}
 
-## Available Tools
-{tools}
+{% if context %}
+## Context
+{{ context }}
+{% endif %}
 
+{% if constraints %}
 ## Constraints
-{constraints}
+{% for constraint in constraints %}
+- {{ constraint }}
+{% endfor %}
+{% endif %}
 
-## Output Format
-Respond with a JSON array of steps:
-```json
-[
-  {{
-    "step_id": 1,
-    "description": "Step description",
-    "action": "tool_name or 'think'",
-    "action_input": {{}},
-    "expected_output": "What this step should produce",
-    "dependencies": []
-  }}
-]
-```
-
-Create a comprehensive plan:""",
-    variables=["task", "tools", "constraints"]
-)
+{% if existing_files %}
+## Existing Files
+{% for file in existing_files %}
+- {{ file }}
+{% endfor %}
+{% endif %}
+"""
 
 
-REACT_SYSTEM_PROMPT = """You are a reasoning agent that solves problems step by step.
+# ===== Template Library =====
 
-Follow the ReAct (Reasoning + Acting) pattern:
-1. Thought: Analyze the current situation and decide what to do next
-2. Action: Choose a tool to use or decide to give final answer
-3. Observation: Observe the result of your action
-4. Repeat until you can provide a final answer
+TEMPLATE_LIBRARY = {
+    "think_before_file": """Before generating {{ file_path }}, analyze what's needed:
 
-Always explain your reasoning before taking an action."""
+FILE TO GENERATE: {{ file_path }}
+PURPOSE: {{ purpose }}
 
-REACT_TEMPLATE = PromptTemplate(
-    name="react_step",
-    description="Single step in ReAct reasoning loop",
-    template="""## Task
-{task}
+{% if existing_files %}
+ALREADY GENERATED FILES:
+{% for f in existing_files %}
+- {{ f }}
+{% endfor %}
+{% else %}
+NO FILES GENERATED YET - this is the first file.
+{% endif %}
 
-## Available Tools
-{tools}
+Think step by step:
+1. What already generated files should I read for context?
+2. What patterns should I search (grep) for?
+3. What's my approach for generating this file?
+4. What considerations/pitfalls should I be careful about?
 
-## Previous Steps
-{history}
-
-## Current Observation
-{observation}
-
-Based on the above, provide your next step.
-
-Respond in this exact format:
-Thought: [Your reasoning about what to do next]
-Action: [tool_name OR "finish"]
-Action Input: [JSON input for the tool OR final answer if Action is "finish"]
+Respond in JSON format:
+{
+  "needs_context": [],
+  "needs_grep": [],
+  "approach": "...",
+  "considerations": ["..."]
+}
 """,
-    variables=["task", "tools", "history", "observation"]
-)
+
+    "reflection": """Review the generated code for issues:
+
+FILES GENERATED:
+{% for file in files %}
+- {{ file }}
+{% endfor %}
+
+Check for:
+1. Syntax errors
+2. Missing imports
+3. Undefined references
+4. Type mismatches
+5. Incomplete implementations
+
+{% if enable_runtime_test %}
+Also check if the code can run successfully.
+{% endif %}
+
+List any issues found (empty list if none):
+""",
+
+    "fix_issues": """Fix the following issues in the code:
+
+ISSUES:
+{% for issue in issues %}
+{{ loop.index }}. {{ issue }}
+{% endfor %}
+
+For each issue:
+1. Identify the file and location
+2. Determine the fix needed
+3. Apply the fix using available tools
+
+Provide fixes in order of priority.
+""",
+
+    "plan_phase": """Plan the files to generate for the {{ phase }} phase.
+
+Environment: {{ env_name }}
+Description: {{ env_description }}
+
+{% if existing_files %}
+Already generated:
+{% for f in existing_files %}
+- {{ f }}
+{% endfor %}
+{% endif %}
+
+{% if reference_files %}
+Reference structure:
+{% for f in reference_files %}
+- {{ f.path }}: {{ f.purpose }}
+{% endfor %}
+{% endif %}
+
+Create a plan with files to generate. For each file specify:
+- path: File path
+- purpose: What this file does
+- dependencies: Other files it depends on
+- instructions: Specific requirements
+
+Output as JSON array.
+""",
+
+    "memory_summary": """Summarize the following events for context preservation:
+
+<PREVIOUS_SUMMARY>
+{{ previous_summary }}
+</PREVIOUS_SUMMARY>
+
+<EVENTS>
+{% for event in events %}
+{{ event }}
+{% endfor %}
+</EVENTS>
+
+Create a concise summary tracking:
+- USER_CONTEXT: Key requirements and goals
+- COMPLETED: Tasks done with brief results
+- PENDING: Tasks still needed
+- CURRENT_STATE: Relevant state information
+- CODE_STATE: File paths and key structures (if applicable)
+
+Keep the summary focused and actionable.
+""",
+}
 
 
-SUMMARIZER_TEMPLATE = PromptTemplate(
-    name="summarizer",
-    description="Summarizes content",
-    template="""Summarize the following content:
-
-{content}
-
-Requirements:
-- Keep the summary concise but comprehensive
-- Preserve key information and main points
-- Use clear and simple language
-{additional_requirements}
-
-Summary:""",
-    variables=["content", "additional_requirements"]
-)
-
-
-ANALYZER_TEMPLATE = PromptTemplate(
-    name="analyzer",
-    description="Analyzes content and extracts information",
-    template="""Analyze the following content and extract relevant information:
-
-## Content
-{content}
-
-## Analysis Focus
-{focus}
-
-## Output Format
-{output_format}
-
-Analysis:""",
-    variables=["content", "focus", "output_format"]
-)
-
-
-CODE_GENERATOR_TEMPLATE = PromptTemplate(
-    name="code_generator",
-    description="Generates code based on requirements",
-    template="""Generate code based on the following requirements:
-
-## Requirements
-{requirements}
-
-## Language
-{language}
-
-## Constraints
-{constraints}
-
-## Context (existing code)
-{context}
-
-Provide clean, well-documented code:""",
-    variables=["requirements", "language", "constraints", "context"]
-)
-
-
-EVALUATOR_TEMPLATE = PromptTemplate(
-    name="evaluator",
-    description="Evaluates results against criteria",
-    template="""Evaluate the following result against the given criteria:
-
-## Task Description
-{task}
-
-## Result to Evaluate
-{result}
-
-## Evaluation Criteria
-{criteria}
-
-Provide your evaluation in the following format:
-1. Score (1-10): 
-2. Strengths:
-3. Weaknesses:
-4. Suggestions for improvement:
-5. Overall assessment:""",
-    variables=["task", "result", "criteria"]
-)
-
-
-class PromptRegistry:
-    """
-    Registry for managing prompt templates
-    """
-    
-    def __init__(self):
-        self._templates: dict[str, PromptTemplate] = {}
-        self._register_builtin()
-    
-    def _register_builtin(self) -> None:
-        """Register built-in templates"""
-        builtins = [
-            PLANNER_TEMPLATE,
-            REACT_TEMPLATE,
-            SUMMARIZER_TEMPLATE,
-            ANALYZER_TEMPLATE,
-            CODE_GENERATOR_TEMPLATE,
-            EVALUATOR_TEMPLATE,
-        ]
-        for template in builtins:
-            self.register(template)
-    
-    def register(self, template: PromptTemplate) -> None:
-        """Register a template"""
-        self._templates[template.name] = template
-    
-    def get(self, name: str) -> Optional[PromptTemplate]:
-        """Get template by name"""
-        return self._templates.get(name)
-    
-    def render(self, name: str, **kwargs) -> str:
-        """Render a template by name"""
-        template = self.get(name)
-        if not template:
-            raise ValueError(f"Template not found: {name}")
-        return template.render(**kwargs)
-    
-    def list_templates(self) -> list[str]:
-        """List all template names"""
-        return list(self._templates.keys())
-    
-    def __contains__(self, name: str) -> bool:
-        return name in self._templates
-
-
-# Global registry
-prompt_registry = PromptRegistry()
+def get_template(name: str) -> str:
+    """Get a template from the library by name."""
+    return TEMPLATE_LIBRARY.get(name, "")
 
 
 # ===== Helper Functions =====
 
 def format_tools_for_prompt(tools: list[dict]) -> str:
     """
-    Format tool definitions for inclusion in prompts
+    Format tool definitions for inclusion in prompts.
     
     Args:
-        tools: List of tool definitions (from ToolRegistry.to_openai_functions())
+        tools: List of tool definitions in OpenAI function format
         
     Returns:
         Formatted string describing available tools
     """
     lines = []
     for tool in tools:
-        name = tool.get("name", "unknown")
-        desc = tool.get("description", "")
-        params = tool.get("parameters", {}).get("properties", {})
-        
-        param_strs = []
-        for pname, pinfo in params.items():
-            ptype = pinfo.get("type", "any")
-            pdesc = pinfo.get("description", "")
-            param_strs.append(f"    - {pname} ({ptype}): {pdesc}")
+        func = tool.get("function", tool)
+        name = func.get("name", "unknown")
+        desc = func.get("description", "")
+        params = func.get("parameters", {}).get("properties", {})
+        required = func.get("parameters", {}).get("required", [])
         
         lines.append(f"### {name}")
         lines.append(f"{desc}")
-        if param_strs:
+        
+        if params:
             lines.append("Parameters:")
-            lines.extend(param_strs)
+            for pname, pinfo in params.items():
+                ptype = pinfo.get("type", "any")
+                pdesc = pinfo.get("description", "")
+                req = "(required)" if pname in required else "(optional)"
+                lines.append(f"  - {pname} ({ptype}) {req}: {pdesc}")
+        
         lines.append("")
     
     return "\n".join(lines)
@@ -446,7 +468,7 @@ def format_tools_for_prompt(tools: list[dict]) -> str:
 
 def format_history_for_prompt(history: list[dict]) -> str:
     """
-    Format action history for inclusion in prompts
+    Format action history for inclusion in prompts.
     
     Args:
         history: List of {thought, action, action_input, observation}
@@ -465,11 +487,136 @@ def format_history_for_prompt(history: list[dict]) -> str:
         if "action" in step:
             lines.append(f"Action: {step['action']}")
         if "action_input" in step:
+            import json
             input_str = json.dumps(step['action_input']) if isinstance(step['action_input'], dict) else str(step['action_input'])
             lines.append(f"Action Input: {input_str}")
         if "observation" in step:
-            lines.append(f"Observation: {step['observation']}")
+            obs = step['observation']
+            if len(str(obs)) > 500:
+                obs = str(obs)[:500] + "... [truncated]"
+            lines.append(f"Observation: {obs}")
         lines.append("")
     
     return "\n".join(lines)
 
+
+# ========== PLANNER PROMPTS ==========
+
+class PromptTemplate:
+    """Simple prompt template with variable substitution."""
+    
+    def __init__(self, template: str = None, name: str = None, variables: list = None):
+        self.template = template or ""
+        self.name = name
+        self.variables = variables or []
+    
+    def format(self, **kwargs) -> str:
+        """Format the template with the given keyword arguments."""
+        result = self.template
+        for key, value in kwargs.items():
+            result = result.replace(f"{{{key}}}", str(value))
+        return result
+    
+    def render(self, **kwargs) -> str:
+        """Alias for format() for compatibility."""
+        return self.format(**kwargs)
+    
+    def __str__(self) -> str:
+        return self.template
+
+
+PLANNER_SYSTEM_PROMPT = """You are a Planning Agent responsible for creating and managing execution plans.
+
+Your role is to:
+1. Analyze tasks and break them down into actionable steps
+2. Create detailed plans with clear objectives
+3. Assign priorities and estimate durations
+4. Monitor progress and adjust plans as needed
+
+Guidelines:
+- Be specific and actionable in your step descriptions
+- Consider dependencies between steps
+- Estimate realistic timeframes
+- Include contingencies for potential issues
+"""
+
+
+PLANNER_TEMPLATE = """## Task
+{task_description}
+
+## Current Context
+{context}
+
+## Available Tools
+{tools}
+
+## Instructions
+Create a detailed plan to accomplish this task. For each step:
+1. Describe what needs to be done
+2. Specify which tool(s) to use
+3. Define success criteria
+4. Note any dependencies on other steps
+
+Output your plan in the following format:
+
+### Step 1: [Step Title]
+- **Action**: [What to do]
+- **Tool**: [Tool to use]
+- **Expected Outcome**: [What success looks like]
+- **Dependencies**: [Any previous steps required]
+
+[Continue for all steps...]
+
+### Summary
+- Total steps: [N]
+- Estimated duration: [Time estimate]
+- Critical path: [Key dependencies]
+"""
+
+
+# ========== REACT PROMPTS ==========
+
+REACT_SYSTEM_PROMPT = """You are an AI assistant that uses the ReAct (Reasoning + Acting) framework.
+
+For each step:
+1. **Thought**: Reason about what to do next based on the current situation
+2. **Action**: Choose an action from the available tools
+3. **Action Input**: Provide the input for the action
+4. **Observation**: Observe the result and learn from it
+
+Guidelines:
+- Think step by step before acting
+- Use tools effectively to gather information
+- Learn from observations to refine your approach
+- Continue until the task is complete or you need to ask for help
+
+Available tools will be provided for each task. Use them wisely.
+"""
+
+
+REACT_TEMPLATE = """## Task
+{task_description}
+
+## Available Tools
+{tools}
+
+## Previous Steps
+{history}
+
+## Instructions
+Based on the task and previous steps:
+1. Think about what to do next
+2. Choose an appropriate action
+3. Execute the action with proper inputs
+
+Format your response as:
+
+Thought: [Your reasoning about what to do next]
+Action: [The tool to use]
+Action Input: [The input for the tool in JSON format]
+
+Or if you're done:
+
+Thought: [Final reasoning]
+Final Answer: [Your final response to the task]
+"""

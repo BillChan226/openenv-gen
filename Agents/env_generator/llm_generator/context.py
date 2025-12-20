@@ -57,6 +57,10 @@ class GenerationContext:
     issues_found: List[str] = field(default_factory=list)
     fixes_applied: List[str] = field(default_factory=list)
     
+    # Screenshot-based generation
+    reference_screenshots: List[str] = field(default_factory=list)  # Paths to reference images
+    design_analysis: Optional[Dict] = None  # Extracted design info from screenshots
+    
     def __post_init__(self):
         if not self.display_name:
             self.display_name = self.name.replace("_", " ").title()

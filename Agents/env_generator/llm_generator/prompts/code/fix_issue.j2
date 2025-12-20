@@ -1,0 +1,64 @@
+Fix the following issue reported by User Agent.
+
+<ISSUE>
+- ID: {{ issue.id }}
+- Severity: {{ issue.severity.value | upper }}
+- Title: {{ issue.title }}
+</ISSUE>
+
+<DESCRIPTION>
+{{ issue.description }}
+</DESCRIPTION>
+
+{% if issue.error_message %}
+<ERROR_MESSAGE>
+{{ issue.error_message }}
+</ERROR_MESSAGE>
+{% endif %}
+
+{% if issue.file_path %}
+<LOCATION>
+- File: {{ issue.file_path }}
+{% if issue.line_number %}- Line: {{ issue.line_number }}{% endif %}
+</LOCATION>
+{% endif %}
+
+{% if issue.code_snippet %}
+<CODE_SNIPPET>
+```
+{{ issue.code_snippet }}
+```
+</CODE_SNIPPET>
+{% endif %}
+
+{% if issue.suggested_fix %}
+<SUGGESTED_FIX>
+{{ issue.suggested_fix }}
+</SUGGESTED_FIX>
+{% endif %}
+
+{% if issue.related_files %}
+<RELATED_FILES>
+{% for file in issue.related_files %}
+- {{ file }}
+{% endfor %}
+</RELATED_FILES>
+{% endif %}
+
+{% if issue.verification_command %}
+<VERIFICATION>
+- Command: {{ issue.verification_command }}
+- Expected: {{ issue.expected_result }}
+</VERIFICATION>
+{% endif %}
+
+<INSTRUCTIONS>
+1. Read the problematic file(s) with view()
+2. Understand the root cause
+3. Apply the fix using str_replace_editor or write_file
+4. Verify the fix if a verification command is provided
+5. Report completion with finish()
+</INSTRUCTIONS>
+
+Begin by examining the file mentioned in the issue.
+

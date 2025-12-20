@@ -83,7 +83,7 @@ class ReasoningResult:
 # Default templates (can be customized)
 DEFAULT_REACT_SYSTEM_PROMPT = REACT_SYSTEM_PROMPT
 
-DEFAULT_REACT_TEMPLATE = REACT_TEMPLATE
+DEFAULT_REACT_TEMPLATE = PromptTemplate(template=REACT_TEMPLATE)
 
 
 class ReActEngine:

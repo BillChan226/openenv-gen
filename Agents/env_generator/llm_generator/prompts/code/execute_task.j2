@@ -1,0 +1,69 @@
+Execute the following task from User Agent.
+
+<TASK>
+- ID: {{ task.id }}
+- Type: {{ task.type.value }}
+- Description: {{ task.description }}
+</TASK>
+
+<REQUIREMENTS>
+{% for req in task.requirements %}
+- {{ req }}
+{% endfor %}
+</REQUIREMENTS>
+
+<TARGET_DIRECTORY>
+{{ task.target_directory }}
+</TARGET_DIRECTORY>
+
+<FILES_TO_GENERATE>
+{% for file in task.file_specs %}
+- {{ file.path }}
+  Purpose: {{ file.purpose }}
+  {% if file.requirements %}
+  Requirements:
+  {% for req in file.requirements %}
+    - {{ req }}
+  {% endfor %}
+  {% endif %}
+  {% if file.dependencies %}
+  Dependencies: {{ file.dependencies | join(', ') }}
+  {% endif %}
+{% endfor %}
+</FILES_TO_GENERATE>
+
+{% if task.existing_files %}
+<EXISTING_FILES>
+These files already exist - check them for consistency:
+{% for file in task.existing_files %}
+- {{ file }}
+{% endfor %}
+</EXISTING_FILES>
+{% endif %}
+
+{% if task.dependencies %}
+<DEPENDENCIES>
+Content from dependent files:
+{% for file, content in task.dependencies.items() %}
+--- {{ file }} ---
+{{ content }}
+{% endfor %}
+</DEPENDENCIES>
+{% endif %}
+
+<ACCEPTANCE_CRITERIA>
+{% for criterion in task.acceptance_criteria %}
+- {{ criterion }}
+{% endfor %}
+</ACCEPTANCE_CRITERIA>
+
+<INSTRUCTIONS>
+1. First, check project structure with project_structure()
+2. Plan the order of file creation
+3. Generate each file with complete, working code
+4. Verify with lint checks
+5. Report completion with finish()
+</INSTRUCTIONS>
+
+Begin by examining the current project state.
+

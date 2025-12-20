@@ -1,0 +1,114 @@
+Verify the result of task: {{ task.id }}
+
+<TASK_INFO>
+- Type: {{ task.type.value }}
+- Description: {{ task.description }}
+- Target: {{ task.target_directory }}
+</TASK_INFO>
+
+<REQUIREMENTS>
+{% for req in task.requirements %}
+- {{ req }}
+{% endfor %}
+</REQUIREMENTS>
+
+<ACCEPTANCE_CRITERIA>
+{% for criterion in task.acceptance_criteria %}
+- {{ criterion }}
+{% endfor %}
+</ACCEPTANCE_CRITERIA>
+
+<FILES_CREATED>
+{% if result.files_created %}
+{% for file in result.files_created %}
+- {{ file }}
+{% endfor %}
+{% else %}
+- None
+{% endif %}
+</FILES_CREATED>
+
+<COMMAND_RESULTS>
+{% if result.commands %}
+{% for cmd in result.commands %}
+- {{ cmd.command }}: {{ 'SUCCESS' if cmd.success else 'FAILED' }}
+{% if not cmd.success %}
+  stderr: {{ cmd.stderr[:200] }}
+{% endif %}
+{% endfor %}
+{% else %}
+- No commands executed
+{% endif %}
+</COMMAND_RESULTS>
+
+<AVAILABLE_TOOLS>
+You can use these tools to verify:
+
+File/Project Tools:
+- project_structure(): View the entire project tree
+- view(path): Read file content to check correctness
+- glob(pattern): Find files matching a pattern
+
+Runtime Tools (use if "runnable" verification needed):
+- execute_bash(command, timeout): Run shell commands (npm install, docker build, etc.)
+- docker_build(service): Build Docker images
+- docker_up(): Start all Docker containers
+- docker_down(): Stop containers
+- docker_logs(service): View container logs
+- docker_status(): Check container status
+
+API/Browser Tools (use if endpoints/UI need testing):
+- test_api(url, method, body): Test API endpoints
+- browser_navigate(url): Open page and capture console errors
+- browser_screenshot(path): Take screenshot for visual verification
+
+Analysis Tools:
+- lint(path): Check code syntax
+- missing_dependencies(path): Check for missing packages
+</AVAILABLE_TOOLS>
+
+<VERIFICATION_GUIDELINES>
+Based on the task description and acceptance criteria, decide what verifications are needed:
+
+1. **File Verification** (always do):
+   - Check required files exist
+   - Verify file contents are correct (use view tool)
+
+2. **Build Verification** (if "runnable" or "buildable" is required):
+   - Run `npm install` or `pip install` to check dependencies
+   - Run `docker build` to verify Dockerfiles
+
+3. **Runtime Verification** (if "runnable" or acceptance criteria mention running):
+   - Start services with docker_up
+   - Check docker_logs for errors
+   - Use docker_status to verify containers are healthy
+
+4. **Functional Verification** (if specific features are required):
+   - Test API endpoints with test_api
+   - Check frontend with browser_navigate
+   - Look for console errors
+
+**IMPORTANT**: 
+- If the goal mentions "runnable environment", you MUST verify it actually runs
+- If acceptance criteria mention specific features, verify those features work
+- Don't just check files exist - verify the system works as intended
+</VERIFICATION_GUIDELINES>
+
+<INSTRUCTIONS>
+1. Analyze the task requirements and acceptance criteria
+2. Decide which verification tools to use based on what's needed
+3. Execute the necessary checks step by step
+4. After all checks, provide your final verdict
+</INSTRUCTIONS>
+
+When you've completed all verifications, respond with JSON:
+```json
+{
+  "passed": true/false,
+  "checks_performed": ["list of all checks you performed"],
+  "passed_checks": ["checks that passed"],
+  "failed_checks": ["checks that failed"],
+  "problems": ["specific problems found that need fixing"],
+  "summary": "overall assessment of the task result"
+}
+```

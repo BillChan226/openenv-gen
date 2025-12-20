@@ -1,0 +1,64 @@
+Review the generated files for issues.
+
+<FILES_GENERATED>
+{% for file in files %}
+- {{ file.path }}{% if file.size %} ({{ file.size }} bytes){% endif %}
+{% endfor %}
+</FILES_GENERATED>
+
+{% if lint_results %}
+<LINT_RESULTS>
+{% for result in lint_results %}
+{{ result.file }}:
+{% for error in result.errors %}
+  Line {{ error.line }}: {{ error.message }}
+{% endfor %}
+{% endfor %}
+</LINT_RESULTS>
+{% endif %}
+
+{% if syntax_results %}
+<SYNTAX_CHECK>
+{% for result in syntax_results %}
+{{ result.file }}: {{ result.status }}{% if result.error %} - {{ result.error }}{% endif %}
+{% endfor %}
+</SYNTAX_CHECK>
+{% endif %}
+
+{% if runtime_results %}
+<RUNTIME_TEST>
+{{ runtime_results }}
+</RUNTIME_TEST>
+{% endif %}
+
+<CHECKLIST>
+Check for:
+1. Syntax errors
+2. Missing imports
+3. Undefined references
+4. Type mismatches
+5. Incomplete implementations
+6. Missing error handling
+7. Cross-file consistency (same models, same API routes)
+</CHECKLIST>
+
+List issues found in JSON format:
+```json
+{
+  "issues": [
+    {
+      "file": "path/to/file",
+      "line": 10,
+      "severity": "error|warning",
+      "type": "syntax|import|reference|logic",
+      "description": "what's wrong",
+      "fix_suggestion": "how to fix"
+    }
+  ],
+  "overall_status": "pass|needs_fixes",
+  "summary": "brief summary of findings"
+}
+```
+
+If no issues found, return empty issues array with "pass" status.
+

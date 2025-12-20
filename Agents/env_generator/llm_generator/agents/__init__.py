@@ -1,18 +1,19 @@
 """
-Agents for Environment Generation
+Agents - Dual agent system for environment generation
 
-- CodeGeneratorAgent: Base agent with code generation + thinking capabilities
-- BackendAgent: FastAPI backend specialist
-- FrontendAgent: React frontend specialist  
-- OpenEnvAgent: OpenEnv adapter specialist
-- GeneratorOrchestrator: Coordinates all agents
+Uses utils.base_agent.BaseAgent as foundation.
+
+UserAgent: Simulated user/PM/QA - plans, delegates, verifies
+CodeAgent: Developer - generates code, fixes issues
+Coordinator: Orchestrates the interaction
 """
 
-from .code_agent import CodeGeneratorAgent
-from .orchestrator import GeneratorOrchestrator
+from .user_agent import UserAgent
+from .code_agent import CodeAgent
+from .coordinator import Coordinator
 
 __all__ = [
-    "CodeGeneratorAgent",
-    "GeneratorOrchestrator",
+    "UserAgent",
+    "CodeAgent",
+    "Coordinator",
 ]
-

@@ -145,6 +145,9 @@ class CheckpointManager:
         """Save checkpoint to file"""
         self.checkpoint.last_updated = self._now()
         
+        # Ensure directory exists
+        self.checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        
         # Create backup of existing checkpoint
         if self.checkpoint_path.exists():
             backup_path = self.checkpoint_path.with_suffix(".json.bak")
