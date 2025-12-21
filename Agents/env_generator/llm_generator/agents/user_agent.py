@@ -30,6 +30,7 @@ from utils.tool import ToolRegistry, ToolResult
 
 from utils.message import Task, TaskType, FileSpec, Issue, IssueSeverity, VerifyResult
 from specs import PROJECT_STRUCTURE, PHASES, get_phase_spec
+from workspace import Workspace
 
 
 class UserAgent(BaseAgent):
@@ -47,13 +48,24 @@ class UserAgent(BaseAgent):
         self,
         config: AgentConfig,
         llm: LLM,
-        output_dir: Path,
+        workspace: Workspace = None,
+        output_dir: Path = None,  # Legacy, use workspace
         tools: Optional[ToolRegistry] = None,
     ):
         super().__init__(config, role=AgentRole.SUPERVISOR)
         
         self.llm = llm
-        self.output_dir = output_dir
+        
+        # Support both workspace (new) and output_dir (legacy)
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
+        
+        # For backward compatibility
+        self.output_dir = self.workspace.root
         
         # Override tools if provided
         if tools:

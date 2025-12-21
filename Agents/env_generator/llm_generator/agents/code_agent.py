@@ -21,6 +21,10 @@ from utils.tool import ToolRegistry, ToolResult
 
 from utils.message import Task, Issue, TaskResult, FixResult, TaskStatus
 
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from workspace import Workspace
+
 
 class CodeAgent(BaseAgent):
     """
@@ -40,14 +44,25 @@ class CodeAgent(BaseAgent):
         self,
         config: AgentConfig,
         llm: LLM,
-        output_dir: Path,
-        tools: ToolRegistry,
+        workspace: Workspace = None,
+        output_dir: Path = None,  # Legacy, use workspace
+        tools: ToolRegistry = None,
     ):
         super().__init__(config, role=AgentRole.WORKER)
         
         self.llm = llm
-        self.output_dir = output_dir
         self._tools = tools
+        
+        # Support both workspace (new) and output_dir (legacy)
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
+        
+        # For backward compatibility
+        self.output_dir = self.workspace.root
         
         # Setup Jinja2 for prompts
         prompt_dir = Path(__file__).parent.parent / "prompts"

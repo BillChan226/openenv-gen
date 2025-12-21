@@ -543,6 +543,116 @@ class LocalLLMClient(BaseLLMClient):
                         yield data["message"]["content"]
 
 
+class GoogleClient(BaseLLMClient):
+    """
+    Google Gemini Client
+    
+    Uses OpenAI-compatible API endpoint provided by Google.
+    Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.
+    """
+    
+    def __init__(self, config: LLMConfig):
+        super().__init__(config)
+        self._client = None
+    
+    def _get_client(self):
+        """Lazy initialization of Google client via OpenAI-compatible API"""
+        if self._client is None:
+            try:
+                from openai import AsyncOpenAI
+            except ImportError:
+                raise ImportError("Please install openai: pip install openai")
+            
+            api_key = self.config.api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise ValueError("Google API key not found. Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.")
+            
+            # Google's OpenAI-compatible endpoint
+            base_url = self.config.api_base or "https://generativelanguage.googleapis.com/v1beta/openai/"
+            
+            self._client = AsyncOpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                timeout=self.config.timeout,
+            )
+        return self._client
+    
+    async def chat(
+        self,
+        messages: list[Message],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        stop: Optional[list[str]] = None,
+        functions: Optional[list[dict]] = None,
+        tools: Optional[list[dict]] = None,
+        tool_choice: Optional[str] = None,
+        **kwargs
+    ) -> Message:
+        """Send chat request to Gemini"""
+        client = self._get_client()
+        
+        # Build request parameters
+        request_params = {
+            "model": self.config.model_name,
+            "messages": [m.to_dict() for m in messages],
+            "temperature": temperature if temperature is not None else self.config.temperature,
+            "max_tokens": max_tokens if max_tokens is not None else self.config.max_tokens,
+        }
+        
+        if stop:
+            request_params["stop"] = stop
+        
+        # Handle tools/functions
+        if tools:
+            request_params["tools"] = tools
+            if tool_choice:
+                request_params["tool_choice"] = tool_choice
+        elif functions:
+            # Convert legacy functions format to tools
+            request_params["tools"] = [{"type": "function", "function": f} for f in functions]
+        
+        async def _call():
+            response = await client.chat.completions.create(**request_params)
+            return response
+        
+        response = await self._retry_with_backoff(_call)
+        choice = response.choices[0]
+        
+        # Build response message
+        return Message.assistant(
+            content=choice.message.content or "",
+            tool_calls=choice.message.tool_calls
+        )
+    
+    async def chat_stream(
+        self,
+        messages: list[Message],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        stop: Optional[list[str]] = None,
+        **kwargs
+    ) -> AsyncIterator[str]:
+        """Stream chat response from Gemini"""
+        client = self._get_client()
+        
+        request_params = {
+            "model": self.config.model_name,
+            "messages": [m.to_dict() for m in messages],
+            "temperature": temperature or self.config.temperature,
+            "max_tokens": max_tokens or self.config.max_tokens,
+            "stream": True,
+        }
+        
+        if stop:
+            request_params["stop"] = stop
+        
+        stream = await client.chat.completions.create(**request_params)
+        
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
+
 def create_llm_client(config: LLMConfig) -> BaseLLMClient:
     """
     Factory function to create LLM client based on config
@@ -556,6 +666,7 @@ def create_llm_client(config: LLMConfig) -> BaseLLMClient:
     provider_map = {
         LLMProvider.OPENAI: OpenAIClient,
         LLMProvider.ANTHROPIC: AnthropicClient,
+        LLMProvider.GOOGLE: GoogleClient,  # Gemini via OpenAI-compatible API
         LLMProvider.AZURE: OpenAIClient,  # Azure uses OpenAI-compatible API
         LLMProvider.LOCAL: LocalLLMClient,
         LLMProvider.CUSTOM: LocalLLMClient,  # Custom endpoints use OpenAI-compatible API
