@@ -9,11 +9,14 @@ Tools for understanding code structure:
 
 import ast
 import re
+import sys
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.tool import BaseTool, ToolResult, ToolCategory, create_tool_param
-from .path_utils import resolve_path
+from workspace import Workspace
 
 
 class FindDefinitionTool(BaseTool):
@@ -29,9 +32,14 @@ Example:
   find_definition(symbol="UserModel", path="app/backend/src")
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.CODE)
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -55,7 +63,7 @@ Example:
         )
     
     async def execute(self, symbol: str, path: str = "") -> ToolResult:
-        search_path = resolve_path(path, self.output_dir)
+        search_path = self.workspace.resolve(path)
         
         if not search_path.exists():
             return ToolResult.fail(f"Path not found: {search_path}")
@@ -109,7 +117,7 @@ Example:
                     stripped = line.strip()
                     for pattern in patterns[suffix]:
                         if re.match(pattern, stripped, re.MULTILINE):
-                            rel_path = file_path.relative_to(self.output_dir)
+                            rel_path = file_path.relative_to(self.workspace.root)
                             definitions.append({
                                 "file": str(rel_path),
                                 "line": line_num,
@@ -145,9 +153,14 @@ Example:
   find_references(symbol="handleLogin", path="app/frontend/src")
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.CODE)
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -171,7 +184,7 @@ Example:
         )
     
     async def execute(self, symbol: str, path: str = "") -> ToolResult:
-        search_path = resolve_path(path, self.output_dir)
+        search_path = self.workspace.resolve(path)
         
         if not search_path.exists():
             return ToolResult.fail(f"Path not found: {search_path}")
@@ -200,7 +213,7 @@ Example:
                 
                 for line_num, line in enumerate(lines, 1):
                     if pattern.search(line):
-                        rel_path = file_path.relative_to(self.output_dir)
+                        rel_path = file_path.relative_to(self.workspace.root)
                         references.append({
                             "file": str(rel_path),
                             "line": line_num,
@@ -228,9 +241,14 @@ Example:
   get_symbols(file="app/backend/src/routes/auth.js")
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.CODE)
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -250,7 +268,7 @@ Example:
         )
     
     async def execute(self, file: str) -> ToolResult:
-        file_path = self.output_dir / file
+        file_path = self.workspace.root / file
         
         if not file_path.exists():
             return ToolResult.fail(f"File not found: {file}")
@@ -359,11 +377,11 @@ Example:
         return symbols
 
 
-def create_analysis_tools(output_dir: str = None) -> List[BaseTool]:
+def create_analysis_tools(output_dir: str = None, workspace: Workspace = None) -> List[BaseTool]:
     """Create all code analysis tools."""
     return [
-        FindDefinitionTool(output_dir=output_dir),
-        FindReferencesTool(output_dir=output_dir),
-        GetSymbolsTool(output_dir=output_dir),
+        FindDefinitionTool(output_dir=output_dir, workspace=workspace),
+        FindReferencesTool(output_dir=output_dir, workspace=workspace),
+        GetSymbolsTool(output_dir=output_dir, workspace=workspace),
     ]
 

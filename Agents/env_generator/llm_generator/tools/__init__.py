@@ -62,7 +62,13 @@ Vision Tools:
 - ExtractComponentsTool: Extract specific UI component specs
 """
 
-# Path Utilities (shared across all tools)
+# Workspace (centralized path management)
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from workspace import Workspace
+
+# Path Utilities (legacy compatibility)
 from .path_utils import (
     resolve_path,
     resolve_output_dir,
@@ -163,59 +169,73 @@ from .vision_tools import (
 )
 
 
-def get_all_tools(output_dir: str = None, work_dir: str = None, include_browser: bool = True):
+def get_all_tools(
+    output_dir: str = None, 
+    work_dir: str = None, 
+    workspace: Workspace = None,
+    include_browser: bool = True
+):
     """
     Get all available tools.
     
     Args:
-        output_dir: Directory for file operations
-        work_dir: Working directory for runtime operations
+        output_dir: Directory for file operations (legacy, use workspace instead)
+        work_dir: Working directory for runtime operations (legacy, use workspace instead)
+        workspace: Workspace object for centralized path management
         include_browser: Include browser tools (requires Playwright)
         
     Returns:
         List of tool instances
     """
+    # Create workspace if not provided
+    if workspace is None:
+        if output_dir:
+            workspace = Workspace(output_dir)
+        elif work_dir:
+            workspace = Workspace(work_dir)
+        else:
+            workspace = Workspace(Path.cwd())
+    
     tools = [
         # File tools
-        ViewTool(output_dir=output_dir),
-        StrReplaceEditorTool(output_dir=output_dir),
-        WriteFileTool(output_dir=output_dir),
-        GlobTool(output_dir=output_dir),
+        ViewTool(workspace=workspace),
+        StrReplaceEditorTool(workspace=workspace),
+        WriteFileTool(workspace=workspace),
+        GlobTool(workspace=workspace),
         
         # Code tools
-        GrepTool(output_dir=output_dir),
-        EditFileTool(output_dir=output_dir),
-        LintTool(output_dir=output_dir),
+        GrepTool(workspace=workspace),
+        EditFileTool(workspace=workspace),
+        LintTool(workspace=workspace),
         ThinkTool(),
         FinishTool(),
         
         # Analysis tools
-        *create_analysis_tools(output_dir=output_dir),
+        *create_analysis_tools(workspace=workspace),
         
         # Dependency tools
-        *create_dependency_tools(output_dir=output_dir),
+        *create_dependency_tools(workspace=workspace),
         
         # Runtime tools
-        ExecuteBashTool(work_dir=work_dir),
-        ExecuteIPythonTool(work_dir=work_dir),
-        StartServerTool(work_dir=work_dir),
+        ExecuteBashTool(workspace=workspace),
+        ExecuteIPythonTool(workspace=workspace),
+        StartServerTool(workspace=workspace),
         StopServerTool(),
         ListServersTool(),
         GetServerLogsTool(),
         TestAPITool(),
-        InstallDependenciesTool(work_dir=work_dir),
+        InstallDependenciesTool(workspace=workspace),
         
         # Docker tools
-        *create_docker_tools(output_dir=output_dir),
+        *create_docker_tools(workspace=workspace),
         
         # Project tools
-        *create_project_tools(output_dir=output_dir),
+        *create_project_tools(workspace=workspace),
     ]
     
     # Browser tools (optional, requires Playwright)
     if include_browser and BROWSER_TOOLS_AVAILABLE:
-        from pathlib import Path
-        screenshot_dir = Path(output_dir) / "screenshots" if output_dir else None
+        screenshot_dir = workspace.root / "screenshots"
         tools.extend(create_browser_tools(screenshot_dir))
     
     return tools
@@ -226,18 +246,21 @@ def get_vision_tools(llm_client=None) -> list:
     return create_vision_tools(llm_client)
 
 
-def get_tool_params(tools=None, output_dir: str = None, work_dir: str = None):
+def get_tool_params(tools=None, output_dir: str = None, work_dir: str = None, workspace: Workspace = None):
     """
     Get tool parameters for LLM function calling.
     """
     if tools is None:
-        tools = get_all_tools(output_dir=output_dir, work_dir=work_dir)
+        tools = get_all_tools(output_dir=output_dir, work_dir=work_dir, workspace=workspace)
     
     return [tool.get_tool_param() for tool in tools]
 
 
 __all__ = [
-    # Path Utilities
+    # Workspace
+    "Workspace",
+    
+    # Path Utilities (legacy)
     "resolve_path",
     "resolve_output_dir",
     "normalize_path_for_tracking",

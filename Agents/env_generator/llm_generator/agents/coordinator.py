@@ -27,6 +27,7 @@ from utils.tool import ToolRegistry
 from tools import get_all_tools
 from utils.message import Task, Issue, TaskResult, VerifyResult
 from specs import PHASES
+from workspace import Workspace
 
 from agents.user_agent import UserAgent
 from agents.code_agent import CodeAgent
@@ -100,9 +101,12 @@ class Coordinator:
         output_dir: Path,
         enable_checkpoints: bool = True,
     ):
-        self.output_dir = Path(output_dir)
+        # Create workspace - this is the single source of truth for the project root
+        self.workspace = Workspace(output_dir)
+        self.output_dir = self.workspace.root  # For backward compatibility
+        
         self.enable_checkpoints = enable_checkpoints
-        self.checkpoint_path = self.output_dir / ".checkpoint.json"
+        self.checkpoint_path = self.workspace.root / ".checkpoint.json"
         
         # Create LLM client
         self.llm = LLM(llm_config)
@@ -124,10 +128,8 @@ class Coordinator:
         """Create tool registry with all tools."""
         registry = ToolRegistry()
         
-        for tool in get_all_tools(
-            output_dir=str(self.output_dir),
-            work_dir=str(self.output_dir),
-        ):
+        # All tools share the same workspace
+        for tool in get_all_tools(workspace=self.workspace):
             registry.register(tool)
         
         self._logger.info(f"Registered {len(registry)} tools")
@@ -142,7 +144,7 @@ class Coordinator:
         return UserAgent(
             config=config,
             llm=self.llm,
-            output_dir=self.output_dir,
+            workspace=self.workspace,
             tools=self._tools,
         )
     
@@ -155,7 +157,7 @@ class Coordinator:
         return CodeAgent(
             config=config,
             llm=self.llm,
-            output_dir=self.output_dir,
+            workspace=self.workspace,
             tools=self._tools,
         )
     

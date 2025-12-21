@@ -4,12 +4,15 @@ Project Structure Tools
 Tools for the agent to understand and visualize the current project structure.
 """
 
+import sys
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Union
 from dataclasses import dataclass
 
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from utils.tool import BaseTool, ToolResult, ToolCategory, create_tool_param
-from .path_utils import resolve_path
+from workspace import Workspace
 
 
 class ProjectStructureTool(BaseTool):
@@ -36,9 +39,14 @@ Use this tool to:
 Returns a tree-like view of the project with file sizes and line counts.
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.FILE)
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -71,7 +79,10 @@ Returns a tree-like view of the project with file sizes and line counts.
         max_depth: int = 5,
         show_sizes: bool = True
     ) -> ToolResult:
-        target_dir = resolve_path(path, self.output_dir)
+        try:
+            target_dir = self.workspace.resolve(path)
+        except Exception as e:
+            return ToolResult(success=False, error_message=f"Invalid path: {e}")
         
         if not target_dir.exists():
             return ToolResult(
@@ -188,9 +199,14 @@ Returns a flat list of all generated files with:
 Use this to check what already exists before generating new files.
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.FILE)
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -211,10 +227,10 @@ Use this to check what already exists before generating new files.
         )
     
     def execute(self, category: str = "all") -> ToolResult:
-        if not self.output_dir.exists():
+        if not self.workspace.root.exists():
             return ToolResult(
                 success=False,
-                error_message=f"Output directory not found: {self.output_dir}"
+                error_message=f"Output directory not found: {self.workspace.root}"
             )
         
         def categorize_file(path: str) -> str:
@@ -243,14 +259,14 @@ Use this to check what already exists before generating new files.
             'other': []
         }
         
-        for file_path in self.output_dir.rglob('*'):
+        for file_path in self.workspace.root.rglob('*'):
             if file_path.is_file() and not file_path.name.startswith('.'):
                 # Skip common ignore patterns
                 path_str = str(file_path)
                 if any(p in path_str for p in ['node_modules', '__pycache__', '.git', 'venv']):
                     continue
                 
-                relative_path = file_path.relative_to(self.output_dir)
+                relative_path = file_path.relative_to(self.workspace.root)
                 cat = categorize_file(str(relative_path))
                 
                 try:
@@ -314,9 +330,14 @@ Detects:
 Use this before creating new files to avoid duplicates.
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.FILE)
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -336,23 +357,23 @@ Use this before creating new files to avoid duplicates.
         )
     
     def execute(self, file_name: str = None) -> ToolResult:
-        if not self.output_dir.exists():
+        if not self.workspace.root.exists():
             return ToolResult(
                 success=False,
-                error_message=f"Output directory not found: {self.output_dir}"
+                error_message=f"Output directory not found: {self.workspace.root}"
             )
         
         # Collect all files by name
         files_by_name: Dict[str, List[str]] = {}
         
-        for file_path in self.output_dir.rglob('*'):
+        for file_path in self.workspace.root.rglob('*'):
             if file_path.is_file() and not file_path.name.startswith('.'):
                 path_str = str(file_path)
                 if any(p in path_str for p in ['node_modules', '__pycache__', '.git']):
                     continue
                 
                 name = file_path.name.lower()
-                relative_path = str(file_path.relative_to(self.output_dir))
+                relative_path = str(file_path.relative_to(self.workspace.root))
                 
                 if name not in files_by_name:
                     files_by_name[name] = []
@@ -427,11 +448,11 @@ Use this before creating new files to avoid duplicates.
         )
 
 
-def create_project_tools(output_dir: str = None) -> List[BaseTool]:
+def create_project_tools(output_dir: str = None, workspace: Workspace = None) -> List[BaseTool]:
     """Create all project structure tools."""
     return [
-        ProjectStructureTool(output_dir=output_dir),
-        ListGeneratedFilesTool(output_dir=output_dir),
-        CheckDuplicatesTool(output_dir=output_dir),
+        ProjectStructureTool(output_dir=output_dir, workspace=workspace),
+        ListGeneratedFilesTool(output_dir=output_dir, workspace=workspace),
+        CheckDuplicatesTool(output_dir=output_dir, workspace=workspace),
     ]
 

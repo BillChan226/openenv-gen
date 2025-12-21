@@ -10,13 +10,15 @@ import asyncio
 import subprocess
 import signal
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from datetime import datetime
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.tool import BaseTool, ToolResult, create_tool_param, ToolCategory
+from workspace import Workspace
 
 
 # ===== Server Registry =====
@@ -99,9 +101,14 @@ Examples:
     DEFAULT_TIMEOUT = 30
     MAX_OUTPUT_LENGTH = 50000
     
-    def __init__(self, work_dir: str = None):
+    def __init__(self, work_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
-        self.work_dir = Path(work_dir) if work_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif work_dir:
+            self.workspace = Workspace(work_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
         self._current_process: Optional[subprocess.Popen] = None
     
     @property
@@ -169,7 +176,7 @@ Examples:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                cwd=str(self.work_dir),
+                cwd=str(self.workspace.root),
                 env={**os.environ, "PYTHONUNBUFFERED": "1"},
             )
             
@@ -181,7 +188,7 @@ Examples:
                 success=result.returncode == 0,
                 data={
                     "exit_code": result.returncode,
-                    "cwd": str(self.work_dir),
+                    "cwd": str(self.workspace.root),
                     "output": output or "(no output)",
                 }
             )
@@ -212,7 +219,7 @@ Examples:
                 shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                cwd=str(self.work_dir),
+                cwd=str(self.workspace.root),
                 start_new_session=True,
             )
             
@@ -290,9 +297,14 @@ Examples:
     execute_ipython "print(df.head())"
 """
     
-    def __init__(self, work_dir: str = None):
+    def __init__(self, work_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
-        self.work_dir = Path(work_dir) if work_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif work_dir:
+            self.workspace = Workspace(work_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
         self._namespace = {
             "__name__": "__main__",
             "__builtins__": __builtins__,
@@ -380,7 +392,7 @@ Examples:
         output = "\n".join(output_parts) if output_parts else "(no output)"
         
         # Add context
-        output += f"\n[Jupyter cwd: {self.work_dir}]"
+        output += f"\n[Jupyter cwd: {self.workspace.root}]"
         
         return ToolResult(
             success=not error,
@@ -411,11 +423,15 @@ Examples:
             try:
                 target = Path(new_dir).expanduser()
                 if not target.is_absolute():
-                    target = self.work_dir / target
+                    target = self.workspace.root / target
+                
+                # Security: ensure target is within workspace
+                if not self.workspace.contains(target):
+                    return ToolResult(success=False, error_message=f"Cannot cd outside workspace: {new_dir}")
                 
                 if target.is_dir():
                     # DON'T change global CWD! Just update internal tracking
-                    self.work_dir = target
+                    # Note: _cwd is internal, workspace.root is the sandbox root
                     return ToolResult(success=True, data=f"Changed to {target}")
                 else:
                     return ToolResult(success=False, error_message=f"Not a directory: {new_dir}")
@@ -423,7 +439,7 @@ Examples:
                 return ToolResult(success=False, error_message=f"cd error: {e}")
         
         elif line.startswith("%pwd"):
-            return ToolResult(success=True, data=str(self.work_dir))
+            return ToolResult(success=True, data=str(self.workspace.root))
         
         elif line.startswith("%env"):
             rest = line[4:].strip()
@@ -460,9 +476,14 @@ Parameters:
 * port: Port number (for tracking)
 """
     
-    def __init__(self, work_dir: str = None):
+    def __init__(self, work_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
-        self.work_dir = Path(work_dir) if work_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif work_dir:
+            self.workspace = Workspace(work_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -508,12 +529,12 @@ Parameters:
                 shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                cwd=str(self.work_dir),
+                cwd=str(self.workspace.root),
                 start_new_session=True,
             )
             
             # Register
-            _server_registry.register(name, process.pid, port, str(self.work_dir))
+            _server_registry.register(name, process.pid, port, str(self.workspace.root))
             
             # Start log capture thread
             import threading
@@ -810,9 +831,14 @@ Automatically detects:
 * pyproject.toml -> pip install -e .
 """
     
-    def __init__(self, work_dir: str = None):
+    def __init__(self, work_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
-        self.work_dir = Path(work_dir) if work_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif work_dir:
+            self.workspace = Workspace(work_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -834,7 +860,10 @@ Automatically detects:
         )
     
     def execute(self, path: str = None) -> ToolResult:
-        project_dir = Path(path or self.work_dir).expanduser()
+        try:
+            project_dir = self.workspace.resolve(path) if path else self.workspace.root
+        except Exception as e:
+            return ToolResult(success=False, error_message=f"Invalid path: {e}")
         
         if not project_dir.exists():
             return ToolResult(success=False, error_message=f"Path not found: {path}")

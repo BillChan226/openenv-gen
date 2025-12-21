@@ -7,13 +7,14 @@ Inspired by OpenHands str_replace_editor.
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.tool import BaseTool, ToolResult, create_tool_param, ToolCategory
-from .path_utils import resolve_path
+from workspace import Workspace
 
 
 # ===== File History =====
@@ -76,10 +77,16 @@ Examples:
     view /path/to/dir                        # List directory contents
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__()
         self._category = ToolCategory.FILE
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        # Support both old (output_dir) and new (workspace) API
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -107,7 +114,10 @@ Examples:
         return self.tool_definition
     
     def execute(self, path: str, view_range: list = None) -> ToolResult:
-        file_path = resolve_path(path, self.output_dir)
+        try:
+            file_path = self.workspace.resolve(path)
+        except Exception as e:
+            return ToolResult(success=False, error_message=f"Invalid path: {e}")
         
         if not file_path.exists():
             return ToolResult(success=False, error_message=f"Path not found: {path}")
@@ -209,9 +219,14 @@ Examples:
     str_replace_editor undo_edit /path/file.py
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.FILE)
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -263,8 +278,10 @@ Examples:
         new_str: str = None,
         insert_line: int = None,
     ) -> ToolResult:
-        
-        file_path = resolve_path(path, self.output_dir)
+        try:
+            file_path = self.workspace.resolve(path)
+        except Exception as e:
+            return ToolResult(success=False, error_message=f"Invalid path: {e}")
         
         if command == "create":
             return self._create(file_path, file_text or "")
@@ -437,9 +454,14 @@ Use str_replace_editor for more precise editing.
 This tool is for creating new files or complete rewrites.
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.FILE)
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -460,7 +482,10 @@ This tool is for creating new files or complete rewrites.
         )
     
     def execute(self, path: str, content: str) -> ToolResult:
-        file_path = resolve_path(path, self.output_dir)
+        try:
+            file_path = self.workspace.resolve(path)
+        except Exception as e:
+            return ToolResult(success=False, error_message=f"Invalid path: {e}")
         
         # Fix: Convert literal \n sequences to actual newlines
         # This handles the case where LLM sends escaped newlines instead of real ones
@@ -521,9 +546,14 @@ Examples:
     glob "test_*.py" /tests     # Test files in tests dir
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.FILE)
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -544,7 +574,10 @@ Examples:
         )
     
     def execute(self, pattern: str, path: str = None) -> ToolResult:
-        search_path = resolve_path(path or "", self.output_dir)
+        try:
+            search_path = self.workspace.resolve(path or "")
+        except Exception as e:
+            return ToolResult(success=False, error_message=f"Invalid path: {e}")
         
         if not search_path.exists():
             return ToolResult(success=False, error_message=f"Path not found: {path}")

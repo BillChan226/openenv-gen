@@ -13,10 +13,13 @@ Dedicated tools for Docker Compose operations:
 import asyncio
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
+
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.tool import BaseTool, ToolResult, ToolCategory, create_tool_param
-from .path_utils import resolve_output_dir
+from workspace import Workspace
 
 
 class DockerBuildTool(BaseTool):
@@ -33,9 +36,14 @@ Example:
   docker_build(service="backend", no_cache=True)
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
-        self.output_dir = resolve_output_dir(output_dir)
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -62,7 +70,7 @@ Example:
         compose_file = self._find_compose_file()
         if not compose_file:
             return ToolResult.fail(
-                f"docker-compose.yml not found in {self.output_dir}. "
+                f"docker-compose.yml not found in {self.workspace.root}. "
                 f"Checked: docker/docker-compose.yml and docker-compose.yml"
             )
         
@@ -78,7 +86,7 @@ Example:
         try:
             result = subprocess.run(
                 cmd,
-                cwd=str(self.output_dir),
+                cwd=str(self.workspace.root),
                 capture_output=True,
                 text=True,
                 timeout=600,  # 10 minutes
@@ -102,8 +110,8 @@ Example:
     def _find_compose_file(self) -> Optional[Path]:
         """Find docker-compose.yml in project."""
         candidates = [
-            self.output_dir / "docker/docker-compose.yml",
-            self.output_dir / "docker-compose.yml",
+            self.workspace.root / "docker/docker-compose.yml",
+            self.workspace.root / "docker-compose.yml",
         ]
         for path in candidates:
             if path.exists():
@@ -125,9 +133,14 @@ Example:
   docker_up(build=True)  # Build before starting
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
-        self.output_dir = resolve_output_dir(output_dir)
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -163,7 +176,7 @@ Example:
         compose_file = self._find_compose_file()
         if not compose_file:
             return ToolResult.fail(
-                f"docker-compose.yml not found in {self.output_dir}. "
+                f"docker-compose.yml not found in {self.workspace.root}. "
                 f"Checked: docker/docker-compose.yml and docker-compose.yml"
             )
         
@@ -182,7 +195,7 @@ Example:
         try:
             result = subprocess.run(
                 cmd,
-                cwd=str(self.output_dir),
+                cwd=str(self.workspace.root),
                 capture_output=True,
                 text=True,
                 timeout=300,
@@ -205,8 +218,8 @@ Example:
     
     def _find_compose_file(self) -> Optional[Path]:
         candidates = [
-            self.output_dir / "docker/docker-compose.yml",
-            self.output_dir / "docker-compose.yml",
+            self.workspace.root / "docker/docker-compose.yml",
+            self.workspace.root / "docker-compose.yml",
         ]
         for path in candidates:
             if path.exists():
@@ -225,9 +238,14 @@ Example:
   docker_down(volumes=True)  # Also remove volumes
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
-        self.output_dir = resolve_output_dir(output_dir)
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -250,7 +268,7 @@ Example:
         compose_file = self._find_compose_file()
         if not compose_file:
             return ToolResult.fail(
-                f"docker-compose.yml not found in {self.output_dir}. "
+                f"docker-compose.yml not found in {self.workspace.root}. "
                 f"Checked: docker/docker-compose.yml and docker-compose.yml"
             )
         
@@ -263,7 +281,7 @@ Example:
         try:
             result = subprocess.run(
                 cmd,
-                cwd=str(self.output_dir),
+                cwd=str(self.workspace.root),
                 capture_output=True,
                 text=True,
                 timeout=60,
@@ -278,8 +296,8 @@ Example:
     
     def _find_compose_file(self) -> Optional[Path]:
         candidates = [
-            self.output_dir / "docker/docker-compose.yml",
-            self.output_dir / "docker-compose.yml",
+            self.workspace.root / "docker/docker-compose.yml",
+            self.workspace.root / "docker-compose.yml",
         ]
         for path in candidates:
             if path.exists():
@@ -298,9 +316,14 @@ Example:
   docker_logs(service="backend", tail=50)
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
-        self.output_dir = resolve_output_dir(output_dir)
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -327,7 +350,7 @@ Example:
         compose_file = self._find_compose_file()
         if not compose_file:
             return ToolResult.fail(
-                f"docker-compose.yml not found in {self.output_dir}. "
+                f"docker-compose.yml not found in {self.workspace.root}. "
                 f"Checked: docker/docker-compose.yml and docker-compose.yml"
             )
         
@@ -340,7 +363,7 @@ Example:
         try:
             result = subprocess.run(
                 cmd,
-                cwd=str(self.output_dir),
+                cwd=str(self.workspace.root),
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -358,8 +381,8 @@ Example:
     
     def _find_compose_file(self) -> Optional[Path]:
         candidates = [
-            self.output_dir / "docker/docker-compose.yml",
-            self.output_dir / "docker-compose.yml",
+            self.workspace.root / "docker/docker-compose.yml",
+            self.workspace.root / "docker-compose.yml",
         ]
         for path in candidates:
             if path.exists():
@@ -379,9 +402,14 @@ Example:
   docker_status()
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
-        self.output_dir = resolve_output_dir(output_dir)
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -399,7 +427,7 @@ Example:
         compose_file = self._find_compose_file()
         if not compose_file:
             return ToolResult.fail(
-                f"docker-compose.yml not found in {self.output_dir}. "
+                f"docker-compose.yml not found in {self.workspace.root}. "
                 f"Checked: docker/docker-compose.yml and docker-compose.yml"
             )
         
@@ -409,7 +437,7 @@ Example:
         try:
             result = subprocess.run(
                 cmd,
-                cwd=str(self.output_dir),
+                cwd=str(self.workspace.root),
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -436,8 +464,8 @@ Example:
     
     def _find_compose_file(self) -> Optional[Path]:
         candidates = [
-            self.output_dir / "docker/docker-compose.yml",
-            self.output_dir / "docker-compose.yml",
+            self.workspace.root / "docker/docker-compose.yml",
+            self.workspace.root / "docker-compose.yml",
         ]
         for path in candidates:
             if path.exists():
@@ -455,9 +483,14 @@ Example:
   docker_restart(service="backend")
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
-        self.output_dir = resolve_output_dir(output_dir)
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -480,7 +513,7 @@ Example:
         compose_file = self._find_compose_file()
         if not compose_file:
             return ToolResult.fail(
-                f"docker-compose.yml not found in {self.output_dir}. "
+                f"docker-compose.yml not found in {self.workspace.root}. "
                 f"Checked: docker/docker-compose.yml and docker-compose.yml"
             )
         
@@ -490,7 +523,7 @@ Example:
         try:
             result = subprocess.run(
                 cmd,
-                cwd=str(self.output_dir),
+                cwd=str(self.workspace.root),
                 capture_output=True,
                 text=True,
                 timeout=60,
@@ -508,8 +541,8 @@ Example:
     
     def _find_compose_file(self) -> Optional[Path]:
         candidates = [
-            self.output_dir / "docker/docker-compose.yml",
-            self.output_dir / "docker-compose.yml",
+            self.workspace.root / "docker/docker-compose.yml",
+            self.workspace.root / "docker-compose.yml",
         ]
         for path in candidates:
             if path.exists():
@@ -517,14 +550,14 @@ Example:
         return None
 
 
-def create_docker_tools(output_dir: str = None) -> List[BaseTool]:
+def create_docker_tools(output_dir: str = None, workspace: Workspace = None) -> List[BaseTool]:
     """Create all Docker tools."""
     return [
-        DockerBuildTool(output_dir=output_dir),
-        DockerUpTool(output_dir=output_dir),
-        DockerDownTool(output_dir=output_dir),
-        DockerLogsTool(output_dir=output_dir),
-        DockerStatusTool(output_dir=output_dir),
-        DockerRestartTool(output_dir=output_dir),
+        DockerBuildTool(output_dir=output_dir, workspace=workspace),
+        DockerUpTool(output_dir=output_dir, workspace=workspace),
+        DockerDownTool(output_dir=output_dir, workspace=workspace),
+        DockerLogsTool(output_dir=output_dir, workspace=workspace),
+        DockerStatusTool(output_dir=output_dir, workspace=workspace),
+        DockerRestartTool(output_dir=output_dir, workspace=workspace),
     ]
 

@@ -66,7 +66,13 @@ async def main():
     parser.add_argument(
         "--model",
         default="gpt-4",
-        help="LLM model to use (default: gpt-4)",
+        help="LLM model to use (default: gpt-4, e.g., gemini-2.0-flash-exp for Google)",
+    )
+    parser.add_argument(
+        "--provider",
+        default="openai",
+        choices=["openai", "google", "anthropic", "azure", "local"],
+        help="LLM provider (default: openai)",
     )
     parser.add_argument(
         "--verbose",
@@ -85,16 +91,29 @@ async def main():
     setup_logging(args.verbose)
     logger = logging.getLogger("main")
     
-    # Check for API key
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        print("Error: OPENAI_API_KEY environment variable not set")
-        print("Usage: OPENAI_API_KEY=sk-... python -m llm_generator.main --name calendar")
-        sys.exit(1)
+    # Determine provider and API key
+    provider_map = {
+        "openai": (LLMProvider.OPENAI, "OPENAI_API_KEY"),
+        "google": (LLMProvider.GOOGLE, "GOOGLE_API_KEY"),
+        "anthropic": (LLMProvider.ANTHROPIC, "ANTHROPIC_API_KEY"),
+        "azure": (LLMProvider.AZURE, "AZURE_OPENAI_API_KEY"),
+        "local": (LLMProvider.LOCAL, None),
+    }
+    
+    provider_enum, api_key_env = provider_map.get(args.provider, (LLMProvider.OPENAI, "OPENAI_API_KEY"))
+    
+    # Check for API key (except for local provider)
+    api_key = None
+    if api_key_env:
+        api_key = os.environ.get(api_key_env) or os.environ.get("GEMINI_API_KEY")  # Also check GEMINI_API_KEY
+        if not api_key:
+            print(f"Error: {api_key_env} environment variable not set")
+            print(f"Usage: {api_key_env}=... python main.py --name calendar --provider {args.provider}")
+            sys.exit(1)
     
     # Create LLM config
     llm_config = LLMConfig(
-        provider=LLMProvider.OPENAI,
+        provider=provider_enum,
         model_name=args.model,
         api_key=api_key,
         temperature=0.7,

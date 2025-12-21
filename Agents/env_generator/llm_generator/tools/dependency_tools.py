@@ -9,11 +9,14 @@ Tools for analyzing and managing dependencies:
 import ast
 import json
 import re
+import sys
 from pathlib import Path
-from typing import List, Set, Dict, Any, Optional
+from typing import List, Set, Dict, Any, Optional, Union
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.tool import BaseTool, ToolResult, ToolCategory, create_tool_param
-from .path_utils import resolve_path
+from workspace import Workspace
 
 
 class CheckImportsTool(BaseTool):
@@ -29,9 +32,14 @@ Example:
   check_imports(file="app/backend/src/app.js")
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.CODE)
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -51,7 +59,7 @@ Example:
         )
     
     async def execute(self, file: str) -> ToolResult:
-        file_path = self.output_dir / file
+        file_path = self.workspace.resolve(file)
         
         if not file_path.exists():
             return ToolResult.fail(f"File not found: {file}")
@@ -160,9 +168,14 @@ Example:
   missing_dependencies(path="app/frontend")
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.CODE)
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -182,7 +195,7 @@ Example:
         )
     
     async def execute(self, path: str = "") -> ToolResult:
-        search_path = resolve_path(path, self.output_dir)
+        search_path = self.workspace.resolve(path)
         
         if not search_path.exists():
             return ToolResult.fail(f"Path not found: {search_path}")
@@ -351,10 +364,10 @@ Example:
         }
 
 
-def create_dependency_tools(output_dir: str = None) -> List[BaseTool]:
+def create_dependency_tools(output_dir: str = None, workspace: Workspace = None) -> List[BaseTool]:
     """Create all dependency analysis tools."""
     return [
-        CheckImportsTool(output_dir=output_dir),
-        MissingDependenciesTool(output_dir=output_dir),
+        CheckImportsTool(output_dir=output_dir, workspace=workspace),
+        MissingDependenciesTool(output_dir=output_dir, workspace=workspace),
     ]
 

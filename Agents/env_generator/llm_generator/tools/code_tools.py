@@ -14,13 +14,14 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.tool import BaseTool, ToolResult, create_tool_param, ToolCategory
-from .path_utils import resolve_path
+from workspace import Workspace
 
 
 # ===== Grep Tool =====
@@ -50,9 +51,14 @@ Examples:
     MAX_RESULTS = 100
     MAX_LINE_LENGTH = 200
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.CODE)
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -83,7 +89,10 @@ Examples:
         )
     
     def execute(self, pattern: str, path: str, include: str = "*") -> ToolResult:
-        search_path = resolve_path(path, self.output_dir)
+        try:
+            search_path = self.workspace.resolve(path)
+        except Exception as e:
+            return ToolResult(success=False, error_message=f"Invalid path: {e}")
         
         if not search_path.exists():
             return ToolResult(success=False, error_message=f"Path not found: {path}")
@@ -197,9 +206,14 @@ def function():
         "// ... rest of code ...",
     ]
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.CODE)
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
     
     @property
     def tool_definition(self):
@@ -240,8 +254,10 @@ def function():
         start: int = None,
         end: int = None
     ) -> ToolResult:
-        
-        file_path = resolve_path(path, self.output_dir)
+        try:
+            file_path = self.workspace.resolve(path)
+        except Exception as e:
+            return ToolResult(success=False, error_message=f"Invalid path: {e}")
         
         # If file doesn't exist, create it
         if not file_path.exists():
@@ -377,9 +393,14 @@ Supports:
 Returns errors with line numbers and suggestions.
 """
     
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.CODE)
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd()
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
         self._tool_cache = {}  # Cache which tools are available
     
     @property
@@ -407,12 +428,56 @@ Returns errors with line numbers and suggestions.
         if tool_name in self._tool_cache:
             return self._tool_cache[tool_name]
         
+        # First check standard PATH
         available = shutil.which(tool_name) is not None
+        
+        # Check nvm paths if not found
+        if not available and tool_name in ['eslint', 'node', 'npm', 'npx']:
+            nvm_dir = os.environ.get('NVM_DIR', os.path.expanduser('~/.nvm'))
+            nvm_node_dir = Path(nvm_dir) / 'versions' / 'node'
+            if nvm_node_dir.exists():
+                # Find the latest node version
+                node_versions = sorted(nvm_node_dir.iterdir(), reverse=True)
+                for version_dir in node_versions:
+                    tool_path = version_dir / 'bin' / tool_name
+                    if tool_path.exists():
+                        available = True
+                        # Cache the full path for later use
+                        self._tool_cache[f"{tool_name}_path"] = str(tool_path)
+                        break
+        
         self._tool_cache[tool_name] = available
         return available
     
+    def _get_tool_path(self, tool_name: str) -> str:
+        """Get the full path to a tool, checking nvm if needed."""
+        # Check if we have a cached full path
+        path_key = f"{tool_name}_path"
+        if path_key in self._tool_cache:
+            return self._tool_cache[path_key]
+        
+        # Try standard which
+        path = shutil.which(tool_name)
+        if path:
+            return path
+        
+        # Check nvm
+        nvm_dir = os.environ.get('NVM_DIR', os.path.expanduser('~/.nvm'))
+        nvm_node_dir = Path(nvm_dir) / 'versions' / 'node'
+        if nvm_node_dir.exists():
+            node_versions = sorted(nvm_node_dir.iterdir(), reverse=True)
+            for version_dir in node_versions:
+                tool_path = version_dir / 'bin' / tool_name
+                if tool_path.exists():
+                    return str(tool_path)
+        
+        return tool_name  # Return just the name as fallback
+    
     def execute(self, path: str) -> ToolResult:
-        file_path = resolve_path(path, self.output_dir)
+        try:
+            file_path = self.workspace.resolve(path)
+        except Exception as e:
+            return ToolResult(success=False, error_message=f"Invalid path: {e}")
         
         if not file_path.exists():
             return ToolResult(success=False, error_message=f"File not found: {path}")
@@ -492,17 +557,101 @@ Returns errors with line numbers and suggestions.
                 error_message=f"Syntax error at line {e.lineno}: {e.msg}"
             )
     
+    def _ensure_eslint_config(self, project_dir: Path) -> Optional[Path]:
+        """
+        Ensure an eslint config exists in the project directory.
+        Creates a minimal config if none exists.
+        Returns the path to config or None.
+        """
+        # Check for existing eslint configs (v9 flat config or legacy)
+        config_files = [
+            'eslint.config.js',
+            'eslint.config.mjs', 
+            '.eslintrc.js',
+            '.eslintrc.json',
+            '.eslintrc.yaml',
+            '.eslintrc.yml',
+            '.eslintrc'
+        ]
+        
+        for config_file in config_files:
+            config_path = project_dir / config_file
+            if config_path.exists():
+                return config_path
+        
+        # Create a minimal eslint config
+        eslint_config = project_dir / 'eslint.config.js'
+        eslint_config_content = '''// Auto-generated eslint config
+import js from '@eslint/js';
+
+export default [
+  js.configs.recommended,
+  {
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        // Node.js globals
+        require: 'readonly',
+        module: 'readonly',
+        exports: 'readonly',
+        process: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+        setTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearTimeout: 'readonly',
+        clearInterval: 'readonly',
+      }
+    },
+    rules: {
+      'no-unused-vars': 'warn',
+      'no-undef': 'error',
+      'semi': ['warn', 'always'],
+    }
+  }
+];
+'''
+        try:
+            eslint_config.write_text(eslint_config_content)
+            return eslint_config
+        except Exception:
+            return None
+    
     def _lint_javascript(self, file_path: Path) -> ToolResult:
         """Lint JavaScript/TypeScript using eslint."""
-        # Try eslint
-        if self._check_tool_available('npx'):
+        # Find the project root (where package.json is)
+        project_dir = file_path.parent
+        for _ in range(10):  # Max 10 levels up
+            if (project_dir / 'package.json').exists():
+                break
+            if project_dir.parent == project_dir:
+                break
+            project_dir = project_dir.parent
+        
+        # Try global eslint first, then npx
+        eslint_cmd = None
+        if self._check_tool_available('eslint'):
+            eslint_path = self._get_tool_path('eslint')
+            eslint_cmd = [eslint_path]
+        elif self._check_tool_available('npx'):
+            npx_path = self._get_tool_path('npx')
+            eslint_cmd = [npx_path, '--yes', 'eslint']
+        
+        if eslint_cmd:
             try:
+                # Ensure eslint config exists
+                self._ensure_eslint_config(project_dir)
+                
+                # Run eslint
                 result = subprocess.run(
-                    ['npx', '--yes', 'eslint', '--format=json', str(file_path)],
+                    eslint_cmd + ['--format=json', str(file_path)],
                     capture_output=True,
                     text=True,
-                    timeout=60,
-                    cwd=file_path.parent
+                    timeout=120,
+                    cwd=project_dir
                 )
                 
                 errors = []
@@ -519,7 +668,13 @@ Returns errors with line numbers and suggestions.
                                     "severity": "error" if msg.get("severity") == 2 else "warning"
                                 })
                     except json.JSONDecodeError:
-                        pass
+                        # eslint might output non-JSON on certain errors
+                        if result.returncode != 0 and result.stderr:
+                            return ToolResult(
+                                success=False,
+                                data={"errors": [], "tool": "eslint"},
+                                error_message=f"ESLint error: {result.stderr[:200]}"
+                            )
                 
                 if errors:
                     error_summary = "; ".join([f"L{e['line']}: {e['msg']}" for e in errors[:5]])
@@ -534,11 +689,39 @@ Returns errors with line numbers and suggestions.
                     data={"errors": [], "tool": "eslint", "message": f"JS/TS lint OK: {file_path.name}"}
                 )
             except subprocess.TimeoutExpired:
+                return ToolResult(
+                    success=False,
+                    data={"errors": [], "tool": "eslint"},
+                    error_message="ESLint timed out"
+                )
+            except Exception as e:
                 pass
+        
+        # Fallback: basic syntax check using node
+        if self._check_tool_available('node'):
+            try:
+                # Use node to check syntax
+                node_path = self._get_tool_path('node')
+                result = subprocess.run(
+                    [node_path, '--check', str(file_path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode != 0:
+                    error_msg = result.stderr.strip() if result.stderr else "Syntax error"
+                    return ToolResult(
+                        success=False,
+                        data={"errors": [{"msg": error_msg}], "tool": "node"},
+                        error_message=f"JS syntax error: {error_msg}"
+                    )
+                return ToolResult(
+                    success=True,
+                    data={"errors": [], "tool": "node", "message": f"JS syntax OK: {file_path.name}"}
+                )
             except Exception:
                 pass
         
-        # Fallback: basic syntax check with esprima-style parsing
         return ToolResult(
             success=True,
             data={"errors": [], "tool": "none", "message": f"No JS linter available for: {file_path.name}"}

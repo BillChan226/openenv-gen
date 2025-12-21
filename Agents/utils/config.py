@@ -30,6 +30,7 @@ class LLMProvider(Enum):
     """LLM service provider"""
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
+    GOOGLE = "google"  # Gemini models
     AZURE = "azure"
     LOCAL = "local"
     CUSTOM = "custom"
