@@ -141,9 +141,38 @@ PHASES = [
         "id": "frontend",
         "type": TaskType.FRONTEND,
         "name": "Frontend",
-        "description": "Generate React frontend application",
+        "description": """Generate React frontend application with COMPLETE, FUNCTIONAL UI.
+
+REQUIREMENTS:
+- All components must be fully functional (no placeholder onClick handlers)
+- All pages must display REAL data from the backend API
+- Navigation must work between all pages
+- Forms must submit data to the backend
+- Search must work end-to-end
+- Settings must be viewable and savable
+- Loading states must show while fetching data
+- Error states must show when API fails
+- Design must be polished and user-friendly""",
         "target_directory": "app/frontend/",
         "depends_on": ["design", "backend"],
+    },
+    {
+        "id": "integration",
+        "type": TaskType.VERIFICATION,
+        "name": "Integration",
+        "description": """Verify frontend-backend integration is complete.
+
+This phase tests:
+1. All frontend pages load with real data from backend
+2. No console errors in browser
+3. No network errors (failed API calls)
+4. All interactive elements work (buttons, forms, links)
+5. CRUD operations work end-to-end
+6. User can complete all core workflows
+
+Use browser tools to navigate, click, fill forms, and verify results.""",
+        "target_directory": "",
+        "depends_on": ["backend", "frontend"],
     },
     {
         "id": "env",
@@ -151,7 +180,7 @@ PHASES = [
         "name": "OpenEnv",
         "description": "Generate OpenEnv adapter for agent interaction",
         "target_directory": "env/",
-        "depends_on": ["backend", "frontend"],
+        "depends_on": ["integration"],
     },
     {
         "id": "docker",
