@@ -57,12 +57,132 @@ Content from dependent files:
 {% endfor %}
 </ACCEPTANCE_CRITERIA>
 
+{% if task.type.value == 'frontend' %}
+<FRONTEND_QUALITY_REQUIREMENTS>
+CRITICAL: Generate COMPLETE, PRODUCTION-READY frontend code. NOT placeholder code!
+
+**MUST HAVE:**
+
+1. **Real API Integration**
+   - Import and use API service functions
+   - Fetch data in useEffect hooks
+   - Handle loading, success, and error states
+   - Display real data from backend, NOT hardcoded values
+
+2. **Functional Components**
+   - Every button MUST have a meaningful onClick handler
+   - Every form MUST submit to the API
+   - Every link MUST navigate to a real page
+   - Every input MUST be controlled and functional
+
+3. **State Management**
+   - Use useState for component state
+   - Use useEffect for data fetching
+   - Implement proper loading states (isLoading)
+   - Implement error handling (error message display)
+
+4. **User Experience**
+   - Show loading spinners while fetching
+   - Show error messages when API fails
+   - Show empty state when no data exists
+   - Provide visual feedback on user actions
+
+**EXAMPLE - WRONG (placeholder):**
+```jsx
+const Dashboard = () => {
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>Welcome to the dashboard</p>
+    </div>
+  );
+};
+```
+
+**EXAMPLE - CORRECT (functional):**
+```jsx
+import { useState, useEffect } from 'react';
+import { getDashboardData } from '../services/api';
+import { Spinner } from './ui/Spinner';
+import { DashboardCard } from './DashboardCard';
+
+const Dashboard = () => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const result = await getDashboardData();
+        setData(result);
+      } catch (err) {
+        setError('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) return <Spinner />;
+  if (error) return <div className="error">{error}</div>;
+  if (!data) return <div>No data available</div>;
+
+  return (
+    <div className="dashboard">
+      <h1>Dashboard</h1>
+      <div className="dashboard-grid">
+        {data.cards.map(card => (
+          <DashboardCard key={card.id} {...card} />
+        ))}
+      </div>
+    </div>
+  );
+};
+```
+
+**API Service Pattern:**
+```jsx
+// services/api.js
+const API_URL = '/api';
+
+export const getDashboardData = async () => {
+  const response = await fetch(`${API_URL}/dashboard`);
+  if (!response.ok) throw new Error('API error');
+  return response.json();
+};
+
+export const searchApps = async (query) => {
+  const response = await fetch(`${API_URL}/search?q=${encodeURIComponent(query)}`);
+  if (!response.ok) throw new Error('Search failed');
+  return response.json();
+};
+
+export const saveSettings = async (settings) => {
+  const response = await fetch(`${API_URL}/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings)
+  });
+  if (!response.ok) throw new Error('Save failed');
+  return response.json();
+};
+```
+</FRONTEND_QUALITY_REQUIREMENTS>
+{% endif %}
+
 <INSTRUCTIONS>
 1. First, check project structure with project_structure()
 2. Plan the order of file creation
 3. Generate each file with complete, working code
-4. Verify with lint checks
-5. Report completion with finish()
+{% if task.type.value == 'frontend' %}
+4. Ensure EVERY component fetches real data from API
+5. Ensure EVERY button has a meaningful onClick handler
+6. Create proper API service layer with fetch functions
+{% endif %}
+7. Verify with lint checks
+8. Report completion with finish()
 </INSTRUCTIONS>
 
 Begin by examining the current project state.

@@ -534,6 +534,494 @@ class BrowserCloseTool(BaseTool):
             return ToolResult.fail(f"Close failed: {str(e)}")
 
 
+class BrowserWaitTool(BaseTool):
+    """Wait for an element to appear or a condition to be met"""
+    
+    def __init__(self, browser_manager: BrowserManager, **kwargs):
+        super().__init__(name="browser_wait", category=ToolCategory.RUNTIME, **kwargs)
+        self.browser = browser_manager
+    
+    @property
+    def tool_definition(self) -> Dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": "browser_wait",
+                "description": "Wait for an element to appear, become visible, or for a timeout. Use for waiting after page navigation or AJAX calls.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selector": {
+                            "type": "string",
+                            "description": "CSS selector to wait for"
+                        },
+                        "state": {
+                            "type": "string",
+                            "enum": ["attached", "visible", "hidden", "detached"],
+                            "description": "Element state to wait for (default: visible)"
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "description": "Timeout in milliseconds (default: 10000)"
+                        }
+                    },
+                    "required": ["selector"]
+                }
+            }
+        }
+    
+    async def execute(self, selector: str, state: str = "visible", timeout: int = 10000, **kwargs) -> ToolResult:
+        if not self.browser.state.page:
+            return ToolResult.fail("No page open. Use browser_navigate first.")
+        
+        try:
+            await self.browser.state.page.wait_for_selector(
+                selector, 
+                state=state,
+                timeout=timeout
+            )
+            return ToolResult.ok(f"Element '{selector}' is now {state}")
+        except Exception as e:
+            return ToolResult.fail(f"Wait failed: {str(e)}")
+
+
+class BrowserScrollTool(BaseTool):
+    """Scroll the page"""
+    
+    def __init__(self, browser_manager: BrowserManager, **kwargs):
+        super().__init__(name="browser_scroll", category=ToolCategory.RUNTIME, **kwargs)
+        self.browser = browser_manager
+    
+    @property
+    def tool_definition(self) -> Dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": "browser_scroll",
+                "description": "Scroll the page. Use to navigate long pages or reveal lazy-loaded content.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "direction": {
+                            "type": "string",
+                            "enum": ["up", "down", "top", "bottom"],
+                            "description": "Scroll direction or position"
+                        },
+                        "pixels": {
+                            "type": "integer",
+                            "description": "Pixels to scroll (for up/down). Default: 500"
+                        },
+                        "selector": {
+                            "type": "string",
+                            "description": "Optional: scroll to this element"
+                        }
+                    },
+                    "required": []
+                }
+            }
+        }
+    
+    async def execute(self, direction: str = "down", pixels: int = 500, selector: Optional[str] = None, **kwargs) -> ToolResult:
+        if not self.browser.state.page:
+            return ToolResult.fail("No page open. Use browser_navigate first.")
+        
+        try:
+            if selector:
+                # Scroll element into view
+                await self.browser.state.page.locator(selector).scroll_into_view_if_needed()
+                return ToolResult.ok(f"Scrolled to element: {selector}")
+            elif direction == "top":
+                await self.browser.state.page.evaluate("window.scrollTo(0, 0)")
+                return ToolResult.ok("Scrolled to top")
+            elif direction == "bottom":
+                await self.browser.state.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                return ToolResult.ok("Scrolled to bottom")
+            elif direction == "up":
+                await self.browser.state.page.evaluate(f"window.scrollBy(0, -{pixels})")
+                return ToolResult.ok(f"Scrolled up {pixels}px")
+            else:  # down
+                await self.browser.state.page.evaluate(f"window.scrollBy(0, {pixels})")
+                return ToolResult.ok(f"Scrolled down {pixels}px")
+        except Exception as e:
+            return ToolResult.fail(f"Scroll failed: {str(e)}")
+
+
+class BrowserHoverTool(BaseTool):
+    """Hover over an element"""
+    
+    def __init__(self, browser_manager: BrowserManager, **kwargs):
+        super().__init__(name="browser_hover", category=ToolCategory.RUNTIME, **kwargs)
+        self.browser = browser_manager
+    
+    @property
+    def tool_definition(self) -> Dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": "browser_hover",
+                "description": "Hover over an element. Use to reveal tooltips, dropdown menus, or hover states.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selector": {
+                            "type": "string",
+                            "description": "CSS selector for the element to hover over"
+                        }
+                    },
+                    "required": ["selector"]
+                }
+            }
+        }
+    
+    async def execute(self, selector: str, **kwargs) -> ToolResult:
+        if not self.browser.state.page:
+            return ToolResult.fail("No page open. Use browser_navigate first.")
+        
+        try:
+            await self.browser.state.page.hover(selector, timeout=5000)
+            return ToolResult.ok(f"Hovered over: {selector}")
+        except Exception as e:
+            return ToolResult.fail(f"Hover failed: {str(e)}")
+
+
+class BrowserSelectTool(BaseTool):
+    """Select an option from a dropdown"""
+    
+    def __init__(self, browser_manager: BrowserManager, **kwargs):
+        super().__init__(name="browser_select", category=ToolCategory.RUNTIME, **kwargs)
+        self.browser = browser_manager
+    
+    @property
+    def tool_definition(self) -> Dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": "browser_select",
+                "description": "Select an option from a <select> dropdown.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selector": {
+                            "type": "string",
+                            "description": "CSS selector for the <select> element"
+                        },
+                        "value": {
+                            "type": "string",
+                            "description": "Option value to select"
+                        },
+                        "label": {
+                            "type": "string",
+                            "description": "Alternative: option text to select"
+                        }
+                    },
+                    "required": ["selector"]
+                }
+            }
+        }
+    
+    async def execute(self, selector: str, value: Optional[str] = None, label: Optional[str] = None, **kwargs) -> ToolResult:
+        if not self.browser.state.page:
+            return ToolResult.fail("No page open. Use browser_navigate first.")
+        
+        try:
+            if value:
+                await self.browser.state.page.select_option(selector, value=value, timeout=5000)
+                return ToolResult.ok(f"Selected value '{value}' in {selector}")
+            elif label:
+                await self.browser.state.page.select_option(selector, label=label, timeout=5000)
+                return ToolResult.ok(f"Selected label '{label}' in {selector}")
+            else:
+                return ToolResult.fail("Provide either value or label")
+        except Exception as e:
+            return ToolResult.fail(f"Select failed: {str(e)}")
+
+
+class BrowserGetAttributeTool(BaseTool):
+    """Get an attribute from an element"""
+    
+    def __init__(self, browser_manager: BrowserManager, **kwargs):
+        super().__init__(name="browser_get_attribute", category=ToolCategory.RUNTIME, **kwargs)
+        self.browser = browser_manager
+    
+    @property
+    def tool_definition(self) -> Dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": "browser_get_attribute",
+                "description": "Get the value of an attribute from an element. Use to check src, href, disabled, etc.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selector": {
+                            "type": "string",
+                            "description": "CSS selector for the element"
+                        },
+                        "attribute": {
+                            "type": "string",
+                            "description": "Attribute name to get (e.g., 'href', 'src', 'disabled')"
+                        }
+                    },
+                    "required": ["selector", "attribute"]
+                }
+            }
+        }
+    
+    async def execute(self, selector: str, attribute: str, **kwargs) -> ToolResult:
+        if not self.browser.state.page:
+            return ToolResult.fail("No page open. Use browser_navigate first.")
+        
+        try:
+            value = await self.browser.state.page.get_attribute(selector, attribute, timeout=5000)
+            return ToolResult.ok({
+                "selector": selector,
+                "attribute": attribute,
+                "value": value
+            })
+        except Exception as e:
+            return ToolResult.fail(f"Get attribute failed: {str(e)}")
+
+
+class BrowserGetTextTool(BaseTool):
+    """Get text content from an element"""
+    
+    def __init__(self, browser_manager: BrowserManager, **kwargs):
+        super().__init__(name="browser_get_text", category=ToolCategory.RUNTIME, **kwargs)
+        self.browser = browser_manager
+    
+    @property
+    def tool_definition(self) -> Dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": "browser_get_text",
+                "description": "Get text content from an element. Use to verify displayed content.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selector": {
+                            "type": "string",
+                            "description": "CSS selector for the element"
+                        }
+                    },
+                    "required": ["selector"]
+                }
+            }
+        }
+    
+    async def execute(self, selector: str, **kwargs) -> ToolResult:
+        if not self.browser.state.page:
+            return ToolResult.fail("No page open. Use browser_navigate first.")
+        
+        try:
+            text = await self.browser.state.page.inner_text(selector, timeout=5000)
+            return ToolResult.ok({
+                "selector": selector,
+                "text": text
+            })
+        except Exception as e:
+            return ToolResult.fail(f"Get text failed: {str(e)}")
+
+
+class BrowserCheckVisibleTool(BaseTool):
+    """Check if an element is visible"""
+    
+    def __init__(self, browser_manager: BrowserManager, **kwargs):
+        super().__init__(name="browser_is_visible", category=ToolCategory.RUNTIME, **kwargs)
+        self.browser = browser_manager
+    
+    @property
+    def tool_definition(self) -> Dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": "browser_is_visible",
+                "description": "Check if an element is visible on the page. Use for verifying UI state.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selector": {
+                            "type": "string",
+                            "description": "CSS selector for the element"
+                        }
+                    },
+                    "required": ["selector"]
+                }
+            }
+        }
+    
+    async def execute(self, selector: str, **kwargs) -> ToolResult:
+        if not self.browser.state.page:
+            return ToolResult.fail("No page open. Use browser_navigate first.")
+        
+        try:
+            is_visible = await self.browser.state.page.is_visible(selector, timeout=5000)
+            return ToolResult.ok({
+                "selector": selector,
+                "is_visible": is_visible
+            })
+        except Exception as e:
+            return ToolResult.fail(f"Visibility check failed: {str(e)}")
+
+
+class BrowserPressKeyTool(BaseTool):
+    """Press a keyboard key"""
+    
+    def __init__(self, browser_manager: BrowserManager, **kwargs):
+        super().__init__(name="browser_press_key", category=ToolCategory.RUNTIME, **kwargs)
+        self.browser = browser_manager
+    
+    @property
+    def tool_definition(self) -> Dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": "browser_press_key",
+                "description": "Press a keyboard key. Use for Enter, Escape, Tab, shortcuts, etc.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "key": {
+                            "type": "string",
+                            "description": "Key to press (e.g., 'Enter', 'Escape', 'Tab', 'ArrowDown', 'Control+a')"
+                        }
+                    },
+                    "required": ["key"]
+                }
+            }
+        }
+    
+    async def execute(self, key: str, **kwargs) -> ToolResult:
+        if not self.browser.state.page:
+            return ToolResult.fail("No page open. Use browser_navigate first.")
+        
+        try:
+            await self.browser.state.page.keyboard.press(key)
+            return ToolResult.ok(f"Pressed key: {key}")
+        except Exception as e:
+            return ToolResult.fail(f"Key press failed: {str(e)}")
+
+
+class BrowserGetNetworkErrorsTool(BaseTool):
+    """Get all network errors captured during page load"""
+    
+    def __init__(self, browser_manager: BrowserManager, **kwargs):
+        super().__init__(name="browser_network_errors", category=ToolCategory.RUNTIME, **kwargs)
+        self.browser = browser_manager
+    
+    @property
+    def tool_definition(self) -> Dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": "browser_network_errors",
+                "description": "Get all network errors (4xx, 5xx responses) captured since page navigation. Use to debug API issues.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }
+            }
+        }
+    
+    async def execute(self, **kwargs) -> ToolResult:
+        if not self.browser.state.page:
+            return ToolResult.fail("No page open. Use browser_navigate first.")
+        
+        errors = [
+            err for err in self.browser.state.network_errors
+            if "localhost" in err.get("url", "")
+        ]
+        
+        return ToolResult.ok({
+            "url": self.browser.state.current_url,
+            "total_errors": len(errors),
+            "errors": errors[:20],
+        })
+
+
+class BrowserCheckAccessibilityTool(BaseTool):
+    """Check page accessibility - find elements without proper labels, alt text, etc."""
+    
+    def __init__(self, browser_manager: BrowserManager, **kwargs):
+        super().__init__(name="browser_check_a11y", category=ToolCategory.RUNTIME, **kwargs)
+        self.browser = browser_manager
+    
+    @property
+    def tool_definition(self) -> Dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": "browser_check_a11y",
+                "description": "Check basic accessibility issues: images without alt, buttons without labels, form inputs without labels.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }
+            }
+        }
+    
+    async def execute(self, **kwargs) -> ToolResult:
+        if not self.browser.state.page:
+            return ToolResult.fail("No page open. Use browser_navigate first.")
+        
+        try:
+            issues = await self.browser.state.page.evaluate("""
+                () => {
+                    const issues = [];
+                    
+                    // Images without alt
+                    document.querySelectorAll('img').forEach((img, i) => {
+                        if (!img.alt && !img.getAttribute('aria-label')) {
+                            issues.push({type: 'img-no-alt', selector: `img:nth-of-type(${i+1})`, src: img.src});
+                        }
+                    });
+                    
+                    // Buttons without accessible text
+                    document.querySelectorAll('button').forEach((btn, i) => {
+                        const text = btn.textContent?.trim();
+                        const ariaLabel = btn.getAttribute('aria-label');
+                        const title = btn.getAttribute('title');
+                        if (!text && !ariaLabel && !title) {
+                            issues.push({type: 'button-no-label', selector: `button:nth-of-type(${i+1})`});
+                        }
+                    });
+                    
+                    // Form inputs without labels
+                    document.querySelectorAll('input, select, textarea').forEach((input, i) => {
+                        const id = input.id;
+                        const ariaLabel = input.getAttribute('aria-label');
+                        const placeholder = input.placeholder;
+                        const hasLabel = id && document.querySelector(`label[for="${id}"]`);
+                        
+                        if (!hasLabel && !ariaLabel && !placeholder) {
+                            issues.push({type: 'input-no-label', selector: `${input.tagName.toLowerCase()}:nth-of-type(${i+1})`});
+                        }
+                    });
+                    
+                    // Links without text
+                    document.querySelectorAll('a').forEach((link, i) => {
+                        const text = link.textContent?.trim();
+                        const ariaLabel = link.getAttribute('aria-label');
+                        if (!text && !ariaLabel) {
+                            issues.push({type: 'link-no-text', selector: `a:nth-of-type(${i+1})`, href: link.href});
+                        }
+                    });
+                    
+                    return issues;
+                }
+            """)
+            
+            return ToolResult.ok({
+                "url": self.browser.state.current_url,
+                "total_issues": len(issues),
+                "issues": issues[:20],
+            })
+        except Exception as e:
+            return ToolResult.fail(f"Accessibility check failed: {str(e)}")
+
+
 def create_browser_tools(screenshot_dir: Optional[Path] = None) -> List[BaseTool]:
     """Create all browser tools with shared browser manager"""
     if not PLAYWRIGHT_AVAILABLE:
@@ -543,13 +1031,34 @@ def create_browser_tools(screenshot_dir: Optional[Path] = None) -> List[BaseTool
     browser_manager = BrowserManager.get_instance(screenshot_dir)
     
     return [
+        # Core navigation and inspection
         BrowserNavigateTool(browser_manager),
         BrowserScreenshotTool(browser_manager),
         BrowserGetConsoleTool(browser_manager),
+        BrowserGetNetworkErrorsTool(browser_manager),
+        
+        # Interaction
         BrowserClickTool(browser_manager),
         BrowserFillTool(browser_manager),
+        BrowserSelectTool(browser_manager),
+        BrowserHoverTool(browser_manager),
+        BrowserPressKeyTool(browser_manager),
+        
+        # Waiting and scrolling
+        BrowserWaitTool(browser_manager),
+        BrowserScrollTool(browser_manager),
+        
+        # Element inspection
         BrowserGetElementsTool(browser_manager),
+        BrowserGetTextTool(browser_manager),
+        BrowserGetAttributeTool(browser_manager),
+        BrowserCheckVisibleTool(browser_manager),
+        
+        # Advanced
         BrowserEvaluateTool(browser_manager),
+        BrowserCheckAccessibilityTool(browser_manager),
+        
+        # Lifecycle
         BrowserCloseTool(browser_manager),
     ]
 

@@ -44,12 +44,12 @@ Verify the result of task: {{ task.id }}
 <AVAILABLE_TOOLS>
 You can use these tools to verify:
 
-File/Project Tools:
+**File/Project Tools:**
 - project_structure(): View the entire project tree
 - view(path): Read file content to check correctness
 - glob(pattern): Find files matching a pattern
 
-Runtime Tools (use if "runnable" verification needed):
+**Runtime Tools (use if "runnable" verification needed):**
 - execute_bash(command, timeout): Run shell commands (npm install, docker build, etc.)
 - docker_build(service): Build Docker images
 - docker_up(): Start all Docker containers
@@ -57,18 +57,145 @@ Runtime Tools (use if "runnable" verification needed):
 - docker_logs(service): View container logs
 - docker_status(): Check container status
 
-API/Browser Tools (use if endpoints/UI need testing):
+**API Testing:**
 - test_api(url, method, body): Test API endpoints
-- browser_navigate(url): Open page and capture console errors
-- browser_screenshot(path): Take screenshot for visual verification
 
-Analysis Tools:
+**Browser Tools (CRITICAL for frontend verification):**
+Core:
+- browser_navigate(url): Open page and capture console/network errors
+- browser_screenshot(path): Take screenshot for visual verification
+- browser_console(filter_type): Get console logs (all/error/warning)
+- browser_network_errors(): Get API call failures (4xx, 5xx)
+
+Interaction:
+- browser_click(selector/text): Click an element
+- browser_fill(selector, value): Fill an input field
+- browser_select(selector, value/label): Select dropdown option
+- browser_hover(selector): Hover over element
+- browser_press_key(key): Press keyboard key (Enter, Tab, Escape)
+
+Inspection:
+- browser_elements(selector): Find elements on page
+- browser_get_text(selector): Get text content
+- browser_get_attribute(selector, attr): Get element attribute
+- browser_is_visible(selector): Check if element is visible
+
+Navigation:
+- browser_wait(selector, state): Wait for element (visible, hidden, attached)
+- browser_scroll(direction/selector): Scroll page or to element
+
+Quality:
+- browser_check_a11y(): Check basic accessibility issues
+- browser_close(): Close browser session
+
+**Analysis Tools:**
 - lint(path): Check code syntax
 - missing_dependencies(path): Check for missing packages
 </AVAILABLE_TOOLS>
 
 <VERIFICATION_GUIDELINES>
-Based on the task description and acceptance criteria, decide what verifications are needed:
+
+## Verification by Task Type
+
+{% if task.type.value == 'frontend' %}
+### FRONTEND VERIFICATION (MANDATORY STEPS)
+
+You MUST perform these verifications for frontend tasks:
+
+**Step 1: Navigate and Check Errors**
+```
+1. browser_navigate("http://localhost:3000")
+2. browser_console(filter_type="error") - MUST be empty
+3. browser_network_errors() - MUST be empty (no 4xx/5xx)
+```
+
+**Step 2: Verify Each Page**
+For each page (dashboard, apps, search, settings, etc.):
+```
+1. browser_click(text="PageName") or browser_navigate("http://localhost:3000/page")
+2. browser_console(filter_type="error") - check for errors
+3. browser_elements("button, a, input") - list interactive elements
+4. browser_get_text("main") or browser_get_text(".content") - verify content exists
+```
+
+**Step 3: Test Functionality**
+For each feature:
+```
+1. Click buttons: browser_click(selector) - verify something happens
+2. Fill forms: browser_fill(selector, value) - verify input works
+3. Check results: browser_get_text(selector) - verify output displays
+```
+
+**Step 4: Verify Data Flow**
+```
+1. After actions, check browser_network_errors() for failed API calls
+2. Verify displayed data is from API, not placeholder text
+3. Check that CRUD operations work (create, read, update, delete)
+```
+
+**Step 5: Quality Checks**
+```
+1. browser_check_a11y() - check accessibility issues
+2. browser_screenshot("verification.png") - visual review
+```
+
+**FAILURE CONDITIONS (Report as issues):**
+- Console has JavaScript errors
+- Network errors to localhost (API failures)
+- Buttons that do nothing when clicked
+- Pages showing placeholder text instead of real data
+- Navigation links that don't work
+- Forms that don't submit
+- Search that doesn't return results
+- Settings that don't save
+
+{% elif task.type.value == 'backend' %}
+### BACKEND VERIFICATION
+
+**Step 1: Check Service is Running**
+```
+1. docker_status() - verify backend container is running
+2. docker_logs(service="backend") - check for startup errors
+```
+
+**Step 2: Test API Endpoints**
+```
+1. test_api("http://localhost:8000/health") - health check
+2. test_api("http://localhost:8000/api/...") - test each endpoint
+3. Verify correct status codes (200, 201, 400, 401)
+4. Verify response format matches spec
+```
+
+**Step 3: Check Database Connection**
+```
+1. Test GET endpoints return data from database
+2. Test POST endpoints create records
+```
+
+{% elif task.type.value == 'database' %}
+### DATABASE VERIFICATION
+
+**Step 1: Check Container**
+```
+1. docker_status() - verify database container is running
+2. docker_logs(service="database") - check for errors
+```
+
+**Step 2: Verify Schema**
+```
+1. view("app/database/init/01_schema.sql") - check table definitions
+2. Verify all required tables exist
+3. Verify foreign keys and constraints
+```
+
+**Step 3: Verify Seed Data**
+```
+1. view("app/database/init/02_seed.sql") - check initial data
+2. Verify realistic sample data exists
+```
+
+{% else %}
+### GENERAL VERIFICATION
 
 1. **File Verification** (always do):
    - Check required files exist
@@ -78,27 +205,46 @@ Based on the task description and acceptance criteria, decide what verifications
    - Run `npm install` or `pip install` to check dependencies
    - Run `docker build` to verify Dockerfiles
 
-3. **Runtime Verification** (if "runnable" or acceptance criteria mention running):
+3. **Runtime Verification** (if "runnable"):
    - Start services with docker_up
    - Check docker_logs for errors
    - Use docker_status to verify containers are healthy
 
-4. **Functional Verification** (if specific features are required):
-   - Test API endpoints with test_api
-   - Check frontend with browser_navigate
-   - Look for console errors
-
-**IMPORTANT**: 
-- If the goal mentions "runnable environment", you MUST verify it actually runs
-- If acceptance criteria mention specific features, verify those features work
-- Don't just check files exist - verify the system works as intended
+{% endif %}
 </VERIFICATION_GUIDELINES>
 
+<QUALITY_STANDARDS>
+## What Makes Frontend Code COMPLETE (not just "done")
+
+**MUST HAVE:**
+- Real data from backend API (not hardcoded)
+- Working navigation between all pages
+- Functional buttons (not placeholder onClick)
+- Working forms (submit to API)
+- Error handling (show user-friendly messages)
+- Loading states (spinners/skeletons)
+
+**NICE TO HAVE:**
+- Consistent visual design
+- Responsive layout
+- Keyboard navigation
+- Accessibility
+
+**RED FLAGS (create issue immediately):**
+- "Lorem ipsum" or "placeholder" text
+- onClick={() => {}} (empty handlers)
+- console.log left in code
+- API calls to wrong endpoints
+- Hardcoded data instead of API data
+</QUALITY_STANDARDS>
+
 <INSTRUCTIONS>
-1. Analyze the task requirements and acceptance criteria
-2. Decide which verification tools to use based on what's needed
-3. Execute the necessary checks step by step
-4. After all checks, provide your final verdict
+1. Analyze the task type and requirements
+2. Follow the verification steps for that task type
+3. Use browser tools ACTIVELY - navigate, click, fill, check
+4. Document every check performed
+5. If you find ANY issue, note it in problems
+6. After all checks, provide your final verdict
 </INSTRUCTIONS>
 
 When you've completed all verifications, respond with JSON:
