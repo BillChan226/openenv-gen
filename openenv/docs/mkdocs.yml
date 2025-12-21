@@ -64,8 +64,8 @@ markdown_extensions:
   - meta
 
 watch:
-  - ../src/openenv/core
-  - ../src/openenv/cli
+  - ../src/core
+  - ../src/openenv_cli
 
 nav:
   - Get Started:
