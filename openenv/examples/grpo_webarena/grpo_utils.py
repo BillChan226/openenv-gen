@@ -183,13 +183,15 @@ async def play_episode(idx, task_id, url, policy, tokenizer):
 
     while not done and step < MAX_STEPS:
         # Log raw observation
+        axtree = obs.axtree_txt or obs.text
         log(f"\n[Step {step+1}/{MAX_STEPS}]", 2)
-        log(f"  [Obs] url={obs.url}", 2)
-        log(f"  [Obs] axtree_len={len(obs.axtree_txt or obs.text)} chars", 2)
+        log(f"  [Obs] goal: {obs.goal}", 2)
+        log(f"  [Obs] url: {obs.url}", 2)
+        log(f"  [Obs] axtree:\n{axtree[:500]}{'...' if len(axtree) > 500 else ''}", 2)
 
         # Format prompt
-        prompt = format_prompt(obs.goal, obs.url, obs.axtree_txt or obs.text, history, step, tokenizer)
-        log(f"  [Prompt] {len(prompt)} chars", 2)
+        prompt = format_prompt(obs.goal, obs.url, axtree, history, step, tokenizer)
+        log(f"  [Prompt]\n{prompt}", 2)
 
         # ASYNC: Generate action from policy (vLLM inference)
         responses = await policy.generate.route(prompt)
@@ -199,7 +201,7 @@ async def play_episode(idx, task_id, url, policy, tokenizer):
         action = parse_action(raw_output)
 
         # Log model output
-        log(f"  [Model Output] {raw_output!r}", 2)
+        log(f"  [Model Output] {raw_output}", 2)
         log(f"  [Parsed Action] {action}", 2)
 
         history.append(action)
