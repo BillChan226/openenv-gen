@@ -68,7 +68,7 @@ ENV BROWSERGYM_PORT=8000
 ENV MINIWOB_HTML_DIR=/app/miniwob-plusplus/miniwob/html
 ENV MINIWOB_HTTP_PORT=8888
 ENV MINIWOB_URL=http://127.0.0.1:8888/miniwob/
-ENV ENABLE_WEB_INTERFACE=true
+ENV ENABLE_WEB_INTERFACE=false
 
 # For WebArena tasks, these should be set by the user when running the container:
 # ENV SHOPPING=
