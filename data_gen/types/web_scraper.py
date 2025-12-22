@@ -4,9 +4,9 @@ from PIL import Image
 from io import BytesIO
 import os
 from typing import Optional
-from .source import WebScraperSource
+from .source import DataSource
 
-class WikipediaImageScraper(WebScraperSource):
+class WikipediaImageScraper(DataSource):
     """Scrapes images from Wikipedia based on search queries."""
 
     def __init__(self, user_agent: str = "Mozilla/5.0 (Research Bot)"):

@@ -1,8 +1,8 @@
 from diffusers import FluxPipeline
 import torch
-from .source import DiffusionSource
+from .source import DataSource
 
-class FluxDiffusionSource(DiffusionSource):
+class FluxDiffusionSource(DataSource):
     """Flux diffusion model for generating images from text prompts."""
 
     def __init__(self):
