@@ -381,8 +381,9 @@ async def setup_training(config_path: str):
     log("Spawning actors and services...", 0)
 
     # ASYNC: Spawn all actors/services in parallel
+    env_cfg = cfg.get("webarena_env", {})
     env, policy, trainer, buffer, adv, ref, reward = await asyncio.gather(
-        EnvActor.options(**cfg.actors.get("webarena_env", {})).as_actor(**cfg.get("webarena_env", {})),
+        EnvActor.options(**cfg.actors.get("webarena_env", {})).as_actor(model=env_cfg.get("model", "meta-llama/Llama-3.1-8B-Instruct")),
         Generator.options(**cfg.services.policy).as_service(**cfg.policy),
         TitanTrainer.options(**cfg.actors.trainer).as_actor(**cfg.trainer, loss=simple_grpo_loss),
         ReplayBuffer.options(**cfg.actors.replay_buffer).as_actor(**cfg.replay_buffer, collate=collate),
