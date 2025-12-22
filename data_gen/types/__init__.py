@@ -3,6 +3,7 @@
 from .source import DataSource, DiffusionSource, WebScraperSource
 from .diffusion_flux import FluxDiffusionSource
 from .web_scraper import WikipediaImageScraper
+from .huggingface_dataset import HuggingFaceDatasetSource
 
 __all__ = [
     "DataSource",
@@ -10,4 +11,5 @@ __all__ = [
     "WebScraperSource",
     "FluxDiffusionSource",
     "WikipediaImageScraper",
+    "HuggingFaceDatasetSource",
 ]
