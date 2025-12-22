@@ -14,6 +14,8 @@ viewport_width = int(os.environ.get("BROWSERGYM_VIEWPORT_WIDTH", "1280"))
 viewport_height = int(os.environ.get("BROWSERGYM_VIEWPORT_HEIGHT", "720"))
 timeout = float(os.environ.get("BROWSERGYM_TIMEOUT", "10000"))
 port = int(os.environ.get("BROWSERGYM_PORT", "8000"))
+# Default to False for text-only LLMs like Llama - screenshots add ~20MB per observation
+use_screenshot = os.environ.get("BROWSERGYM_USE_SCREENSHOT", "false").lower() == "true"
 
 
 # Factory function to create BrowserGymEnvironment instances
@@ -26,6 +28,7 @@ def create_browsergym_environment():
         viewport_width=viewport_width,
         viewport_height=viewport_height,
         timeout=timeout,
+        use_screenshot=use_screenshot,
     )
 
 
