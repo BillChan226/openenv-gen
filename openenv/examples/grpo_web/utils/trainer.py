@@ -175,6 +175,7 @@ class GRPOWebTrainer:
                     all_step_results.extend(step_results)
 
                 # Create episodes from step results
+                print(f"[TRAINER DEBUG] Creating {len(all_step_results)} episodes...")
                 episodes = []
                 input_ids = torch.ones(
                     (len(all_step_results), max_req_tokens + max_res_tokens),
@@ -193,6 +194,7 @@ class GRPOWebTrainer:
                     )
 
                     # Compute shaped reward
+                    print(f"[TRAINER DEBUG] Computing reward for episode {i+1}/{len(all_step_results)}...")
                     episode.reward = await reward_actor.evaluate_response.route(
                         prompt=step_result["prompt"],
                         response=step_result["response"].text,
@@ -200,23 +202,29 @@ class GRPOWebTrainer:
                         step_count=step_result["step_count"],
                         max_steps=step_result["max_steps"],
                     )
+                    print(f"[TRAINER DEBUG] Episode {i+1} reward: {episode.reward}")
 
                     episodes.append(episode)
                     input_ids[i, :max_req_tokens] = episode.request_tensor
                     input_ids[i, max_req_tokens:] = episode.response_tensor
 
                 # Get reference model log probabilities
+                print(f"[TRAINER DEBUG] Getting ref model logprobs for {len(episodes)} episodes...")
                 ref_logprobs = await ref_model.forward.route(
                     input_ids, max_req_tokens, return_logprobs=True
                 )
+                print(f"[TRAINER DEBUG] Got ref logprobs")
                 for i, episode in enumerate(episodes):
                     episode.ref_logprobs = ref_logprobs[i]
 
                 # Compute group-relative advantages
+                print(f"[TRAINER DEBUG] Computing advantages...")
                 advantages = await compute_advantages.compute.call_one(episodes)
+                print(f"[TRAINER DEBUG] Adding episodes to replay buffer...")
                 for episode, advantage in zip(episodes, advantages):
                     episode.advantage = advantage
                     await replay_buffer.add.call_one(episode)
+                print(f"[TRAINER DEBUG] Episodes added to replay buffer")
 
                 self._rollout_count += 1
 

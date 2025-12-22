@@ -1,7 +1,7 @@
 group_size: 8
 local_batch_size: 4
 max_req_tokens: 2048
-max_res_tokens: 512
+max_res_tokens: 2048
 model: Qwen/Qwen3-8B
 model_local_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-8B
 off_by_n: 1
@@ -14,7 +14,7 @@ web_env:
   model: ${model}
   benchmark: miniwob
   task_name: click-test
-  max_steps: 15
+  max_steps: 8
 policy:
   engine_args:
     model: ${model}
@@ -39,7 +39,7 @@ trainer:
     warmup_steps: 10
   training:
     local_batch_size: ${local_batch_size}
-    seq_len: 2560
+    seq_len: 4200
     max_norm: 1.0
     steps: 2000
     dtype: bfloat16

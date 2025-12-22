@@ -16,7 +16,10 @@ ACTION_PREFIX_RE = re.compile(
     re.IGNORECASE,
 )
 # Pattern to match Qwen3 think tags (for chain-of-thought reasoning)
+# Matches both closed tags <think>...</think> and unclosed tags <think>...
 THINK_TAG_PATTERN = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+# Pattern for unclosed think tags (when response is truncated)
+UNCLOSED_THINK_PATTERN = re.compile(r"<think>.*$", re.DOTALL | re.IGNORECASE)
 
 # BrowserGym action documentation for prompts
 BROWSERGYM_ACTIONS = """
@@ -77,10 +80,10 @@ def format_web_prompt(
 
 Rules:
 1. Output exactly ONE action per turn
-2. Use element IDs (BIDs) from the page content when clicking/filling
-3. Copy element IDs exactly as shown
+2. Use element IDs (BIDs) from the page content - look for [XX] before element names
+3. Copy element IDs exactly as shown (e.g., if you see [13] button, use click('13'))
 4. If unsure, use noop() to observe
-5. No explanations, just the action"""
+5. Keep reasoning very brief, then output the action"""
 
     # Extract observation fields
     goal = observation.goal or "(not provided)"
@@ -223,13 +226,23 @@ def parse_web_action(response_text: str, fallback: str = "noop()") -> str:
     if not response_text:
         return fallback
 
+    # Check if response has an unclosed <think> tag (truncated mid-thought)
+    # In this case, the model never got to output the actual action
+    has_open_think = "<think>" in response_text.lower()
+    has_close_think = "</think>" in response_text.lower()
+
+    if has_open_think and not has_close_think:
+        # Response was truncated inside <think> section
+        # Don't try to parse action from reasoning - return fallback
+        return fallback
+
     # Strip <think>...</think> tags (Qwen3 chain-of-thought)
     # The action should be after the think tags
     clean_text = THINK_TAG_PATTERN.sub("", response_text).strip()
 
-    # If we stripped think tags and got empty, try the original
+    # If we stripped think tags and got empty, return fallback
     if not clean_text:
-        clean_text = response_text
+        return fallback
 
     # Try to find action in each line
     lines = clean_text.splitlines()

@@ -373,4 +373,16 @@ class BrowserGymEnvironment(Environment):
     def close(self) -> None:
         """Clean up environment resources."""
         if hasattr(self, "gym_env"):
-            self.gym_env.close()
+            try:
+                self.gym_env.close()
+            except Exception as e:
+                logger.warning(f"Error closing gym_env: {e}")
+                # If close fails, try to reset the global Playwright state
+                # to prevent corruption affecting future sessions
+                try:
+                    import browsergym.core
+                    if hasattr(browsergym.core, '_set_global_playwright'):
+                        browsergym.core._set_global_playwright(None)
+                        logger.info("Reset global Playwright state after close error")
+                except Exception as reset_error:
+                    logger.warning(f"Failed to reset global Playwright: {reset_error}")

@@ -23,7 +23,20 @@ port = int(os.environ.get("BROWSERGYM_PORT", "8000"))
 
 # Factory function to create BrowserGymEnvironment instances
 def create_browsergym_environment():
-    """Factory function that creates BrowserGymEnvironment with config."""
+    """Factory function that creates BrowserGymEnvironment with config.
+
+    Resets the global Playwright state before creating each environment to ensure
+    each session gets a fresh Playwright instance. This prevents greenlet thread
+    errors when sessions are closed abruptly and new sessions are created.
+    """
+    # Reset global Playwright state to ensure fresh instance per session
+    try:
+        import browsergym.core
+        if hasattr(browsergym.core, '_set_global_playwright'):
+            browsergym.core._set_global_playwright(None)
+    except Exception:
+        pass  # Ignore errors, best effort cleanup
+
     return BrowserGymEnvironment(
         benchmark=benchmark,
         task_name=task_name,

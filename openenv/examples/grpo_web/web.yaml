@@ -14,7 +14,7 @@
 group_size: 8  # Number of parallel tasks per rollout
 local_batch_size: 4  # Per-device batch size (smaller due to longer sequences)
 max_req_tokens: 2048  # Max tokens for prompt (web pages are longer than game states)
-max_res_tokens: 512  # Max tokens for response
+max_res_tokens: 2048  # Max tokens for response (Qwen3 uses <think> tags for extensive reasoning)
 model: "Qwen/Qwen3-8B"
 model_local_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-8B
 off_by_n: 1  # Off-policy tolerance
@@ -33,7 +33,7 @@ web_env:
   model: ${model}
   benchmark: "miniwob"
   task_name: "click-test"  # Start with simple task
-  max_steps: 15  # Max steps per episode
+  max_steps: 8  # Max steps per episode
 
 # Policy configuration
 policy:
@@ -62,7 +62,7 @@ trainer:
     warmup_steps: 10
   training:
     local_batch_size: ${local_batch_size}
-    seq_len: 2560  # Longer sequences for web pages (max_req + max_res + buffer)
+    seq_len: 4200  # Longer sequences for web pages (max_req + max_res + buffer)
     max_norm: 1.0
     steps: 2000  # More steps needed for web navigation
     dtype: bfloat16
