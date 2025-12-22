@@ -90,6 +90,6 @@ if __name__ == "__main__":
 
     # Test 3: HuggingFace Dataset Source
     dataset_queries = [
-        "imdb:train",  # IMDB movie reviews dataset (train split)
+        "imdb:train",
     ]
     test_huggingface_source(dataset_queries, output_dir)
