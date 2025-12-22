@@ -1,0 +1,125 @@
+group_size: 8
+local_batch_size: 4
+max_req_tokens: 2048
+max_res_tokens: 512
+model: Qwen/Qwen3-8B
+model_local_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-8B
+off_by_n: 1
+rollout_threads: 1
+metric_logging:
+  console:
+    logging_mode: global_reduce
+web_env:
+  server_url: http://localhost:8005
+  model: ${model}
+  benchmark: miniwob
+  task_name: click-test
+  max_steps: 15
+policy:
+  engine_args:
+    model: ${model}
+    tensor_parallel_size: 1
+    pipeline_parallel_size: 1
+    enforce_eager: false
+  sampling_params:
+    'n': 1
+    max_tokens: ${max_res_tokens}
+    temperature: 0.7
+    top_p: 0.95
+trainer:
+  model:
+    name: qwen3
+    flavor: 8B
+    hf_assets_path: ${model_local_path}
+  optimizer:
+    name: AdamW
+    lr: 5.0e-06
+    eps: 1.0e-08
+  lr_scheduler:
+    warmup_steps: 10
+  training:
+    local_batch_size: ${local_batch_size}
+    seq_len: 2560
+    max_norm: 1.0
+    steps: 2000
+    dtype: bfloat16
+    gc_freq: 1
+  compile:
+    enable: false
+  parallelism:
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: 1
+    tensor_parallel_degree: 1
+    pipeline_parallel_degree: 1
+    context_parallel_degree: 1
+    expert_parallel_degree: 1
+    disable_loss_parallel: true
+  checkpoint:
+    enable: true
+    folder: ./checkpoint
+    initial_load_path: ${model_local_path}
+    initial_load_in_hf: true
+    last_save_in_hf: true
+    interval: 500
+    async_mode: disabled
+  activation_checkpoint:
+    mode: selective
+    selective_ac_option: op
+replay_buffer:
+  batch_size: ${local_batch_size}
+  max_policy_age: ${off_by_n}
+  dp_size: ${trainer.parallelism.data_parallel_shard_degree}
+ref_model:
+  model:
+    name: qwen3
+    flavor: 8B
+    hf_assets_path: ${model_local_path}
+  training:
+    seq_len: ${trainer.training.seq_len}
+    dtype: bfloat16
+    gc_freq: 1
+  compile:
+    enable: false
+  parallelism:
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: 1
+    tensor_parallel_degree: 1
+    pipeline_parallel_degree: 1
+    context_parallel_degree: 1
+    expert_parallel_degree: 1
+  checkpoint:
+    enable: true
+    initial_load_path: ${model_local_path}
+    initial_load_in_hf: true
+services:
+  policy:
+    procs: ${policy.engine_args.tensor_parallel_size}
+    num_replicas: 1
+    mesh_name: policy
+    with_gpus: true
+  ref_model:
+    procs: 1
+    num_replicas: 1
+    mesh_name: ref_model
+    with_gpus: true
+actors:
+  web_env:
+    procs: 1
+    with_gpus: false
+    mesh_name: web_env
+  trainer:
+    procs: 1
+    with_gpus: true
+    mesh_name: trainer
+  replay_buffer:
+    procs: 1
+    with_gpus: false
+    mesh_name: replay_buffer
+  compute_advantages:
+    procs: 1
+    with_gpus: false
+    mesh_name: compute_advantages
+  reward_actor:
+    procs: 1
+    with_gpus: false
+    mesh_name: reward_actor

@@ -1,8 +1,13 @@
-"""FastAPI server for the BrowserGym environment."""
+"""FastAPI server for the BrowserGym environment.
+
+Uses http_server_sessionworker which provides dedicated worker threads per session
+for Playwright/greenlet compatibility.
+"""
 
 import os
 
-from openenv.core.env_server.http_server import create_app
+# Use the sessionworker version for Playwright compatibility
+from openenv.core.env_server.http_server_sessionworker import create_app
 from browsergym_env.models import BrowserGymAction, BrowserGymObservation
 from browsergym_env.server.browsergym_environment import BrowserGymEnvironment
 

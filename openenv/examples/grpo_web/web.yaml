@@ -1,0 +1,155 @@
+# Web Agent GRPO Training Configuration
+# >>> python -m examples.grpo_web.train --config examples/grpo_web/web.yaml
+#
+# Prerequisites:
+# 1. Build and start BrowserGym Docker container:
+#    cd openenv/envs/browsergym_env/server
+#    docker build -t browsergym-env:latest .
+#    docker run -p 8005:8000 -e BROWSERGYM_BENCHMARK=miniwob -e BROWSERGYM_TASK_NAME=click-test browsergym-env:latest
+#
+# 2. Run training:
+#    python -m examples.grpo_web.train --config examples/grpo_web/web.yaml
+
+# Global configuration
+group_size: 8  # Number of parallel tasks per rollout
+local_batch_size: 4  # Per-device batch size (smaller due to longer sequences)
+max_req_tokens: 2048  # Max tokens for prompt (web pages are longer than game states)
+max_res_tokens: 512  # Max tokens for response
+model: "Qwen/Qwen3-8B"
+model_local_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-8B
+off_by_n: 1  # Off-policy tolerance
+
+# Main loop configuration
+rollout_threads: 1  # Number of parallel rollout threads
+
+# Observability configuration
+metric_logging:
+  console:
+    logging_mode: global_reduce
+
+# Web environment configuration (BrowserGym)
+web_env:
+  server_url: "http://localhost:8005"
+  model: ${model}
+  benchmark: "miniwob"
+  task_name: "click-test"  # Start with simple task
+  max_steps: 15  # Max steps per episode
+
+# Policy configuration
+policy:
+  engine_args:  # https://docs.vllm.ai/en/v0.10.0/api/vllm/engine/arg_utils.html
+    model: ${model}
+    tensor_parallel_size: 1
+    pipeline_parallel_size: 1
+    enforce_eager: false
+  sampling_params:  # https://docs.vllm.ai/en/v0.10.0/api/vllm/sampling_params.html
+    n: 1  # Generate 1 response per observation
+    max_tokens: ${max_res_tokens}
+    temperature: 0.7  # Lower temperature for more focused actions
+    top_p: 0.95
+
+# Trainer configuration
+trainer:
+  model:
+    name: qwen3
+    flavor: 8B
+    hf_assets_path: ${model_local_path}
+  optimizer:
+    name: AdamW
+    lr: 5e-6  # Lower LR for web tasks (more complex)
+    eps: 1e-8
+  lr_scheduler:
+    warmup_steps: 10
+  training:
+    local_batch_size: ${local_batch_size}
+    seq_len: 2560  # Longer sequences for web pages (max_req + max_res + buffer)
+    max_norm: 1.0
+    steps: 2000  # More steps needed for web navigation
+    dtype: bfloat16
+    gc_freq: 1
+  compile:
+    enable: false
+  parallelism:
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: 1
+    tensor_parallel_degree: 1
+    pipeline_parallel_degree: 1
+    context_parallel_degree: 1
+    expert_parallel_degree: 1
+    disable_loss_parallel: true
+  checkpoint:
+    enable: true
+    folder: ./checkpoint
+    initial_load_path: ${model_local_path}
+    initial_load_in_hf: true
+    last_save_in_hf: true
+    interval: 500
+    async_mode: "disabled"
+  activation_checkpoint:
+    mode: selective
+    selective_ac_option: op
+
+# Replay buffer configuration
+replay_buffer:
+  batch_size: ${local_batch_size}
+  max_policy_age: ${off_by_n}
+  dp_size: ${trainer.parallelism.data_parallel_shard_degree}
+
+# Reference model configuration
+ref_model:
+  model:
+    name: qwen3
+    flavor: 8B
+    hf_assets_path: ${model_local_path}
+  training:
+    seq_len: ${trainer.training.seq_len}
+    dtype: bfloat16
+    gc_freq: 1
+  compile:
+    enable: false
+  parallelism:
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: 1
+    tensor_parallel_degree: 1
+    pipeline_parallel_degree: 1
+    context_parallel_degree: 1
+    expert_parallel_degree: 1
+  checkpoint:
+    enable: true
+    initial_load_path: ${model_local_path}
+    initial_load_in_hf: true
+
+# All resource allocations
+services:
+  policy:
+    procs: ${policy.engine_args.tensor_parallel_size}
+    num_replicas: 1
+    mesh_name: policy
+    with_gpus: true
+  ref_model:
+    procs: 1
+    num_replicas: 1
+    mesh_name: ref_model
+    with_gpus: true
+
+actors:
+  web_env:
+    procs: 1
+    with_gpus: false
+    mesh_name: web_env
+  trainer:
+    procs: 1
+    with_gpus: true
+    mesh_name: trainer
+  replay_buffer:
+    procs: 1
+    with_gpus: false
+    mesh_name: replay_buffer
+  compute_advantages:
+    procs: 1
+    with_gpus: false
+    mesh_name: compute_advantages
+  reward_actor:
+    procs: 1
+    with_gpus: false
+    mesh_name: reward_actor

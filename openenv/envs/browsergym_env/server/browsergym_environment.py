@@ -8,6 +8,7 @@ with OpenEnv's Environment ABC. BrowserGym includes multiple benchmarks:
 - WorkArena: Enterprise task automation
 """
 
+import asyncio
 import importlib
 import logging
 from typing import Any, Dict, Optional

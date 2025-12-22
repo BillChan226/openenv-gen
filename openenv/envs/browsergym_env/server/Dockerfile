@@ -33,14 +33,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy environment files first (for better caching)
-COPY . .
+# Copy openenv-core source first (for http_server fix)
+COPY src/openenv /app/openenv-core/src/openenv
+COPY pyproject.toml /app/openenv-core/pyproject.toml
+
+# Copy environment files
+COPY envs/browsergym_env /app/env
 
 # Make start script executable
 RUN chmod +x /app/env/server/start.sh
 
+# Install openenv-core from local source (includes http_server fix)
+RUN pip install --no-cache-dir -e /app/openenv-core
+
 # Install Python dependencies using pip install -e . (from pyproject.toml)
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir -e /app/env
 
 # Install Playwright browsers (Chromium by default)
 # Use python -m since playwright command might not be in PATH
