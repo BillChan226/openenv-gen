@@ -11,10 +11,10 @@
 #    python -m examples.grpo_web.train --config examples/grpo_web/web.yaml
 
 # Global configuration
-group_size: 8  # Number of parallel tasks per rollout
-local_batch_size: 4  # Per-device batch size (smaller due to longer sequences)
-max_req_tokens: 2048  # Max tokens for prompt (web pages are longer than game states)
-max_res_tokens: 2048  # Max tokens for response (Qwen3 uses <think> tags for extensive reasoning)
+group_size: 8  # Number of parallel tasks per rollout (reduced to avoid OOM with multi-step tasks)
+local_batch_size: 4  # Per-device batch size (smaller due to longer sequences and more steps)
+max_req_tokens: 2048  # Max tokens for prompt 
+max_res_tokens: 1024  # Max tokens for response 
 model: "Qwen/Qwen3-1.7B"
 model_local_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
 off_by_n: 1  # Off-policy tolerance
@@ -26,14 +26,24 @@ rollout_threads: 1  # Number of parallel rollout threads
 metric_logging:
   console:
     logging_mode: global_reduce
+  wandb:
+    project: "grpo-web"
+    name: "miniwob-medium-5tasks"
+    logging_mode: global_reduce
 
 # Web environment configuration (BrowserGym)
 web_env:
   server_url: "http://localhost:8005"
   model: ${model}
   benchmark: "miniwob"
-  task_name: "click-test"  # Start with simple task
-  max_steps: 8  # Max steps per episode
+  task_name: "click-test"  # Default task (fallback if task_pool is empty)
+  max_steps: 10  # Max steps per episode
+  # Task pool - randomly sample tasks during training for better generalization
+  # Options: "easy" (22 tasks), "medium" (50 tasks), "hard" (63 tasks), "all" (~125 tasks)
+  # Or specify a list directly: ["click-test", "click-button", "enter-text"]
+  # task_pool: "easy"  # Start with easy tasks for curriculum learning
+  # task_pool: ["click-test"]  # Single task for debugging
+  task_pool: ["enter-text", "click-button-sequence", "click-checkboxes", "choose-list", "focus-text"]
 
 # Policy configuration
 policy:
@@ -109,7 +119,7 @@ ref_model:
   parallelism:
     data_parallel_replicate_degree: 1
     data_parallel_shard_degree: 1
-    tensor_parallel_degree: 1
+    tensor_parallel_degree: 2  # Use 2 GPUs (policy=1 + trainer=1 + ref_model=2 = 4 total)
     pipeline_parallel_degree: 1
     context_parallel_degree: 1
     expert_parallel_degree: 1
@@ -126,7 +136,7 @@ services:
     mesh_name: policy
     with_gpus: true
   ref_model:
-    procs: 1
+    procs: 2  # Match tensor_parallel_degree (policy=1 + trainer=1 + ref_model=2 = 4 total GPUs)
     num_replicas: 1
     mesh_name: ref_model
     with_gpus: true

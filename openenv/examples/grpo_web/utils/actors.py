@@ -252,7 +252,7 @@ class WebEnvActor(ForgeActor):
         print(f"  Server: {self.server_url}")
         print(f"  Model: {self.model}")
         print(f"  Benchmark: {self.benchmark}")
-        print(f"  Task: {self.task_name}")
+        print(f"  (Task selection handled by trainer task_pool)")
 
     def _get_tokenizer(self):
         """Get the cached tokenizer instance (internal helper)."""

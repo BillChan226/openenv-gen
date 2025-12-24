@@ -156,9 +156,9 @@ class GRPOWebTrainer:
             if not task_pool:
                 print(f"Warning: Unknown task_pool '{task_pool_cfg}', using default task")
                 task_pool = [default_task_name]
-        elif isinstance(task_pool_cfg, list):
-            # Direct list of task names
-            task_pool = task_pool_cfg
+        elif hasattr(task_pool_cfg, '__iter__') and not isinstance(task_pool_cfg, str):
+            # Direct list of task names (handles both list and OmegaConf ListConfig)
+            task_pool = list(task_pool_cfg)
         else:
             task_pool = [default_task_name]
 
@@ -183,9 +183,11 @@ class GRPOWebTrainer:
             while not self._shutdown_event.is_set():
                 all_step_results = []
 
-                # Play a group of tasks
+                # Play a group of tasks (randomly sample from task pool)
                 for task_idx in range(group_size):
                     task_id = str(uuid.uuid4())[:8]
+                    # Randomly sample a task from the pool
+                    current_task = random.choice(task_pool)
                     step_results = await play_web_task(
                         task_idx=task_idx,
                         task_id=task_id,
@@ -196,7 +198,7 @@ class GRPOWebTrainer:
                         rollout_count=self._rollout_count,
                         max_steps=max_steps,
                         benchmark=benchmark,
-                        task_name=task_name,
+                        task_name=current_task,
                     )
                     all_step_results.extend(step_results)
 
@@ -429,6 +431,10 @@ async def setup_forge_training(config_path: str) -> GRPOWebTrainer:
     print("")
     print("  Initializing services...")
 
+    # Filter web_env config for WebEnvActor (remove task_pool which is only used in trainer)
+    web_env_cfg = dict(cfg.get("web_env", {}))
+    web_env_cfg.pop("task_pool", None)  # task_pool is handled in GRPOWebTrainer.run()
+
     # Start all services concurrently
     (
         env_actor,
@@ -441,7 +447,7 @@ async def setup_forge_training(config_path: str) -> GRPOWebTrainer:
     ) = await asyncio.gather(
         WebEnvActor.options(
             **cfg.actors.get("web_env", cfg.actors.get("env_actor", {}))
-        ).as_actor(**cfg.get("web_env", {})),
+        ).as_actor(**web_env_cfg),
         Generator.options(**cfg.services.policy).as_service(**cfg.policy),
         RLTrainer.options(**cfg.actors.trainer).as_actor(
             **cfg.trainer, loss=simple_grpo_loss

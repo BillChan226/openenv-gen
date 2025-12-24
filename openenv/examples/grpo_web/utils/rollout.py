@@ -111,9 +111,9 @@ async def play_web_task(
         env.connect()
         print(f"  [DEBUG] WebSocket connected successfully")
 
-        # Reset environment
-        print(f"  [DEBUG] Calling env.reset()...")
-        result = env.reset()
+        # Reset environment with specific task
+        print(f"  [DEBUG] Calling env.reset(task_name={task_name})...")
+        result = env.reset(task_name=task_name)
         print(f"  [DEBUG] env.reset() completed")
         obs = result.observation
         done = False
@@ -146,10 +146,8 @@ async def play_web_task(
             print(f"  [DEBUG] Step {step_num + 1} - policy.generate.route() completed")
             response = responses[0]
 
-            # Log model output (show more for debugging)
-            response_preview = response.text[:200] + "..." if len(response.text) > 200 else response.text
-            task_log(f"Model output: '{response_preview}'")
-            print(f"  [DEBUG] Step {step_num + 1} - model output: '{response_preview}'")
+            # Log model output (show full output for debugging)
+            task_log(f"Model output: '{response.text}'")
 
             # Parse action from model output
             action_str = parse_web_action(response.text)

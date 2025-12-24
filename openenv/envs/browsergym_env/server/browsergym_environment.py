@@ -211,11 +211,30 @@ class BrowserGymEnvironment(Environment):
 
         Args:
             seed: Random seed for reproducibility
-            task_name: Override task name for this episode
+            task_name: Override task name for this episode. If different from
+                      current task, will recreate the gym environment.
 
         Returns:
             Initial observation for the task
         """
+        # Check if we need to switch tasks (requires recreating gym environment)
+        new_task = task_name or self.task_name
+        current_task = self._state.task_name if hasattr(self, '_state') else None
+
+        # If task changed, close existing gym_env and update config
+        if new_task and new_task != current_task:
+            if self.gym_env is not None:
+                # Task changed - close old environment
+                logger.info(f"Switching task from '{current_task}' to '{new_task}'")
+                try:
+                    self.gym_env.close()
+                except Exception as e:
+                    logger.warning(f"Error closing gym_env during task switch: {e}")
+                self.gym_env = None
+            # Update task config BEFORE creating gym_env
+            self.task_name = new_task
+            self.env_id = f"browsergym/{self.benchmark}.{new_task}"
+
         # Lazily create gym_env in the current thread (executor thread)
         self._ensure_gym_env()
 
@@ -224,7 +243,7 @@ class BrowserGymEnvironment(Environment):
             episode_id=str(uuid4()),
             step_count=0,
             benchmark=self.benchmark,
-            task_name=task_name or self.task_name or "",
+            task_name=new_task or "",
         )
 
         # Reset options
