@@ -6,6 +6,7 @@ Used by both the tutorial notebook and the full training script.
 """
 
 import asyncio
+import sys
 import time
 import uuid
 from dataclasses import dataclass
@@ -13,10 +14,20 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+# Add src to path for openenv imports
+_src_path = Path(__file__).parent.parent.parent / "src"
+if _src_path.exists() and str(_src_path) not in sys.path:
+    sys.path.insert(0, str(_src_path))
+
+# Add openenv root to path for envs imports
+_openenv_root = Path(__file__).parent.parent.parent
+if str(_openenv_root) not in sys.path:
+    sys.path.insert(0, str(_openenv_root))
+
 import torch
 import torch.nn.functional as F
 import torchstore as ts
-from omegaConf import DictConfig
+from omegaconf import DictConfig
 
 from envs.openspiel_env import OpenSpielAction, OpenSpielEnv
 from forge.actors._torchstore_utils import (
@@ -580,6 +591,101 @@ def play_heuristic_policy(server_url: str, num_games: int = 100):
     return play_random_policy(server_url, num_games)  # Placeholder
 
 
+async def evaluate_policy(
+    server_url: str,
+    policy,
+    tokenizer,
+    num_games: int = 20,
+    temperature: float = 0.1,
+) -> dict:
+    """
+    Evaluate the trained policy by playing games with low temperature (greedy).
+
+    Args:
+        server_url: OpenEnv server URL
+        policy: Generator policy service
+        tokenizer: Tokenizer for prompt formatting
+        num_games: Number of games to evaluate
+        temperature: Sampling temperature (low = more greedy)
+
+    Returns:
+        dict with evaluation statistics
+    """
+    wins = losses = pushes = 0
+    total_steps = 0
+    games_played = 0
+
+    for game_idx in range(num_games):
+        env = None
+        try:
+            # Create fresh connection for each game
+            env = OpenSpielEnv(base_url=server_url)
+            result = env.reset()
+            done = False
+            step_num = 0
+            action_history = []
+
+            while not done and step_num < 10:
+                # Format prompt
+                prompt = format_prompt(step_num, action_history, tokenizer)
+
+                # Generate action with low temperature (greedy-ish)
+                responses = await policy.generate.route(
+                    prompt,
+                    temperature=temperature,
+                    max_tokens=32,
+                )
+                response = responses[0]
+
+                # Parse action
+                action_id = parse_action(response.text, result.observation.legal_actions)
+                action_name = "HIT" if action_id == 0 else "STAND"
+                action_history.append((action_id, action_name))
+
+                # Take action
+                result = env.step(OpenSpielAction(action_id=action_id, game_name="blackjack"))
+                done = result.done
+                step_num += 1
+
+            total_steps += step_num
+            games_played += 1
+
+            # Count outcome
+            if result.reward > 0:
+                wins += 1
+            elif result.reward < 0:
+                losses += 1
+            else:
+                pushes += 1
+
+        except Exception as e:
+            # Skip failed games but continue evaluation
+            print(f"   ⚠️ Eval game {game_idx + 1} failed: {e}")
+            continue
+
+        finally:
+            if env is not None:
+                try:
+                    env.close()
+                except Exception:
+                    pass
+            # Small delay to avoid overwhelming the server
+            await asyncio.sleep(0.05)
+
+    # Use games_played instead of num_games for accurate stats
+    win_rate = wins / games_played if games_played > 0 else 0
+    avg_steps = total_steps / games_played if games_played > 0 else 0
+
+    return {
+        "wins": wins,
+        "losses": losses,
+        "pushes": pushes,
+        "win_rate": win_rate,
+        "total_games": games_played,
+        "avg_steps": avg_steps,
+    }
+
+
 # ============================================================================
 # Forge Training Abstraction (Hides Complexity)
 # ============================================================================
@@ -716,6 +822,10 @@ class GRPOTrainer:
                 win_rate = wins / len(episodes) if episodes else 0
                 print(f"📊 Rollout {rollout_count}: {len(episodes)} episodes, Win rate: {win_rate:.1%}")
 
+                # Log to wandb
+                record_metric("train/win_rate", win_rate, Reduce.MEAN)
+                record_metric("train/episodes_per_rollout", len(episodes), Reduce.MEAN)
+
         # Training loop (copy-pasted from blackjack_main_fixed.py)
         async def continuous_training():
             training_step = 0
@@ -850,3 +960,42 @@ async def setup_forge_training(config_path: str) -> GRPOTrainer:
     }
 
     return GRPOTrainer(services, cfg)
+
+
+# ============================================================================
+# Main Entry Point
+# ============================================================================
+
+
+async def main(config_path: str, steps: int):
+    """
+    Main entry point for running GRPO training.
+
+    Args:
+        config_path: Path to YAML config file
+        steps: Number of training steps
+    """
+    print(f"BlackJack GRPO Training")
+    print(f"Config: {config_path}")
+    print(f"Steps: {steps}")
+    print("")
+
+    trainer = await setup_forge_training(config_path)
+    await trainer.run(steps=steps)
+    await trainer.shutdown()
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="BlackJack GRPO Training")
+    parser.add_argument("--config", type=str, default="blackjack.yaml", help="Path to config file")
+    parser.add_argument("--steps", type=int, default=100, help="Number of training steps")
+    args = parser.parse_args()
+
+    # Resolve config path
+    config = Path(args.config)
+    if not config.is_absolute():
+        config = Path(__file__).parent / config
+
+    asyncio.run(main(str(config), args.steps))

@@ -11,7 +11,7 @@
 # It includes the minimal dependencies needed to run HTTP environment servers
 # and uv for fast dependency management.
 #
-# Build from repo root: docker build -t openenv-base:latest -f src/core/containers/images/Dockerfile .
+# Build from repo root: docker build -t openenv-base:latest -f src/openenv/core/containers/images/Dockerfile .
 # Tag:   docker tag openenv-base:latest openenv-base:0.2.0
 #
 
@@ -21,7 +21,7 @@ FROM ghcr.io/astral-sh/uv:0.5.27-python3.11-bookworm-slim AS builder
 WORKDIR /app
 
 # Copy core pyproject.toml and lockfile for dependency installation
-COPY src/core/pyproject.toml src/core/uv.lock* ./
+COPY pyproject.toml uv.lock* ./
 
 # Install core dependencies using uv with cache mount
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -46,6 +46,12 @@ COPY --from=builder /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/
 
 # Copy installed Python packages from builder
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+
+# Copy all Python entry point scripts (uvicorn, typer, etc.) from builder
+# Using a pattern to copy all installed scripts
+RUN --mount=from=builder,source=/usr/local/bin,target=/builder-bin \
+    cp /builder-bin/uvicorn /usr/local/bin/ 2>/dev/null || true && \
+    cp /builder-bin/typer /usr/local/bin/ 2>/dev/null || true
 
 # Set working directory
 WORKDIR /app

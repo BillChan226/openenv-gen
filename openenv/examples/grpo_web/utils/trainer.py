@@ -6,6 +6,7 @@ all Forge infrastructure and exposes a simple API for training.
 """
 
 import asyncio
+import random
 import time
 import uuid
 from typing import Any, Dict, List, Optional
@@ -24,12 +25,14 @@ from forge.actors.replay_buffer import ReplayBuffer
 from forge.actors.trainer import RLTrainer
 from forge.controller.provisioner import init_provisioner, shutdown
 from forge.observability.metric_actors import get_or_create_metric_logger
+from forge.observability.metrics import Reduce, record_metric
 from forge.types import LauncherConfig, ProvisionerConfig
 
 from .data import Episode, collate
 from .loss import simple_grpo_loss
 from .actors import WebReward, ComputeAdvantages, WebEnvActor
 from .rollout import play_web_task, setup_task_logger
+from .tasks import get_tasks_by_category, MINIWOB_ALL_TASKS_UNIQUE
 
 
 async def drop_weights(version: int) -> None:
@@ -139,8 +142,31 @@ class GRPOWebTrainer:
         web_env_cfg = self._cfg.get("web_env", {})
         server_url = web_env_cfg.get("server_url", "http://localhost:8005")
         benchmark = web_env_cfg.get("benchmark", "miniwob")
-        task_name = web_env_cfg.get("task_name", "click-test")
+        default_task_name = web_env_cfg.get("task_name", "click-test")
         max_steps = web_env_cfg.get("max_steps", 15)
+
+        # Build task pool for random sampling during training
+        task_pool_cfg = web_env_cfg.get("task_pool", None)
+        if task_pool_cfg is None:
+            # No task pool specified, use single task
+            task_pool = [default_task_name]
+        elif isinstance(task_pool_cfg, str):
+            # String like "easy", "medium", "hard", "all"
+            task_pool = get_tasks_by_category(task_pool_cfg)
+            if not task_pool:
+                print(f"Warning: Unknown task_pool '{task_pool_cfg}', using default task")
+                task_pool = [default_task_name]
+        elif isinstance(task_pool_cfg, list):
+            # Direct list of task names
+            task_pool = task_pool_cfg
+        else:
+            task_pool = [default_task_name]
+
+        print(f"Task pool: {len(task_pool)} tasks")
+        if len(task_pool) <= 10:
+            print(f"  Tasks: {task_pool}")
+        else:
+            print(f"  First 10: {task_pool[:10]}...")
 
         task_log = setup_task_logger()
 
@@ -201,6 +227,7 @@ class GRPOWebTrainer:
                         task_reward=step_result["final_reward"],
                         step_count=step_result["step_count"],
                         max_steps=step_result["max_steps"],
+                        had_error=step_result.get("had_error", False),
                     )
                     print(f"[TRAINER DEBUG] Episode {i+1} reward: {episode.reward}")
 
@@ -239,6 +266,11 @@ class GRPOWebTrainer:
                     f"success rate: {success_rate:.1%}, "
                     f"avg reward: {avg_reward:.2f}"
                 )
+
+                # Log to wandb
+                record_metric("train/success_rate", success_rate, Reduce.MEAN)
+                record_metric("train/avg_reward", avg_reward, Reduce.MEAN)
+                record_metric("train/episodes_per_rollout", len(episodes), Reduce.MEAN)
 
         async def continuous_training():
             """Training loop: sample and update policy."""
@@ -419,7 +451,7 @@ async def setup_forge_training(config_path: str) -> GRPOWebTrainer:
         ),
         ComputeAdvantages.options(**cfg.actors.compute_advantages).as_actor(),
         ReferenceModel.options(**cfg.services.ref_model).as_service(**cfg.ref_model),
-        WebReward.options(**cfg.actors.reward_actor).as_actor(),
+        WebReward.options(**cfg.services.reward_actor).as_service(),
     )
 
     print("  [OK] All services initialized")

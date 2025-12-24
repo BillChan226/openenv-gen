@@ -15,8 +15,8 @@ group_size: 8  # Number of parallel tasks per rollout
 local_batch_size: 4  # Per-device batch size (smaller due to longer sequences)
 max_req_tokens: 2048  # Max tokens for prompt (web pages are longer than game states)
 max_res_tokens: 2048  # Max tokens for response (Qwen3 uses <think> tags for extensive reasoning)
-model: "Qwen/Qwen3-8B"
-model_local_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-8B
+model: "Qwen/Qwen3-1.7B"
+model_local_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
 off_by_n: 1  # Off-policy tolerance
 
 # Main loop configuration
@@ -52,7 +52,7 @@ policy:
 trainer:
   model:
     name: qwen3
-    flavor: 8B
+    flavor: 1.7B
     hf_assets_path: ${model_local_path}
   optimizer:
     name: AdamW
@@ -79,7 +79,6 @@ trainer:
     disable_loss_parallel: true
   checkpoint:
     enable: true
-    folder: ./checkpoint
     initial_load_path: ${model_local_path}
     initial_load_in_hf: true
     last_save_in_hf: true
@@ -99,7 +98,7 @@ replay_buffer:
 ref_model:
   model:
     name: qwen3
-    flavor: 8B
+    flavor: 1.7B
     hf_assets_path: ${model_local_path}
   training:
     seq_len: ${trainer.training.seq_len}
@@ -131,6 +130,11 @@ services:
     num_replicas: 1
     mesh_name: ref_model
     with_gpus: true
+  reward_actor:
+    procs: 1
+    num_replicas: 1
+    mesh_name: reward_actor
+    with_gpus: false
 
 actors:
   web_env:
@@ -149,7 +153,3 @@ actors:
     procs: 1
     with_gpus: false
     mesh_name: compute_advantages
-  reward_actor:
-    procs: 1
-    with_gpus: false
-    mesh_name: reward_actor
