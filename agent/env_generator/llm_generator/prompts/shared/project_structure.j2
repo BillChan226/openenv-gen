@@ -1,0 +1,97 @@
+# Project Structure Reference
+
+## Standard Web Environment Structure
+
+```
+{{ project_name }}/
+
+  design/                          # Design documents
+    spec.json                      # Project specification
+    api_contracts.md               # API endpoint definitions
+    components.md                  # UI component inventory
+
+  app/
+    frontend/                      # React + Vite application
+      public/
+        favicon.ico
+      src/
+        components/
+          ui/                      # Basic UI: Button, Input, Card, Modal
+          features/                # Business: specific to this app
+        layouts/                   # MainLayout, Header, Sidebar, Footer
+        pages/                     # Dashboard, Login, Settings, etc.
+        hooks/                     # useAuth, useFetch, etc.
+        services/                  # api.js, auth.js
+        stores/                    # State: context or zustand
+        styles/                    # index.css, theme.css
+        utils/                     # helpers, formatters
+        App.jsx
+        main.jsx
+      index.html
+      package.json
+      vite.config.js
+      Dockerfile
+
+    backend/                       # Express.js API
+      src/
+        config/                    # env.js, database.js, auth.js
+        controllers/               # Request handlers
+        middleware/                # auth, errorHandler, validation
+        models/                    # Sequelize models
+        routes/                    # index.js, auth.js, users.js
+        services/                  # Business logic
+        utils/                     # Helpers
+        app.js                     # Express app setup
+        server.js                  # Server entry point
+      package.json
+      Dockerfile
+
+    database/                      # PostgreSQL
+      init/
+        01_schema.sql              # Table definitions
+        02_seed.sql                # Initial data
+      Dockerfile
+
+  env/                             # OpenEnv Adapter
+    models.py                      # WebAction, WebObservation, WebState
+    client.py                      # WebEnvClient
+    openenv.yaml                   # Environment configuration
+    pyproject.toml
+    server/
+      environment.py               # Environment logic
+      app.py                       # FastAPI app
+      Dockerfile
+
+  docker/
+    docker-compose.yml             # Production config
+    docker-compose.dev.yml         # Development config
+
+  config.yaml                      # Project configuration
+```
+
+## Key Conventions
+
+### Frontend
+- Use JSX (not TSX) for components
+- All layouts in `layouts/` - never create `layout/`, `Layout/`, or `components/layout/`
+- Pages are route components in `pages/`
+- Shared UI in `components/ui/`
+- Feature-specific components in `components/features/`
+
+### Backend
+- CommonJS (require/module.exports) not ESM
+- Routes mounted under `/api`
+- Health check at `/health`
+- Models use Sequelize
+- Authentication via JWT
+
+### Database
+- PostgreSQL 15+
+- Schema in numbered SQL files
+- Seed data for development
+
+### Docker
+- Backend on port 5001
+- Frontend on port 3000
+- Database on port 5432
+

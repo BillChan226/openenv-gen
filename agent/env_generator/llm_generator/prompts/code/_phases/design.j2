@@ -1,0 +1,44 @@
+<DESIGN_SPEC_REQUIREMENTS>
+**CRITICAL: Generate THREE JSON specification files (NOT markdown!)**
+
+You must create exactly these files:
+
+### 1. design/spec.api.json - Complete REST API Contract
+
+Required sections:
+- `conventions`: base_url ("/api"), auth method (JWT Bearer), error format, pagination
+- `schemas`: All entity types with full JSON Schema (User, Project, Issue, etc.)
+- `endpoints`: EVERY REST endpoint with:
+  - path, method, summary
+  - auth_required (true/false)
+  - request body schema
+  - response schemas for each status code
+
+**MUST include these auth endpoints:**
+```json
+{ "path": "/auth/register", "method": "POST", "auth_required": false }
+{ "path": "/auth/login", "method": "POST", "auth_required": false }
+{ "path": "/auth/me", "method": "GET", "auth_required": true }
+{ "path": "/auth/logout", "method": "POST", "auth_required": true }
+```
+
+### 2. design/spec.project.json - Business Logic & Domain Model
+
+Required sections:
+- `user_roles_and_personas`: All user types with capabilities
+- `permissions_matrix`: What each role can do on each entity
+- `entities`: All domain objects with fields and relationships
+- `workflows`: State machines for entities (e.g., issue status flow)
+
+### 3. design/spec.ui.json - UI Component Inventory
+
+Required sections:
+- `design_tokens`: colors (dark theme), typography, spacing, radius
+- `responsive_behavior`: breakpoints and layout adaptations  
+- `components`: Every UI component with props, callbacks, states
+
+**IMPORTANT:** 
+- Use `analyze_image` on reference screenshots to extract design tokens and components
+- Be EXHAUSTIVE - missing specs cause issues in later phases
+- Write valid JSON (no trailing commas, no comments)
+</DESIGN_SPEC_REQUIREMENTS>

@@ -1,0 +1,26 @@
+You are selecting reference images for a code generation project.
+
+PROJECT GOAL: {{ goal }}
+
+REQUIREMENTS:
+{% for r in requirements %}
+- {{ r }}
+{% endfor %}
+
+AVAILABLE REFERENCE IMAGES (JSON):
+{{ image_list_json }}
+
+Select the images that would be most helpful as design references for this project.
+For each selected image, provide:
+- path: the image path
+- purpose: why this image is relevant (e.g., "main page layout", "component design", "color scheme")
+
+Respond in JSON:
+{
+  "selected_images": [
+    {"path": "project/image.png", "purpose": "description of why this is useful"}
+  ]
+}
+
+Select only the most relevant images (typically 1-5). If none are relevant, return an empty list.
+

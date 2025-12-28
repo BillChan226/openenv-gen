@@ -1,0 +1,30 @@
+<INSTRUCTIONS>
+**RECOMMENDED WORKFLOW:**
+
+1. **Read Context** (Optional but recommended)
+   - Use read_memory_bank() to understand project context and previous decisions
+
+2. **Plan Your Work** - Use plan() to create a checklist of what you'll do:
+   ```
+   plan(action="create", items=[
+     "Create main entry file",
+     "Create component X",
+     "Create service Y",
+     ...
+   ])
+   ```
+   IMPORTANT: You CANNOT call finish() until ALL plan items are marked complete!
+
+3. **Check Current State** - Use project_structure() to see what already exists
+
+4. **Execute Your Plan** - For each plan item:
+   - Use think() to reason about implementation details
+   - Create the file(s)
+   - Run lint ONCE
+   - Mark item complete: plan(action="complete", item_text="...")
+
+5. **Complete** - Call finish() when ALL plan items are done
+
+**You decide what files to create based on the requirements!**
+</INSTRUCTIONS>
+

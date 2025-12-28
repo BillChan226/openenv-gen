@@ -1,0 +1,272 @@
+## Design Phase: Generate Detailed Specifications
+
+You must generate THREE specification files in JSON format. These specs define the entire project and will be used by backend, frontend, and database phases.
+
+### Files to Generate
+
+1. **design/spec.api.json** - Complete REST API contract
+2. **design/spec.project.json** - Business logic and domain model
+3. **design/spec.ui.json** - UI component inventory and design tokens
+
+---
+
+## 1. spec.api.json - API Contract
+
+```json
+{
+  "name": "Project API Contracts",
+  "version": "0.1.0",
+  "description": "REST API specification for {{ project_name }}",
+  "conventions": {
+    "base_url": "/api",
+    "auth": "JWT via Authorization: Bearer <token>",
+    "content_type": "application/json",
+    "error_format": {
+      "type": "object",
+      "properties": {
+        "error": {"type": "string", "description": "Machine-readable error code"},
+        "message": {"type": "string", "description": "Human-readable message"},
+        "details": {"type": "object", "description": "Optional per-field errors"},
+        "requestId": {"type": "string"}
+      }
+    },
+    "pagination": {
+      "query_params": ["limit", "offset"],
+      "response_envelope": {
+        "items": "array",
+        "total": "integer",
+        "limit": "integer",
+        "offset": "integer"
+      }
+    }
+  },
+  "schemas": {
+    "UserSummary": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string", "format": "uuid"},
+        "displayName": {"type": "string"},
+        "email": {"type": "string", "format": "email"}
+      },
+      "required": ["id", "displayName"]
+    }
+    // Add ALL entity schemas here
+  },
+  "endpoints": [
+    {
+      "path": "/auth/register",
+      "method": "POST",
+      "summary": "Register a new user",
+      "auth_required": false,
+      "request": {
+        "content_type": "application/json",
+        "body": {
+          "email": {"type": "string", "required": true},
+          "password": {"type": "string", "required": true},
+          "displayName": {"type": "string", "required": true}
+        }
+      },
+      "responses": {
+        "201": {"schema": {"token": "string", "user": "$ref:UserSummary"}},
+        "400": {"schema": "$ref:ErrorResponse"},
+        "409": {"description": "Email already exists"}
+      }
+    },
+    {
+      "path": "/auth/login",
+      "method": "POST",
+      "summary": "Login and get JWT token",
+      "auth_required": false,
+      "request": {
+        "body": {
+          "email": {"type": "string", "required": true},
+          "password": {"type": "string", "required": true}
+        }
+      },
+      "responses": {
+        "200": {"schema": {"token": "string", "user": "$ref:UserSummary"}},
+        "401": {"description": "Invalid credentials"}
+      }
+    },
+    {
+      "path": "/auth/me",
+      "method": "GET",
+      "summary": "Get current user profile",
+      "auth_required": true,
+      "responses": {
+        "200": {"schema": "$ref:UserSummary"},
+        "401": {"description": "Not authenticated"}
+      }
+    }
+    // Add ALL CRUD endpoints for each entity
+  ]
+}
+```
+
+**CRITICAL RULES for spec.api.json:**
+- Include ALL auth endpoints (register, login, me, logout)
+- Include CRUD endpoints for every entity
+- Mark `auth_required: true/false` for each endpoint
+- Use consistent schema references
+- Include search/filter endpoints where needed
+
+---
+
+## 2. spec.project.json - Domain Model
+
+```json
+{
+  "name": "{{ project_name }} Domain Model",
+  "version": "0.1.0",
+  "user_roles_and_personas": {
+    "personas": [
+      {
+        "id": "admin",
+        "label": "Administrator",
+        "description": "Full access to all features",
+        "typical_actions": ["manage users", "configure settings", "view analytics"]
+      },
+      {
+        "id": "user",
+        "label": "Standard User",
+        "description": "Can create and manage own content",
+        "typical_actions": ["create items", "edit own items", "search"]
+      }
+    ],
+    "permissions_matrix": {
+      "admin": {
+        "users": ["create", "read", "update", "delete"],
+        "settings": ["read", "update"]
+      },
+      "user": {
+        "items": ["create", "read", "update:own", "delete:own"]
+      }
+    }
+  },
+  "entities": {
+    "User": {
+      "fields": {
+        "id": {"type": "uuid", "primary": true},
+        "email": {"type": "string", "unique": true},
+        "passwordHash": {"type": "string"},
+        "displayName": {"type": "string"},
+        "role": {"type": "enum", "values": ["admin", "user"]},
+        "createdAt": {"type": "timestamp"},
+        "updatedAt": {"type": "timestamp"}
+      },
+      "relationships": {}
+    }
+    // Add ALL entities with their fields and relationships
+  },
+  "workflows": {
+    "item_status": {
+      "states": ["draft", "active", "archived"],
+      "transitions": [
+        {"from": "draft", "to": "active", "action": "publish"},
+        {"from": "active", "to": "archived", "action": "archive"},
+        {"from": "archived", "to": "active", "action": "restore"}
+      ]
+    }
+  }
+}
+```
+
+---
+
+## 3. spec.ui.json - UI Components
+
+```json
+{
+  "name": "{{ project_name }} UI Spec",
+  "version": "0.1.0",
+  "design_tokens": {
+    "colors": {
+      "background.page": "#0B0C10",
+      "background.surface": "#161A1D",
+      "background.card": "#1D2125",
+      "text.primary": "#F4F5F7",
+      "text.secondary": "#9FADBC",
+      "accent.primary": "#0C66E4",
+      "accent.success": "#36B37E",
+      "accent.danger": "#FF5630"
+    },
+    "typography": {
+      "fontFamily.base": "system-ui, -apple-system, sans-serif",
+      "fontSize.sm": 13,
+      "fontSize.md": 14,
+      "fontSize.lg": 16
+    },
+    "spacing": {
+      "xs": 4,
+      "sm": 8,
+      "md": 12,
+      "lg": 16
+    },
+    "radius": {
+      "sm": 4,
+      "md": 8
+    }
+  },
+  "responsive_behavior": {
+    "breakpoints": {
+      "mobile": 480,
+      "tablet": 768,
+      "desktop": 1200
+    }
+  },
+  "components": [
+    {
+      "name": "Button",
+      "category": "ui",
+      "props": {
+        "variant": {"type": "enum", "values": ["primary", "secondary", "danger"]},
+        "size": {"type": "enum", "values": ["sm", "md", "lg"]},
+        "disabled": {"type": "boolean"},
+        "loading": {"type": "boolean"}
+      },
+      "callbacks": ["onClick"],
+      "states": ["default", "hover", "active", "disabled", "loading"]
+    },
+    {
+      "name": "TopNav",
+      "category": "layout",
+      "props": {
+        "user": {"type": "UserSummary"},
+        "searchQuery": {"type": "string"}
+      },
+      "callbacks": ["onSearch", "onLogout", "onProfileClick"],
+      "slots": ["left", "center", "right"]
+    }
+    // Add ALL components
+  ]
+}
+```
+
+---
+
+## Instructions
+
+1. **Analyze the project goal** and reference images to understand:
+   - What entities exist (users, items, projects, etc.)
+   - What actions users can perform
+   - What UI components are needed
+
+2. **Generate spec.api.json** first:
+   - Define all schemas
+   - Define all endpoints with auth requirements
+   - Be exhaustive - every feature needs an API
+
+3. **Generate spec.project.json** second:
+   - Define user roles and permissions
+   - Define entity relationships
+   - Define any workflows/state machines
+
+4. **Generate spec.ui.json** last:
+   - Extract design tokens from reference images
+   - List all UI components with their props
+   - Define responsive behavior
+
+5. **Use str_replace_editor** to create each file with the complete JSON content.
+
+**Remember:** These specs drive the entire project. Missing endpoints or components will cause issues in later phases!
+

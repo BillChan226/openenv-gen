@@ -1,0 +1,175 @@
+Fix the following issue reported by User Agent.
+
+**CRITICAL: You MUST use tool calls to perform actions. Do NOT just describe what you would do - actually call the tools!**
+
+Every response must include a tool call:
+- To read file: `view(path="...")`
+- To edit file: `str_replace_editor` or `write_file`
+- To complete: `finish(message="...")`
+
+**Do NOT respond with plain text. Always call a tool.**
+
+**CRITICAL PATH RULE:**
+- Use RELATIVE paths like `app/backend/src/routes/issues.js`
+- Do NOT use absolute paths like `/Users/.../generated/jira/...`
+- Do NOT prefix with project name like `jira/app/backend/...`
+- The workspace root is already set correctly; just use paths relative to it
+
+<ISSUE>
+- ID: {{ issue.id }}
+- Severity: {{ issue.severity.value | upper }}
+- Title: {{ issue.title }}
+</ISSUE>
+
+<DESCRIPTION>
+{{ issue.description }}
+</DESCRIPTION>
+
+{% if issue.error_message %}
+<ERROR_MESSAGE>
+{{ issue.error_message }}
+</ERROR_MESSAGE>
+{% endif %}
+
+{% if issue.file_path %}
+<LOCATION>
+- File: {{ issue.file_path }}
+{% if issue.line_number %}- Line: {{ issue.line_number }}{% endif %}
+</LOCATION>
+{% endif %}
+
+{% if issue.code_snippet %}
+<CODE_SNIPPET>
+```
+{{ issue.code_snippet }}
+```
+</CODE_SNIPPET>
+{% endif %}
+
+{% if issue.suggested_fix %}
+<SUGGESTED_FIX>
+{{ issue.suggested_fix }}
+</SUGGESTED_FIX>
+{% endif %}
+
+{% if issue.related_files %}
+<RELATED_FILES>
+{% for file in issue.related_files %}
+- {{ file }}
+{% endfor %}
+</RELATED_FILES>
+{% endif %}
+
+{% if issue.verification_command %}
+<VERIFICATION>
+- Command: {{ issue.verification_command }}
+- Expected: {{ issue.expected_result }}
+</VERIFICATION>
+{% endif %}
+
+<INSTRUCTIONS>
+1. Read the problematic file(s) with view()
+2. Use think() to analyze the root cause
+3. For complex fixes (multiple files), create a plan:
+   - plan(action="create", items=["Fix file A", "Fix file B", ...])
+4. Apply the fix using str_replace_editor or write_file
+5. Mark each fix complete: plan(action="complete", item_text="...")
+6. Verify the fix if a verification command is provided
+7. Report completion with finish()
+</INSTRUCTIONS>
+
+<COMMON_FRONTEND_FIXES>
+If the issue is about frontend not building/starting:
+- Ensure Vite layout:
+  - `app/frontend/index.html` exists at project root and references `/src/main.jsx`
+  - `app/frontend/src/main.jsx` and `app/frontend/src/App.jsx` exist
+  - `app/frontend/package.json` has `dev` and `build` scripts for Vite
+  - `public/` is only for static assets (no `public/index.html` entry)
+- Use cwd parameter instead of "cd ... &&":
+  - execute_bash("npm install", cwd="app/frontend")
+  - execute_bash("npm run build", cwd="app/frontend")
+- If icons/images are missing, use `google_image_search` / `search_image` + `download_image` and store locally.
+</COMMON_FRONTEND_FIXES>
+
+<COMMON_DOCKER_DB_FIXES>
+If the issue is about backend API returning 500/404 or DB not initialized:
+- Ensure `docker/docker-compose.yml` includes a Postgres `db` service with:
+  - `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
+  - Volume mount for init scripts:
+    - `../app/database/init:/docker-entrypoint-initdb.d:ro`
+- If the DB volume already exists and init scripts didn't run, run:
+  - docker_down(volumes=true)
+  - docker_up()
+- If protected routes return 401, verify the User Agent obtains a token via `/api/auth/login`
+  and passes `Authorization: Bearer <token>` headers when calling `test_api`.
+- If auth/register fails with schema mismatch (e.g. users has `username` but code uses `name`, or vice versa):
+  - Either accept both fields in request (map `name` -> `username`), OR
+  - Align DB schema + seed + controller to use a consistent set (`username` + optional `name`).
+
+- If you see connection refused / 404 during verification, verify the backend port:
+  - Check `docker/docker-compose.yml` published ports and backend `PORT`.
+  - Make sure frontend proxy (Vite) and verification base URL match the compose port.
+</COMMON_DOCKER_DB_FIXES>
+
+<COMMON_DOCKER_FRONTEND_BACKEND_WIRING_FIXES>
+If the issue is about Docker-run frontend failing to call backend (e.g., /api/projects 500, ERR_NAME_NOT_RESOLVED, /health returns frontend HTML):
+- Do NOT bake docker-only hostnames into browser JS (e.g., `http://jira-backend:3000`); host browser can't resolve it.
+- Prefer same-origin API in production:
+  - Frontend uses `/api` (relative) and nginx reverse-proxies `/api/*` to backend service in Docker network.
+- In docker dev with Vite-in-container:
+  - Vite proxy `/api` should target backend service name `http://jira-backend:<container_port>`.
+  - Backend should be published on a free host port (prefer 8000-8999), NOT 3000 (avoid clashing with frontend port).
+  - Use find_free_port() to pick a free host port and propagate it consistently.
+- If verification sees `/health` returning HTML app shell, your ports/proxy are wrong (frontend served on backend port or vice versa).
+</COMMON_DOCKER_FRONTEND_BACKEND_WIRING_FIXES>
+
+<COMMON_PORT_CONFLICT_FIXES>
+If the issue is about "port already in use", "Server already running", or connection refused despite server "running":
+- Use cleanup_ports([3000, 8000]) to kill zombie processes on those ports
+- If a server shows as "already running" but can't connect, it's a zombie:
+  - cleanup_ports([<port>], action="all_servers") to clean both port and registry
+- After cleanup, restart the server with start_server()
+- Common zombie causes:
+  - Previous run crashed but process kept running
+  - Vite auto-switched to a different port
+  - Multiple server starts without stops
+</COMMON_PORT_CONFLICT_FIXES>
+
+<LONG_RUNNING_SERVERS>
+CRITICAL: Servers (node, npm start, vite dev) are LONG-RUNNING processes!
+- Do NOT use `execute_bash("node src/server.js")` - it will timeout
+- Use `start_server()` instead - it starts in background AND waits for port to open
+
+start_server features:
+- Automatically waits for port to become available (default 10s)
+- Reports startup crash with error logs if server dies immediately
+- Supports custom working directory (cwd parameter)
+- Optional health endpoint verification
+
+Examples:
+  # Basic backend server
+  start_server(name="backend", command="node src/server.js", port=3001)
+  
+  # With working directory (preferred)
+  start_server(name="api", command="node src/server.js", port=8000, cwd="app/backend")
+  
+  # Frontend with npm
+  start_server(name="frontend", command="npm run dev", port=5173, cwd="app/frontend")
+  
+  # With health check
+  start_server(name="api", command="node src/server.js", port=3000, health_path="/health")
+
+After start_server succeeds, verify with:
+  test_api(method="GET", url="http://localhost:3001/health")
+
+If start_server fails with "crashed on startup", check the error logs in the output!
+</LONG_RUNNING_SERVERS>
+
+<AVAILABLE_HELP>
+- think("...") - Reason about the problem
+- plan(action="create", items=[...]) - Track fixes for complex issues
+- ask_user_agent(question="...") - Ask for clarification if unsure
+</AVAILABLE_HELP>
+
+Begin by examining the file mentioned in the issue.
+
