@@ -1,0 +1,59 @@
+{#
+  Execute Task Prompt - Main Template
+  
+  This is the entry point for Code Agent task execution.
+  Phase-specific content is in _phases/*.j2
+  Common sections are in _common/*.j2
+  
+  Structure:
+  - _common/header.j2      : Task info, requirements, dependencies
+  - _phases/<type>.j2      : Phase-specific requirements
+  - _common/instructions.j2: General workflow instructions
+  - _common/rules.j2       : Important rules and tool usage
+#}
+
+{# ==================== HEADER ==================== #}
+{% include 'code/_common/header.j2' %}
+
+{# ==================== PHASE-SPECIFIC REQUIREMENTS ==================== #}
+
+{% if task.type.value == 'frontend' %}
+{% include 'code/_phases/frontend.j2' %}
+{% endif %}
+
+{% if task.type.value == 'design' %}
+{% include 'code/_phases/design.j2' %}
+{% endif %}
+
+{% if task.type.value == 'database' %}
+{% include 'code/_phases/database.j2' %}
+{% endif %}
+
+{% if task.type.value in ['database', 'backend', 'docker'] %}
+{% include 'code/_common/docker_db_init.j2' %}
+{% endif %}
+
+{% if task.type.value == 'backend' %}
+{% include 'code/_phases/backend.j2' %}
+{% endif %}
+
+{% if task.type.value in ['backend', 'docker'] %}
+{% include 'code/_common/backend_port.j2' %}
+{% endif %}
+
+{% if task.type.value == 'docker' %}
+{% include 'code/_phases/docker.j2' %}
+{% endif %}
+
+{% if task.type.value == 'frontend' %}
+{% include 'code/_common/frontend_guidelines.j2' %}
+{% endif %}
+
+{% if task.type.value == 'env' %}
+{% include 'code/_phases/env.j2' %}
+{% endif %}
+
+{# ==================== COMMON SECTIONS ==================== #}
+{% include 'code/_common/instructions.j2' %}
+
+{% include 'code/_common/rules.j2' %}

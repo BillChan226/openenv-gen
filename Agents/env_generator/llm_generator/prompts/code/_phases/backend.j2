@@ -1,0 +1,598 @@
+<BACKEND_QUALITY_REQUIREMENTS>
+============================================================
+BACKEND API QUALITY STANDARDS
+============================================================
+
+Your backend must be PRODUCTION-READY and USER-TESTABLE:
+
+**1. COMPLETE API Coverage**
+   - ALL CRUD operations for every entity (User, Project, Issue, Comment, etc.)
+   - Search/filter endpoints with query parameters
+   - Pagination on list endpoints (limit, offset, total)
+   - Proper HTTP status codes (200, 201, 400, 401, 404, 500)
+
+**2. WORKING Authentication**
+   - POST /auth/register - Create new account
+   - POST /auth/login - Returns JWT token
+   - GET /auth/me - Get current user (requires token)
+   - All protected routes check JWT properly
+
+**3. TESTABLE with seed data**
+   - Login with: admin@example.com / password
+   - Login with: user@example.com / password
+   - All entities have test data to query
+
+**4. ROBUST Error Handling**
+   - Validation errors return 400 with field details
+   - Missing resources return 404 with clear message
+   - Auth failures return 401/403 appropriately
+   - Server errors return 500 with safe message
+
+**5. API Documentation Ready**
+   - Consistent response format across all endpoints
+   - Clear field names matching frontend expectations
+   - Proper content-type headers
+
+**Example Comprehensive Route Set:**
+```
+Auth:    POST /auth/register, POST /auth/login, GET /auth/me
+Users:   GET /users, GET /users/:id, PUT /users/:id
+Projects: GET /projects, POST /projects, GET /projects/:id, PUT /projects/:id, DELETE /projects/:id
+Issues:  GET /issues, POST /issues, GET /issues/:id, PUT /issues/:id, DELETE /issues/:id
+         GET /issues/search?q=..., GET /projects/:id/issues
+Comments: GET /issues/:id/comments, POST /issues/:id/comments
+Search:  GET /search?q=...
+Health:  GET /health
+```
+</BACKEND_QUALITY_REQUIREMENTS>
+
+<BACKEND_ROUTE_ORDERING>
+**CRITICAL: Express Route Ordering Rules**
+
+In Express.js, route order MATTERS! Specific routes MUST come BEFORE parameterized routes.
+
+**WRONG (will break):**
+```javascript
+// This is BROKEN - /search will never be reached!
+router.get('/:id', getById);      // Catches EVERYTHING including "search"
+router.get('/search', search);     // Never reached - "search" matches :id
+```
+
+**CORRECT:**
+```javascript
+// Specific routes FIRST
+router.get('/search', search);     // Matches "/search" exactly
+router.get('/statistics', stats);  // Other specific routes
+router.get('/:id', getById);       // LAST - catches remaining dynamic paths
+```
+
+**Apply this pattern to ALL route files:**
+```javascript
+// routes/issues.js
+const router = express.Router();
+
+// 1. Specific routes FIRST
+router.get('/search', authOptional, searchIssues);     // /issues/search
+router.get('/recent', authOptional, getRecentIssues);  // /issues/recent
+router.post('/', authRequired, createIssue);            // POST /issues
+
+// 2. Parameterized routes LAST
+router.get('/:issueId', authOptional, getIssueById);   // /issues/:issueId
+router.put('/:issueId', authRequired, updateIssue);    // PUT /issues/:issueId
+router.delete('/:issueId', authRequired, deleteIssue); // DELETE /issues/:issueId
+
+// 3. Nested routes under parameterized parent (also specific first)
+router.get('/:issueId/comments', authOptional, getComments);
+router.post('/:issueId/comments', authRequired, addComment);
+```
+
+**Common mistake to AVOID:**
+```javascript
+// WRONG - this goes in main router and breaks sub-routes
+app.use('/api/issues', issueRoutes);
+app.use('/api/issues/:issueId', issueDetailRoutes);  // Never reached!
+```
+
+**Correct main router setup:**
+```javascript
+// routes/index.js
+router.use('/auth', authRoutes);
+router.use('/projects', projectRoutes);
+router.use('/issues', issueRoutes);      // All /issues/* routes in one file
+router.use('/search', searchRoutes);     // Global search
+router.use(healthRoutes);                // /health at root
+```
+</BACKEND_ROUTE_ORDERING>
+
+<BACKEND_API_PATTERNS>
+**Standard Express.js API Patterns**
+
+**1. Error Handler Middleware (middleware/errorHandler.js):**
+```javascript
+export class ApiError extends Error {
+  constructor(status, code, message, details) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
+  static badRequest(message, details) { return new ApiError(400, 'validation_error', message, details); }
+  static unauthorized(message) { return new ApiError(401, 'unauthorized', message); }
+  static forbidden(message) { return new ApiError(403, 'forbidden', message); }
+  static notFound(message) { return new ApiError(404, 'not_found', message); }
+}
+
+export function errorHandler(err, req, res, next) {
+  const status = err.status || 500;
+  res.status(status).json({
+    error: err.code || 'server_error',
+    message: err.message,
+    details: err.details || null,
+  });
+}
+```
+
+**2. Auth Middleware (middleware/auth.js):**
+```javascript
+import jwt from 'jsonwebtoken';
+
+export function authRequired(req, res, next) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) return next(ApiError.unauthorized('Missing token'));
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    next(ApiError.unauthorized('Invalid token'));
+  }
+}
+
+export function authOptional(req, res, next) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    try { req.user = jwt.verify(token, process.env.JWT_SECRET); } catch {}
+  }
+  next();
+}
+```
+
+**3. Validation Helper:**
+```javascript
+export function requireFields(body, fields) {
+  const missing = fields.filter(f => !body[f]);
+  if (missing.length) {
+    throw ApiError.badRequest(`Missing required fields: ${missing.join(', ')}`);
+  }
+}
+```
+
+**4. Health Endpoint (MUST return JSON, not HTML):**
+```javascript
+router.get('/health', async (req, res) => {
+  try {
+    await db.query('SELECT 1');  // Check DB connection
+    res.json({ status: 'ok', db: 'connected' });
+  } catch (err) {
+    res.status(503).json({ status: 'error', db: 'disconnected' });
+  }
+});
+```
+</BACKEND_API_PATTERNS>
+
+<BACKEND_SECURITY_PATTERNS>
+**Security Patterns (REQUIRED)**
+
+**1. Input Validation with express-validator:**
+```javascript
+// middleware/validators.js
+import { body, param, query, validationResult } from 'express-validator';
+
+// Reusable validation middleware
+export const validate = (validations) => async (req, res, next) => {
+  await Promise.all(validations.map(v => v.run(req)));
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      error: 'validation_error',
+      message: 'Invalid input',
+      details: errors.array().map(e => ({ field: e.path, message: e.msg }))
+    });
+  }
+  next();
+};
+
+// Common validators
+export const validators = {
+  uuid: (field) => param(field).isUUID().withMessage('Invalid UUID'),
+  email: body('email').isEmail().normalizeEmail(),
+  password: body('password').isLength({ min: 8 }).withMessage('Password min 8 chars'),
+  pagination: [
+    query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+    query('offset').optional().isInt({ min: 0 }).toInt(),
+  ],
+};
+
+// Usage in routes
+router.post('/issues',
+  validate([
+    body('title').trim().notEmpty().escape(),
+    body('description').optional().trim().escape(),
+    body('projectId').isUUID(),
+  ]),
+  authRequired,
+  createIssue
+);
+```
+
+**2. SQL Injection Prevention (Parameterized Queries):**
+```javascript
+// WRONG - SQL Injection vulnerable
+const result = await db.query(`SELECT * FROM issues WHERE title LIKE '%${query}%'`);
+
+// CORRECT - Parameterized query
+const result = await db.query(
+  'SELECT * FROM issues WHERE title ILIKE $1',
+  [`%${query}%`]
+);
+
+// With Sequelize ORM (automatic parameterization)
+const issues = await Issue.findAll({
+  where: { title: { [Op.iLike]: `%${query}%` } }
+});
+```
+
+**3. Rate Limiting:**
+```javascript
+// middleware/rateLimiter.js
+import rateLimit from 'express-rate-limit';
+
+export const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  max: 100,                   // 100 requests per window
+  message: { error: 'rate_limit', message: 'Too many requests' }
+});
+
+export const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,  // 1 hour
+  max: 5,                     // 5 failed attempts
+  message: { error: 'rate_limit', message: 'Too many login attempts' }
+});
+
+// Usage
+app.use('/api', apiLimiter);
+router.post('/auth/login', authLimiter, loginHandler);
+```
+
+**4. CORS Configuration:**
+```javascript
+// config/cors.js
+import cors from 'cors';
+
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
+```
+
+**5. Helmet Security Headers:**
+```javascript
+import helmet from 'helmet';
+app.use(helmet());
+```
+
+**6. Password Hashing:**
+```javascript
+import bcrypt from 'bcrypt';
+
+const SALT_ROUNDS = 10;
+
+export async function hashPassword(password) {
+  return bcrypt.hash(password, SALT_ROUNDS);
+}
+
+export async function verifyPassword(password, hash) {
+  return bcrypt.compare(password, hash);
+}
+```
+
+**Package.json security dependencies:**
+```json
+{
+  "dependencies": {
+    "bcrypt": "^5.1.0",
+    "cors": "^2.8.5",
+    "express-rate-limit": "^7.0.0",
+    "express-validator": "^7.0.0",
+    "helmet": "^7.0.0"
+  }
+}
+```
+</BACKEND_SECURITY_PATTERNS>
+
+<BACKEND_ENV_CONFIG>
+**Environment Configuration (REQUIRED)**
+
+**1. config/env.js - Centralized Environment Variables:**
+```javascript
+// config/env.js
+import dotenv from 'dotenv';
+dotenv.config();
+
+// Required environment variables
+const required = ['DATABASE_URL', 'JWT_SECRET'];
+for (const key of required) {
+  if (!process.env[key]) {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+}
+
+export const config = {
+  // Server
+  PORT: parseInt(process.env.PORT, 10) || 3000,
+  NODE_ENV: process.env.NODE_ENV || 'development',
+  
+  // Database
+  DATABASE_URL: process.env.DATABASE_URL,
+  
+  // Auth
+  JWT_SECRET: process.env.JWT_SECRET,
+  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '7d',
+  
+  // CORS
+  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
+  
+  // Feature flags
+  DEBUG: process.env.DEBUG === 'true',
+};
+
+export default config;
+```
+
+**2. .env.example - Template for Environment Variables:**
+```bash
+# .env.example - Copy to .env and fill in values
+# Server
+PORT=8000
+NODE_ENV=development
+
+# Database
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/myapp
+
+# Authentication
+JWT_SECRET=your-secret-key-change-in-production
+JWT_EXPIRES_IN=7d
+
+# CORS
+FRONTEND_URL=http://localhost:3000
+
+# Debug
+DEBUG=false
+```
+
+**3. Usage in Application:**
+```javascript
+// app.js
+import { config } from './config/env.js';
+
+const app = express();
+
+// Use config values
+app.listen(config.PORT, () => {
+  console.log(`Server running on port ${config.PORT}`);
+});
+
+// Conditional debugging
+if (config.DEBUG) {
+  app.use(morgan('dev'));
+}
+```
+
+**4. Docker Environment:**
+```yaml
+# docker-compose.yml
+services:
+  backend:
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/myapp
+      - JWT_SECRET=${JWT_SECRET}  # From host .env
+      - FRONTEND_URL=http://frontend:3000
+```
+
+**IMPORTANT:**
+- NEVER commit .env files with real secrets
+- ALWAYS provide .env.example with placeholder values
+- Use different secrets for dev/staging/production
+- Validate required variables at startup
+</BACKEND_ENV_CONFIG>
+
+<BACKEND_LOGGING>
+**Logging Patterns**
+
+**1. Simple Logger (utils/logger.js):**
+```javascript
+// utils/logger.js
+const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
+const currentLevel = LOG_LEVELS[process.env.LOG_LEVEL] || LOG_LEVELS.info;
+
+function formatMessage(level, message, meta) {
+  const timestamp = new Date().toISOString();
+  const metaStr = meta ? ` ${JSON.stringify(meta)}` : '';
+  return `${timestamp} [${level.toUpperCase()}] ${message}${metaStr}`;
+}
+
+export const logger = {
+  error: (msg, meta) => LOG_LEVELS.error <= currentLevel && console.error(formatMessage('error', msg, meta)),
+  warn: (msg, meta) => LOG_LEVELS.warn <= currentLevel && console.warn(formatMessage('warn', msg, meta)),
+  info: (msg, meta) => LOG_LEVELS.info <= currentLevel && console.log(formatMessage('info', msg, meta)),
+  debug: (msg, meta) => LOG_LEVELS.debug <= currentLevel && console.log(formatMessage('debug', msg, meta)),
+};
+```
+
+**2. Request Logging Middleware:**
+```javascript
+// middleware/requestLogger.js
+import { logger } from '../utils/logger.js';
+
+export function requestLogger(req, res, next) {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    logger.info(`${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`, {
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      duration,
+      userAgent: req.get('user-agent'),
+    });
+  });
+  
+  next();
+}
+
+// Usage in app.js
+app.use(requestLogger);
+```
+
+**3. Error Logging:**
+```javascript
+// middleware/errorHandler.js
+import { logger } from '../utils/logger.js';
+
+export function errorHandler(err, req, res, next) {
+  // Log the error
+  logger.error(err.message, {
+    stack: err.stack,
+    path: req.path,
+    method: req.method,
+    userId: req.user?.id,
+  });
+
+  const status = err.status || 500;
+  res.status(status).json({
+    error: err.code || 'server_error',
+    message: process.env.NODE_ENV === 'production' 
+      ? 'An error occurred' 
+      : err.message,
+  });
+}
+```
+
+**4. Database Query Logging (Development):**
+```javascript
+// config/database.js
+import { Pool } from 'pg';
+import { logger } from '../utils/logger.js';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+// Log slow queries in development
+if (process.env.NODE_ENV === 'development') {
+  const originalQuery = pool.query.bind(pool);
+  pool.query = async (...args) => {
+    const start = Date.now();
+    const result = await originalQuery(...args);
+    const duration = Date.now() - start;
+    
+    if (duration > 100) { // Log queries > 100ms
+      logger.debug(`Slow query (${duration}ms)`, { 
+        query: args[0]?.substring?.(0, 200) || args[0] 
+      });
+    }
+    return result;
+  };
+}
+
+export default pool;
+```
+</BACKEND_LOGGING>
+
+<BACKEND_TESTING_WORKFLOW>
+**HOW TO TEST YOUR BACKEND**
+
+**1. DO NOT use execute_bash for servers:**
+```
+WRONG: execute_bash("node src/server.js")     # Will timeout!
+WRONG: execute_bash("npm start")               # Will block forever!
+```
+
+**2. USE run_background for running servers:**
+```javascript
+// Start backend server (unified tool for all background processes)
+run_background(
+  command="npm start",
+  port=8000,
+  name="backend",
+  cwd="app/backend"
+)
+
+// Check if server is running
+list_processes()
+
+// Get server logs
+get_process_output("backend", lines=50)
+
+// Test API
+test_api("GET", "http://localhost:8000/health")
+test_api("POST", "http://localhost:8000/auth/login", body='{"email":"admin@example.com","password":"password"}')
+
+// Stop server when done
+stop_process("backend")
+```
+
+**3. Environment Variables:**
+Create `.env` file BEFORE starting server:
+```javascript
+// First create .env
+write_file(
+  path="app/backend/.env",
+  content=`DATABASE_URL=postgresql://postgres:postgres@localhost:5432/jira
+JWT_SECRET=dev-secret-key
+PORT=8000`
+)
+
+// Then start server
+run_background("npm start", port=8000, name="backend", cwd="app/backend")
+```
+
+**4. Testing Workflow:**
+1. Create all files first
+2. Run `npm install` in app/backend
+3. Create `.env` file
+4. run_background(...) to start server
+5. test_api() to verify endpoints
+6. get_process_output() to debug issues
+7. stop_process() when done
+
+**5. Debugging Server Issues:**
+```javascript
+// If server fails to start:
+get_process_output("backend", lines=100)  // Check error logs
+
+// If port is in use:
+cleanup_ports([8000])  // Kill existing processes
+
+// If process needs to be interrupted:
+interrupt_process("backend")  // Send Ctrl+C
+
+// If process needs force kill:
+stop_process("backend", force=true)  // Force kill
+```
+
+**6. Background Tasks (not servers):**
+```javascript
+// Run a build task
+run_background("npm run build", cwd="app/frontend")
+
+// Wait for it to complete
+wait_for_process("build-task", timeout=300)
+
+// Or just check status later
+list_processes()
+```
+</BACKEND_TESTING_WORKFLOW>

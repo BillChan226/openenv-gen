@@ -1,0 +1,58 @@
+{# Frontend icon library guidance #}
+5. **Icons - USE REACT ICON LIBRARIES (MANDATORY)**
+   
+   **PREFERRED: Use `lucide-react` or `react-icons` - NO custom SVGs or emoji!**
+   
+   First, add the icon library to package.json:
+   ```json
+   "dependencies": {
+     "lucide-react": "^0.400.0"
+   }
+   ```
+   
+   **lucide-react (Recommended - clean, consistent):**
+   ```jsx
+   import { Search, Settings, User, Plus, X, ChevronDown, Menu, Home, Folder, FileText, Check, AlertCircle } from 'lucide-react';
+   
+   // Usage
+   <Search className="w-4 h-4" />
+   <Button><Plus className="w-4 h-4 mr-2" /> Create</Button>
+   ```
+   
+   **react-icons (Alternative - huge icon set):**
+   ```jsx
+   import { FiSearch, FiSettings, FiUser, FiPlus } from 'react-icons/fi';  // Feather
+   import { HiOutlineHome, HiOutlineFolder } from 'react-icons/hi';       // Heroicons
+   import { BiTask, BiGitBranch } from 'react-icons/bi';                  // BoxIcons
+   
+   <FiSearch size={16} />
+   ```
+   
+   **Common Icon Mappings:**
+   | Purpose | lucide-react | react-icons |
+   |---------|-------------|-------------|
+   | Search | `Search` | `FiSearch` |
+   | Settings | `Settings` | `FiSettings` |
+   | User/Profile | `User` | `FiUser` |
+   | Add/Create | `Plus` | `FiPlus` |
+   | Close | `X` | `FiX` |
+   | Menu | `Menu` | `FiMenu` |
+   | Home | `Home` | `FiHome` |
+   | Folder/Project | `Folder` | `FiFolder` |
+   | File/Issue | `FileText` | `FiFileText` |
+   | Check/Done | `Check` | `FiCheck` |
+   | Warning | `AlertCircle` | `FiAlertCircle` |
+   | Edit | `Pencil` | `FiEdit2` |
+   | Delete | `Trash2` | `FiTrash2` |
+   | Arrow Right | `ChevronRight` | `FiChevronRight` |
+   | Dropdown | `ChevronDown` | `FiChevronDown` |
+   
+   **DO NOT:**
+   - Use emoji as icons (X, checkmark, gear symbols)
+   - Create custom SVG files for common icons
+   - Use text symbols like [X] or [+]
+   
+   **For images/photos (not icons):**
+   - Use `google_image_search` or `search_image` to find assets
+   - Use `download_image` to save to `app/frontend/public/assets/`
+

@@ -1,0 +1,11 @@
+<DOCKER_DB_INIT_GUIDANCE>
+CRITICAL (Docker + Postgres init): When you define Postgres in `docker/docker-compose.yml`,
+you MUST mount the DB init scripts so schema/seed load automatically:
+
+- Mount: `../app/database/init:/docker-entrypoint-initdb.d:ro`
+- Ensure database phase creates:
+  - `app/database/init/01_schema.sql`
+  - `app/database/init/02_seed.sql`
+- If using a named volume for Postgres data, remember: init scripts only run on first init.
+  If schema changes, you may need to recreate the volume (docker_down(volumes=true)).
+</DOCKER_DB_INIT_GUIDANCE>

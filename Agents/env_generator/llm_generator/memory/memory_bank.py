@@ -1,0 +1,629 @@
+"""
+Memory Bank - Structured Long-term Project Memory
+
+Inspired by Cursor Memory Bank:
+https://cursor.zone/faq/how-to-use-cursor-memory-bank.html
+
+Complements utils/memory.py by providing file-based persistent project documentation.
+AgentMemory handles conversation/event memory, MemoryBank handles project knowledge.
+
+Structure:
+    memory-bank/
+    ├── project_brief.md      # Core requirements and goals
+    ├── tech_context.md       # Technologies, dependencies, constraints
+    ├── system_patterns.md    # Architecture, design patterns
+    ├── active_context.md     # Current work focus, recent changes
+    └── progress.md           # Completed features, known issues
+"""
+
+import logging
+from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Dict, Optional, Any
+from datetime import datetime
+import re
+
+
+@dataclass
+class MemoryFile:
+    """Represents a single memory file."""
+    name: str
+    path: Path
+    content: str = ""
+    last_updated: Optional[datetime] = None
+    
+    def load(self) -> str:
+        """Load content from file."""
+        if self.path.exists():
+            self.content = self.path.read_text(encoding="utf-8")
+            self.last_updated = datetime.fromtimestamp(self.path.stat().st_mtime)
+        return self.content
+    
+    def save(self, content: str) -> None:
+        """Save content to file."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(content, encoding="utf-8")
+        self.content = content
+        self.last_updated = datetime.now()
+
+
+@dataclass
+class MemoryBank:
+    """
+    Memory Bank for persistent project knowledge.
+    
+    Provides structured storage for:
+    - Project requirements and goals
+    - Technical context and constraints
+    - Architecture patterns and decisions
+    - Current work focus and progress
+    - Completed features and known issues
+    """
+    
+    root_dir: Path
+    _files: Dict[str, MemoryFile] = field(default_factory=dict)
+    _logger: logging.Logger = field(default_factory=lambda: logging.getLogger("memory_bank"))
+    
+    # Core memory file definitions
+    CORE_FILES = {
+        "project_brief": {
+            "filename": "project_brief.md",
+            "description": "Core requirements and project goals",
+            "template": """# Project Brief
+
+## Overview
+{project_name} - {description}
+
+## Core Requirements
+{requirements_block}
+
+## Goals
+- Build a Jira-like issue tracking system with projects, boards, issues, workflows, and collaboration.
+- Provide a runnable dev environment (frontend + backend + database + docker).
+
+## Scope
+- In scope: Jira-like UI, REST API, PostgreSQL schema/seed, auth, search, and basic workflows.
+- Out of scope: Full enterprise Jira parity, marketplace apps, SSO/SCIM, advanced permissions.
+
+## Success Criteria
+- No obvious runtime errors; core flows work end-to-end (create/update issues, move status, comment, search).
+- Services start via docker compose and basic smoke tests pass.
+"""
+        },
+        "tech_context": {
+            "filename": "tech_context.md",
+            "description": "Technologies, dependencies, and constraints",
+            "template": """# Technical Context
+
+## Technology Stack
+- Frontend: {frontend_tech}
+- Backend: {backend_tech}
+- Database: {database_tech}
+
+## Dependencies
+- Frontend: React Router, build tooling (Vite), lint tooling (ESLint) as applicable
+- Backend: Express, JWT auth, PostgreSQL client
+
+## Development Setup
+- Use docker compose for local stack when available
+- Otherwise run backend + frontend locally with node and connect to postgres
+
+## Technical Constraints
+- Keep paths within the workspace root; avoid writing outside generated project
+- Prefer deterministic, testable APIs and clear error handling
+
+## Environment Variables
+- OPENAI_API_KEY (or provider-specific key)
+- GOOGLE_API_KEY / GOOGLE_CX (optional, for google_image_search)
+- DATABASE_URL or DB_HOST/DB_USER/DB_PASSWORD/DB_NAME/DB_PORT (backend)
+"""
+        },
+        "system_patterns": {
+            "filename": "system_patterns.md",
+            "description": "Architecture and design patterns",
+            "template": """# System Patterns
+
+## Architecture Overview
+- Monorepo-style generated project with app/frontend, app/backend, app/database and docker/
+- REST API backend with JWT auth, PostgreSQL persistence
+- SPA frontend consuming backend API
+
+## Design Patterns
+- Route/controller separation on backend
+- Basic validation middleware and centralized error handling
+- Frontend pages/components with shared layout, loading/error states
+
+## Component Relationships
+- Frontend routes -> pages -> components -> API client -> backend endpoints
+- Backend routes -> controllers -> db queries -> postgres
+
+## Key Technical Decisions
+- Keep file operations within Workspace to avoid path traversal/duplication
+- Prefer simple, consistent naming for routes and models
+
+## API Patterns
+- JSON REST endpoints under /api/*
+- Use Authorization: Bearer <token> for protected routes
+"""
+        },
+        "active_context": {
+            "filename": "active_context.md",
+            "description": "Current work focus and recent changes",
+            "template": """# Active Context
+
+## Current Focus
+Working on: initialization
+
+## Recent Changes
+- {timestamp}: [Change description]
+
+## Next Steps
+1. [Next action item]
+
+## Active Decisions
+[Decisions being considered]
+
+## Blockers
+[Current blockers if any]
+"""
+        },
+        "progress": {
+            "filename": "progress.md",
+            "description": "Completed features and known issues",
+            "template": """# Progress
+
+## Completed Features
+- [x] Initialized project and memory bank
+
+## In Progress
+- [ ] (auto-updated during generation)
+
+## Known Issues
+- (none yet)
+
+## Test Status
+[Testing progress]
+
+## Deployment Status
+[Deployment state]
+"""
+        }
+    }
+    
+    def __post_init__(self):
+        """Initialize memory files."""
+        self.memory_dir = self.root_dir / "memory-bank"
+        self._initialize_files()
+    
+    def _initialize_files(self) -> None:
+        """Initialize memory file objects."""
+        for key, config in self.CORE_FILES.items():
+            file_path = self.memory_dir / config["filename"]
+            self._files[key] = MemoryFile(
+                name=key,
+                path=file_path,
+            )
+    
+    def initialize(self, project_info: Dict[str, Any]) -> None:
+        """
+        Initialize memory bank with project information.
+        
+        Args:
+            project_info: Dict containing project details like name, description, etc.
+        """
+        self._logger.info("Initializing Memory Bank")
+        self.memory_dir.mkdir(parents=True, exist_ok=True)
+        
+        requirements = project_info.get("requirements") or []
+        if isinstance(requirements, str):
+            # tolerate string input; split lines
+            requirements = [r.strip("- ").strip() for r in requirements.splitlines() if r.strip()]
+
+        requirements_block = "- " + "\n- ".join(requirements) if requirements else "- (not specified)"
+
+        for key, config in self.CORE_FILES.items():
+            file_path = self.memory_dir / config["filename"]
+            
+            if not file_path.exists():
+                # Create from template
+                content = config["template"].format(
+                    project_name=project_info.get("name", "Project"),
+                    description=project_info.get("description", ""),
+                    frontend_tech=project_info.get("frontend", "React"),
+                    backend_tech=project_info.get("backend", "Node.js"),
+                    database_tech=project_info.get("database", "PostgreSQL"),
+                    requirements_block=requirements_block,
+                    timestamp=datetime.now().isoformat(),
+                )
+                self._files[key].save(content)
+                self._logger.debug(f"Created {config['filename']}")
+            else:
+                # Opportunistically hydrate placeholders if the file still has template markers
+                existing = self._files[key].load()
+                if key == "project_brief" and "[List core requirements here]" in existing:
+                    self._files[key].save(
+                        existing.replace("- [List core requirements here]", requirements_block)
+                    )
+
+        # Always run a lightweight repair pass to remove common placeholders/noise
+        self.repair(project_info)
+
+    def repair(self, project_info: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Repair/normalize existing memory bank files.
+
+        This removes template placeholders and de-duplicates sections that can become
+        noisy during long runs (e.g., repeated "Working on:" lines).
+        Safe to call multiple times.
+        """
+        project_info = project_info or {}
+        requirements = project_info.get("requirements") or []
+        if isinstance(requirements, str):
+            requirements = [r.strip("- ").strip() for r in requirements.splitlines() if r.strip()]
+        requirements_block = "- " + "\n- ".join(requirements) if requirements else "- (not specified)"
+
+        # project_brief: replace placeholders if present
+        pb = self._files["project_brief"].load()
+        if "- [List core requirements here]" in pb or "[List core requirements here]" in pb:
+            pb = pb.replace("- [List core requirements here]", requirements_block)
+        if "- [List project goals here]" in pb:
+            pb = pb.replace("- [List project goals here]", "- Build a Jira-like issue tracking system with projects, boards, issues, and workflows.")
+        if "- In scope: [What's included]" in pb:
+            pb = pb.replace("- In scope: [What's included]", "- In scope: Jira-like UI, REST API, PostgreSQL schema/seed, auth, search, workflows.")
+        if "- Out of scope: [What's excluded]" in pb:
+            pb = pb.replace("- Out of scope: [What's excluded]", "- Out of scope: Full Jira parity, SSO/SCIM, marketplace apps.")
+        if "- [Define success metrics]" in pb:
+            pb = pb.replace("- [Define success metrics]", "- Core flows work end-to-end; services start via docker compose; no obvious runtime errors.")
+        self._files["project_brief"].save(pb.strip() + "\n")
+
+        # progress: remove placeholders
+        prog = self._files["progress"].load()
+        prog = prog.replace("- [x] [Feature 1]", "").replace("- [ ] [Feature 2]", "")
+        prog = prog.replace("- [Issue 1]: [Description]", "- (none yet)")
+        self._files["progress"].save("\n".join([ln.rstrip() for ln in prog.splitlines() if ln.strip() != ""]).strip() + "\n")
+
+        # active_context: collapse Current Focus to a single line if it got spammed
+        ac_lines = self._files["active_context"].load().splitlines()
+
+        def _find_idx(header: str) -> Optional[int]:
+            for i, ln in enumerate(ac_lines):
+                if ln.strip() == header:
+                    return i
+            return None
+
+        def _section_range(header: str) -> Optional[tuple[int, int]]:
+            start = _find_idx(header)
+            if start is None:
+                return None
+            end = len(ac_lines)
+            for j in range(start + 1, len(ac_lines)):
+                if ac_lines[j].startswith("## "):
+                    end = j
+                    break
+            return start, end
+
+        # Current Focus: keep only one meaningful line
+        focus_rng = _section_range("## Current Focus")
+        if focus_rng:
+            start, end = focus_rng
+            body = [ln.strip() for ln in ac_lines[start + 1 : end] if ln.strip()]
+            body = [ln for ln in body if "[What's being worked on now]" not in ln]
+            # Keep first "Working on:" line if present
+            focus_line = next((ln for ln in body if ln.lower().startswith("working on:")), None) or (body[0] if body else "Working on: (unknown)")
+            ac_lines = ac_lines[: start + 1] + [focus_line, ""] + ac_lines[end:]
+
+        # Recent Changes: remove placeholder, de-dup, cap to last 10
+        rc_rng = _section_range("## Recent Changes")
+        if rc_rng:
+            start, end = rc_rng
+            body = [ln.strip() for ln in ac_lines[start + 1 : end] if ln.strip()]
+            body = [ln for ln in body if "[Change description]" not in ln]
+            # Keep only bullet lines
+            body = [ln for ln in body if ln.startswith("- ")]
+            # De-dup preserving order
+            seen = set()
+            deduped = []
+            for ln in body:
+                if ln not in seen:
+                    seen.add(ln)
+                    deduped.append(ln)
+            deduped = deduped[:10]
+            ac_lines = ac_lines[: start + 1] + (deduped + [""] if deduped else ["- (none yet)", ""]) + ac_lines[end:]
+
+        # Next Steps: remove placeholder, ensure at least one item exists
+        ns_rng = _section_range("## Next Steps")
+        if ns_rng:
+            start, end = ns_rng
+            body = [ln.strip() for ln in ac_lines[start + 1 : end] if ln.strip()]
+            body = [ln for ln in body if "[Next action item]" not in ln]
+            # Keep only numbered items
+            body = [ln for ln in body if ln[0:2].isdigit() or ln.startswith("1.")]
+            if not body:
+                body = ["1. (auto-updated during generation)"]
+            else:
+                body = body[:5]
+            ac_lines = ac_lines[: start + 1] + body + [""] + ac_lines[end:]
+
+        # Active Decisions: remove placeholder, keep simple marker
+        ad_rng = _section_range("## Active Decisions")
+        if ad_rng:
+            start, end = ad_rng
+            body = [ln.strip() for ln in ac_lines[start + 1 : end] if ln.strip()]
+            body = [ln for ln in body if "[Decisions being considered]" not in ln]
+            if not body:
+                body = ["- (none)"]
+            ac_lines = ac_lines[: start + 1] + body + [""] + ac_lines[end:]
+
+        # Blockers: remove placeholder, keep simple marker
+        bl_rng = _section_range("## Blockers")
+        if bl_rng:
+            start, end = bl_rng
+            body = [ln.strip() for ln in ac_lines[start + 1 : end] if ln.strip()]
+            body = [ln for ln in body if "[Current blockers if any]" not in ln]
+            if not body:
+                body = ["- (none)"]
+            ac_lines = ac_lines[: start + 1] + body
+
+        self._files["active_context"].save("\n".join(ac_lines).strip() + "\n")
+    
+    def load_all(self) -> Dict[str, str]:
+        """
+        Load all memory files.
+        
+        Returns:
+            Dict mapping file keys to their content
+        """
+        contents = {}
+        for key, mem_file in self._files.items():
+            contents[key] = mem_file.load()
+        return contents
+    
+    def get_context(self) -> str:
+        """
+        Get combined context from all memory files for LLM prompt.
+        
+        Returns:
+            Formatted string with all memory bank contents
+        """
+        contents = self.load_all()
+        
+        sections = []
+        for key, config in self.CORE_FILES.items():
+            content = contents.get(key, "")
+            if content:
+                sections.append(f"## {config['description']}\n\n{self._strip_top_heading(content)}")
+        
+        return "\n\n---\n\n".join(sections)
+
+    @staticmethod
+    def _strip_top_heading(content: str) -> str:
+        """
+        Avoid nested headings in prompts.
+        If the file starts with a single '# Title' line, strip it.
+        """
+        lines = content.splitlines()
+        if not lines:
+            return content
+        if lines[0].startswith("# "):
+            # drop first line and following single blank line
+            rest = lines[1:]
+            if rest and rest[0].strip() == "":
+                rest = rest[1:]
+            return "\n".join(rest).strip()
+        return content.strip()
+    
+    def update(self, key: str, content: str) -> None:
+        """
+        Update a specific memory file.
+        
+        Args:
+            key: Memory file key (e.g., 'active_context', 'progress')
+            content: New content for the file
+        """
+        if key not in self._files:
+            raise ValueError(f"Unknown memory file: {key}")
+        
+        self._files[key].save(content)
+        self._logger.info(f"Updated {key}")
+    
+    def append_to_progress(self, item: str, category: str = "completed") -> None:
+        """
+        Append an item to the progress file.
+        
+        Args:
+            item: Item description
+            category: One of 'completed', 'in_progress', 'issues'
+        """
+        current = self._files["progress"].load()
+        # Remove placeholder entries if still present
+        current = current.replace("- [x] [Feature 1]", "").replace("- [ ] [Feature 2]", "")
+        current = current.replace("- [Issue 1]: [Description]", "").strip() + "\n"
+        
+        category_markers = {
+            "completed": "## Completed Features",
+            "in_progress": "## In Progress",
+            "issues": "## Known Issues",
+        }
+        
+        marker = category_markers.get(category)
+        if marker and marker in current:
+            # Find the section and append
+            lines = current.split("\n")
+            new_lines = []
+            in_section = False
+            added = False
+            
+            for line in lines:
+                new_lines.append(line)
+                if line.startswith(marker):
+                    in_section = True
+                elif in_section and line.startswith("## "):
+                    in_section = False
+                elif in_section and not added and line.startswith("-"):
+                    # Insert right after the section header before the first list item
+                    checkbox = "[x]" if category == "completed" else "[ ]"
+                    new_lines.insert(len(new_lines) - 1, f"- {checkbox} {item}")
+                    added = True
+            
+            if not added:
+                new_lines.append(f"- {'[x]' if category == 'completed' else '[ ]'} {item}")
+            
+            self._files["progress"].save("\n".join(new_lines))
+    
+    def update_active_context(self, focus: str, recent_change: str = None, next_step: str = None) -> None:
+        """
+        Update the active context file.
+        
+        Args:
+            focus: Current work focus
+            recent_change: Optional recent change to log
+            next_step: Optional next step to add
+        """
+        current = self._files["active_context"].load()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        
+        lines = current.split("\n")
+
+        def _section_bounds(header: str) -> Optional[tuple[int, int]]:
+            start = None
+            for i, ln in enumerate(lines):
+                if ln.strip() == header:
+                    start = i
+                    break
+            if start is None:
+                return None
+            end = len(lines)
+            for j in range(start + 1, len(lines)):
+                if lines[j].startswith("## "):
+                    end = j
+                    break
+            return start, end
+
+        # Update Current Focus: replace the section body with a single line
+        bounds = _section_bounds("## Current Focus")
+        if bounds:
+            start, end = bounds
+            new_lines = lines[: start + 1] + [focus] + [""] + lines[end:]
+            lines = new_lines
+
+        # Update Recent Changes: prepend a bullet, keep last 10, remove placeholder
+        if recent_change:
+            bounds = _section_bounds("## Recent Changes")
+            if bounds:
+                start, end = bounds
+                body = [ln for ln in lines[start + 1 : end] if ln.strip() and "[Change description]" not in ln]
+                # Remove duplicates
+                entry = f"- {timestamp}: {recent_change}"
+                body = [ln for ln in body if ln.strip() != entry.strip()]
+                body.insert(0, entry)
+                body = body[:10]
+                lines = lines[: start + 1] + body + [""] + lines[end:]
+
+        # Update Next Steps if provided (replace first item)
+        if next_step:
+            bounds = _section_bounds("## Next Steps")
+            if bounds:
+                start, end = bounds
+                body = [ln for ln in lines[start + 1 : end] if ln.strip()]
+                # Replace with a single next step line
+                lines = lines[: start + 1] + [f"1. {next_step}"] + [""] + lines[end:]
+
+        self._files["active_context"].save("\n".join(lines).strip() + "\n")
+    
+    def get_file(self, key: str) -> Optional[str]:
+        """Get content of a specific memory file."""
+        if key in self._files:
+            return self._files[key].load()
+        return None
+    
+    def exists(self) -> bool:
+        """Check if memory bank directory exists."""
+        return self.memory_dir.exists()
+    
+    def get_summary(self) -> str:
+        """
+        Get a brief summary of memory bank status.
+        
+        Returns:
+            Summary string for logging/display
+        """
+        if not self.exists():
+            return "Memory Bank: Not initialized"
+        
+        files_status = []
+        for key, mem_file in self._files.items():
+            if mem_file.path.exists():
+                size = mem_file.path.stat().st_size
+                files_status.append(f"  - {key}: {size} bytes")
+            else:
+                files_status.append(f"  - {key}: missing")
+        
+        return f"Memory Bank: {self.memory_dir}\n" + "\n".join(files_status)
+
+    def get_digest(self, max_chars: int = 4000) -> str:
+        """
+        Return a concise, actionable digest of the Memory Bank.
+
+        This is meant to be LLM-friendly: current focus, next step, recent changes,
+        completed items, and current blockers/issues (without dumping full files).
+        """
+        if not self.exists():
+            return "Memory Bank not initialized."
+
+        def _read(key: str) -> str:
+            return (self._files.get(key).load() if key in self._files else "") or ""
+
+        active = _read("active_context")
+        progress = _read("progress")
+        tech = _read("tech_context")
+
+        def _section(md: str, header: str) -> str:
+            # Extract section body between "## Header" and next "## "
+            m = re.search(rf"^##\\s+{re.escape(header)}\\s*$([\\s\\S]*?)(?=^##\\s+|\\Z)", md, flags=re.MULTILINE)
+            if not m:
+                return ""
+            body = m.group(1).strip()
+            # Remove empty lines at ends
+            return "\n".join([ln.rstrip() for ln in body.splitlines() if ln.strip()][:50]).strip()
+
+        focus = _section(active, "Current Focus")
+        recent = _section(active, "Recent Changes")
+        next_steps = _section(active, "Next Steps")
+        completed = _section(progress, "Completed Features")
+        issues = _section(progress, "Known Issues")
+
+        # Pull a few high-signal tech lines (ports/compose paths often end up here)
+        tech_lines = []
+        for ln in tech.splitlines():
+            if any(k in ln.lower() for k in ["docker", "compose", "port", "url", "vite", "express", "postgres", "database_url"]):
+                tech_lines.append(ln.strip())
+            if len(tech_lines) >= 12:
+                break
+        tech_block = "\n".join([ln for ln in tech_lines if ln]) or "(see tech_context.md)"
+
+        out = "\n".join([
+            "MEMORY BANK DIGEST",
+            "",
+            "Current Focus:",
+            focus or "(unknown)",
+            "",
+            "Next Steps:",
+            next_steps or "(none)",
+            "",
+            "Recent Changes:",
+            recent or "(none)",
+            "",
+            "Known Issues / Blockers:",
+            issues or "(none)",
+            "",
+            "Completed (recent):",
+            completed or "(none)",
+            "",
+            "Tech Notes (high-signal):",
+            tech_block,
+        ]).strip() + "\n"
+
+        if len(out) > max_chars:
+            return out[: max_chars - 20] + "\n...(truncated)\n"
+        return out
+

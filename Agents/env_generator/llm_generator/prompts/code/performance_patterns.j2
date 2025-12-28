@@ -1,0 +1,325 @@
+## Performance Patterns Reference
+
+### React Performance Optimization
+
+**1. Code Splitting with React.lazy:**
+```jsx
+// App.jsx - Route-based code splitting
+import { lazy, Suspense } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import { Spinner } from './components/ui/Spinner';
+
+// Lazy load pages
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const ProjectList = lazy(() => import('./pages/ProjectList'));
+const IssueDetail = lazy(() => import('./pages/IssueDetail'));
+const Settings = lazy(() => import('./pages/Settings'));
+
+function App() {
+  return (
+    <Suspense fallback={<Spinner size="lg" className="flex justify-center py-20" />}>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/projects" element={<ProjectList />} />
+        <Route path="/issues/:id" element={<IssueDetail />} />
+        <Route path="/settings" element={<Settings />} />
+      </Routes>
+    </Suspense>
+  );
+}
+```
+
+**2. Memoization with useMemo and useCallback:**
+```jsx
+import { useMemo, useCallback, memo } from 'react';
+
+// Memoize expensive computations
+function IssueBoard({ issues, filters }) {
+  const filteredIssues = useMemo(() => {
+    return issues
+      .filter(issue => !filters.status || issue.status === filters.status)
+      .filter(issue => !filters.assignee || issue.assigneeId === filters.assignee)
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  }, [issues, filters.status, filters.assignee]);
+
+  // Memoize callbacks passed to children
+  const handleDragEnd = useCallback((result) => {
+    // Handle drag logic
+  }, []);
+
+  return (
+    <DragDropContext onDragEnd={handleDragEnd}>
+      {filteredIssues.map(issue => (
+        <IssueCard key={issue.id} issue={issue} />
+      ))}
+    </DragDropContext>
+  );
+}
+
+// Memoize components that receive stable props
+const IssueCard = memo(function IssueCard({ issue, onSelect }) {
+  return (
+    <div onClick={() => onSelect(issue.id)}>
+      <h3>{issue.title}</h3>
+      <span>{issue.status}</span>
+    </div>
+  );
+});
+```
+
+**3. Virtualization for Long Lists:**
+```jsx
+// For lists > 100 items, use virtualization
+import { useVirtualizer } from '@tanstack/react-virtual';
+
+function VirtualIssueList({ issues }) {
+  const parentRef = useRef(null);
+  
+  const virtualizer = useVirtualizer({
+    count: issues.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 72,  // Estimated item height
+    overscan: 5,             // Render 5 items outside viewport
+  });
+
+  return (
+    <div ref={parentRef} className="h-[600px] overflow-auto">
+      <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+        {virtualizer.getVirtualItems().map(virtualRow => (
+          <div
+            key={virtualRow.key}
+            style={{
+              position: 'absolute',
+              top: virtualRow.start,
+              height: virtualRow.size,
+              width: '100%',
+            }}
+          >
+            <IssueCard issue={issues[virtualRow.index]} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+**4. Debounce Search Input:**
+```jsx
+import { useState, useMemo, useCallback } from 'react';
+import debounce from 'lodash/debounce';
+
+function SearchInput({ onSearch }) {
+  const [query, setQuery] = useState('');
+
+  // Debounce the search callback
+  const debouncedSearch = useMemo(
+    () => debounce((q) => onSearch(q), 300),
+    [onSearch]
+  );
+
+  // Cleanup on unmount
+  useEffect(() => () => debouncedSearch.cancel(), [debouncedSearch]);
+
+  const handleChange = useCallback((e) => {
+    const value = e.target.value;
+    setQuery(value);
+    debouncedSearch(value);
+  }, [debouncedSearch]);
+
+  return (
+    <input
+      type="search"
+      value={query}
+      onChange={handleChange}
+      placeholder="Search..."
+    />
+  );
+}
+```
+
+**5. Image Optimization:**
+```jsx
+// Use native lazy loading for images
+<img 
+  src={project.coverImage} 
+  alt={project.name}
+  loading="lazy"
+  decoding="async"
+  width={300}
+  height={200}
+/>
+
+// For critical above-the-fold images
+<img 
+  src={heroImage} 
+  alt="Hero"
+  loading="eager"
+  fetchPriority="high"
+/>
+
+// Responsive images with srcset
+<img
+  src={image.url}
+  srcSet={`
+    ${image.small} 400w,
+    ${image.medium} 800w,
+    ${image.large} 1200w
+  `}
+  sizes="(max-width: 600px) 400px, (max-width: 1000px) 800px, 1200px"
+  alt={image.alt}
+  loading="lazy"
+/>
+```
+
+---
+
+### Backend Performance
+
+**1. Database Query Optimization:**
+```javascript
+// Use proper indexes (in SQL schema)
+CREATE INDEX idx_issues_project_status ON issues(project_id, status);
+CREATE INDEX idx_issues_assignee ON issues(assignee_id) WHERE assignee_id IS NOT NULL;
+
+// Pagination with cursor-based pagination for large datasets
+async function getIssuesWithCursor(cursor, limit = 20) {
+  const query = cursor
+    ? `SELECT * FROM issues WHERE id > $1 ORDER BY id LIMIT $2`
+    : `SELECT * FROM issues ORDER BY id LIMIT $1`;
+  
+  const params = cursor ? [cursor, limit] : [limit];
+  const result = await db.query(query, params);
+  
+  return {
+    items: result.rows,
+    nextCursor: result.rows.length === limit 
+      ? result.rows[result.rows.length - 1].id 
+      : null,
+  };
+}
+
+// Select only needed columns
+// WRONG
+const issues = await db.query('SELECT * FROM issues');
+
+// CORRECT
+const issues = await db.query(`
+  SELECT id, title, status, assignee_id, updated_at 
+  FROM issues 
+  WHERE project_id = $1
+`, [projectId]);
+```
+
+**2. Caching with Redis (optional):**
+```javascript
+// Simple in-memory cache for API responses
+const cache = new Map();
+const CACHE_TTL = 60 * 1000; // 1 minute
+
+async function getCachedOrFetch(key, fetchFn) {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  
+  const data = await fetchFn();
+  cache.set(key, { data, timestamp: Date.now() });
+  return data;
+}
+
+// Usage
+async function getProjectStats(projectId) {
+  return getCachedOrFetch(`project:${projectId}:stats`, async () => {
+    return db.query(`SELECT ... FROM issues WHERE project_id = $1`, [projectId]);
+  });
+}
+```
+
+**3. Compression:**
+```javascript
+import compression from 'compression';
+
+// Enable gzip compression for responses > 1KB
+app.use(compression({ threshold: 1024 }));
+```
+
+**4. Connection Pooling:**
+```javascript
+// config/database.js
+import { Pool } from 'pg';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20,                    // Max connections in pool
+  idleTimeoutMillis: 30000,   // Close idle connections after 30s
+  connectionTimeoutMillis: 2000, // Fail fast if can't connect
+});
+
+export default pool;
+```
+
+---
+
+### Bundle Size Optimization
+
+**1. Tree-shaking friendly imports:**
+```javascript
+// WRONG - imports entire library
+import _ from 'lodash';
+_.debounce(fn, 300);
+
+// CORRECT - imports only what's needed
+import debounce from 'lodash/debounce';
+debounce(fn, 300);
+
+// For icons - same principle
+// WRONG
+import * as Icons from 'lucide-react';
+<Icons.Search />
+
+// CORRECT
+import { Search } from 'lucide-react';
+<Search />
+```
+
+**2. Analyze bundle size:**
+```bash
+# Add to package.json scripts
+"analyze": "vite build --mode production && npx vite-bundle-analyzer"
+```
+
+**3. Dynamic imports for heavy dependencies:**
+```javascript
+// Only load chart library when needed
+const ChartView = lazy(() => import('./ChartView'));
+
+// Or on-demand
+async function loadAndRenderChart() {
+  const { Chart } = await import('chart.js');
+  // Use Chart
+}
+```
+
+---
+
+### Performance Checklist
+
+**Frontend:**
+- [ ] Route-based code splitting with React.lazy
+- [ ] Memoize expensive computations (useMemo)
+- [ ] Memoize callbacks passed to children (useCallback)
+- [ ] Use memo() for pure components with stable props
+- [ ] Debounce search/filter inputs
+- [ ] Virtualize lists > 100 items
+- [ ] Lazy load images with loading="lazy"
+- [ ] Tree-shake imports (lodash, icons)
+
+**Backend:**
+- [ ] Add database indexes for frequent queries
+- [ ] Use pagination for list endpoints
+- [ ] Select only needed columns
+- [ ] Enable response compression
+- [ ] Configure connection pooling
+- [ ] Cache expensive queries when appropriate
+
