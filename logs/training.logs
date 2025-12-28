@@ -119,3 +119,603 @@ INFO 12-28 12:52:20 [backends.py:530] Using cache directory: /home/macos/.cache/
 INFO 12-28 12:52:20 [backends.py:541] Dynamo bytecode transform time: 5.02 s
 INFO 12-28 12:52:22 [backends.py:161] Directly load the compiled graph(s) for dynamic shape from the cache, took 1.841 s
 INFO 12-28 12:52:23 [monitor.py:34] torch.compile takes 5.02 s in total
+INFO 12-28 12:52:24 [gpu_worker.py:255] Available KV cache memory: 120.54 GiB
+INFO 12-28 12:52:24 [kv_cache_utils.py:833] GPU KV cache size: 1,128,512 tokens
+INFO 12-28 12:52:24 [kv_cache_utils.py:837] Maximum concurrency for 40,960 tokens per request: 27.55x
+Capturing CUDA graph shapes:   0%|          | 0/67 [00:00<?, ?it/s]Capturing CUDA graph shapes:   6%|▌         | 4/67 [00:00<00:01, 33.66it/s]Capturing CUDA graph shapes:  12%|█▏        | 8/67 [00:00<00:01, 34.18it/s]Capturing CUDA graph shapes:  18%|█▊        | 12/67 [00:00<00:01, 33.07it/s]Capturing CUDA graph shapes:  24%|██▍       | 16/67 [00:00<00:01, 30.00it/s]Capturing CUDA graph shapes:  30%|██▉       | 20/67 [00:00<00:01, 28.23it/s]Capturing CUDA graph shapes:  36%|███▌      | 24/67 [00:00<00:01, 29.60it/s]Capturing CUDA graph shapes:  42%|████▏     | 28/67 [00:00<00:01, 29.54it/s]Capturing CUDA graph shapes:  46%|████▋     | 31/67 [00:01<00:01, 28.08it/s]Capturing CUDA graph shapes:  51%|█████     | 34/67 [00:01<00:01, 28.40it/s]Capturing CUDA graph shapes:  55%|█████▌    | 37/67 [00:01<00:01, 28.71it/s]Capturing CUDA graph shapes:  60%|█████▉    | 40/67 [00:01<00:00, 28.17it/s]Capturing CUDA graph shapes:  64%|██████▍   | 43/67 [00:01<00:00, 27.91it/s]Capturing CUDA graph shapes:  70%|███████   | 47/67 [00:01<00:00, 28.98it/s]Capturing CUDA graph shapes:  75%|███████▍  | 50/67 [00:01<00:00, 28.27it/s]Capturing CUDA graph shapes:  79%|███████▉  | 53/67 [00:01<00:00, 28.30it/s]Capturing CUDA graph shapes:  84%|████████▎ | 56/67 [00:01<00:00, 28.26it/s]Capturing CUDA graph shapes:  90%|████████▉ | 60/67 [00:02<00:00, 29.01it/s]Capturing CUDA graph shapes:  96%|█████████▌| 64/67 [00:02<00:00, 29.64it/s]Capturing CUDA graph shapes: 100%|██████████| 67/67 [00:02<00:00, 29.34it/s]
+INFO 12-28 12:52:26 [gpu_model_runner.py:2485] Graph capturing finished in 3 secs, took 0.61 GiB
+INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
+  [OK] All services initialized
+  [OK] Torchstore
+
+Forge ready for training!
+
+
+Starting training for 500 steps...
+Task: click-test
+Benchmark: miniwob
+
+Environment pool: 1 server(s) available
+Task pool: 53 tasks
+  First 10: ['click-checkboxes', 'click-checkboxes-large', 'click-checkboxes-soft', 'click-checkboxes-transfer', 'click-button-sequence', 'choose-list', 'click-menu', 'click-menu-2', 'click-pie', 'click-pie-nodelay']...
+================================================================================
+GRPO Web Training - Task Log Started at 2025-12-28 12:52:40.915426
+================================================================================
+
+Evaluation: every 5 steps, 32 tasks
+
+[Step 0] Running initial evaluation (before training)...
+
+============================================================
+EVALUATION: 32 tasks (from 53 task types)
+Using shared pool with 1 server(s)
+Task pool sample: ['click-checkboxes', 'click-checkboxes-large', 'click-checkboxes-soft', 'click-checkboxes-transfer', 'click-button-sequence']...
+============================================================
+
+================================================================================
+TASK 1 (Rollout #0) - ID: e0a093e7
+Benchmark: miniwob, Task: click-checkboxes
+================================================================================
+
+GOAL: Select v3q, T1qNmX, EL6T and click Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/click-checkboxes.html
+Action error: 
+Action error: 
+Action error: 
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> click('v3q') -> click('EL6T') -> click('T1qNmX')
+
+================================================================================
+TASK 2 (Rollout #0) - ID: b96c46ba
+Benchmark: miniwob, Task: click-checkboxes-large
+================================================================================
+
+GOAL: Select lb3SPJK, O0Z3, oz, ixD, hg, Qeyj84G and click Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/click-checkboxes-large.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 3 (Rollout #0) - ID: 89bd026c
+Benchmark: miniwob, Task: click-checkboxes-soft
+================================================================================
+
+GOAL: Select words similar to mistaken, car, conceal, despise, savory and click Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/click-checkboxes-soft.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 4 (Rollout #0) - ID: 85a1079a
+Benchmark: miniwob, Task: click-checkboxes-transfer
+================================================================================
+
+GOAL: Select kYH, ztwY, sFB8 and click Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/click-checkboxes-transfer.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 5 (Rollout #0) - ID: c5a85a1b
+Benchmark: miniwob, Task: click-button-sequence
+================================================================================
+
+GOAL: Click button ONE, then click button TWO.
+Initial URL: http://127.0.0.1:8888/miniwob/click-button-sequence.html
+Task completed!
+
+SUCCESS - Reward: 1.0
+Task length: 2 steps
+Actions: click('12') -> click('13')
+
+================================================================================
+TASK 6 (Rollout #0) - ID: a8b1e3ba
+Benchmark: miniwob, Task: choose-list
+================================================================================
+
+GOAL: Select Delinda from the list and click Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/choose-list.html
+Action error: 
+Action error: 
+Action error: 
+Action error: 
+Action error: 
+Action error: 
+Action error: 
+Action error: 
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> hover('[17] option "Delinda"') -> click('[17] option "Delinda"') -> click('[23] button "Submit"') -> click('[23] button "Submit"') -> click('[23] button "Submit"') -> noop() -> click('[23] button "Submit"') -> select('[13] combobox', 'Delinda') -> click('[23] button "Submit"')
+
+================================================================================
+TASK 7 (Rollout #0) - ID: 384d5f6d
+Benchmark: miniwob, Task: click-menu
+================================================================================
+
+GOAL: Select Mercy
+Initial URL: http://127.0.0.1:8888/miniwob/click-menu.html
+Task completed!
+
+SUCCESS - Reward: 1.0
+Task length: 3 steps
+Actions: noop() -> noop() -> click('69')
+
+================================================================================
+TASK 8 (Rollout #0) - ID: fd9f3209
+Benchmark: miniwob, Task: click-menu-2
+================================================================================
+
+GOAL: Click the "Menu" button, and then find and click on the item labeled "Play".
+Initial URL: http://127.0.0.1:8888/miniwob/click-menu-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: click('16') -> click('16') -> noop() -> click('16') -> click('16') -> click('16') -> click('16') -> noop() -> noop() -> click('16')
+
+================================================================================
+TASK 9 (Rollout #0) - ID: 5f4b9a26
+Benchmark: miniwob, Task: click-pie
+================================================================================
+
+GOAL: Expand the pie menu below and click on the item labeled "N".
+Initial URL: http://127.0.0.1:8888/miniwob/click-pie.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 10 (Rollout #0) - ID: ae9b924b
+Benchmark: miniwob, Task: click-pie-nodelay
+================================================================================
+
+GOAL: Expand the pie menu below and click on the item labeled "Z".
+Initial URL: http://127.0.0.1:8888/miniwob/click-pie-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 11 (Rollout #0) - ID: b0431f88
+Benchmark: miniwob, Task: click-shades
+================================================================================
+
+GOAL: Select all the shades of red and press Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/click-shades.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> goto('http://127.0.0.1:8888/miniwob/click-shades.html') -> noop() -> noop()
+
+================================================================================
+TASK 12 (Rollout #0) - ID: e8d3c84c
+Benchmark: miniwob, Task: count-shape
+================================================================================
+
+GOAL: How many 7s are there?
+Initial URL: http://127.0.0.1:8888/miniwob/count-shape.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 13 (Rollout #0) - ID: 94b48c5f
+Benchmark: miniwob, Task: count-sides
+================================================================================
+
+GOAL: Press the button that correctly denotes how many sides the shape has.
+Initial URL: http://127.0.0.1:8888/miniwob/count-sides.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================[-]E1228 12:58:59.297949 2006092 hyperactor/src/channel/net.rs:793] session unix:@koNvTlm8drdWWW4CqWsJaU7r.11282728972829097649: failed while receiving ack: Connection reset by peer (os error 104)
+[-]E1228 12:58:59.297974 2006092 hyperactor/src/channel/net.rs:793] session unix:@koNvTlm8drdWWW4CqWsJaU7r.18426997098203439307: failed while receiving ack: Connection reset by peer (os error 104)
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/scratch/czr/env-gen/openenv/examples/grpo_web/train.py", line 197, in <module>
+    asyncio.run(main())
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/runners.py", line 194, in run
+    with Runner(debug=debug, loop_factory=loop_factory) as runner:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/runners.py", line 62, in __exit__
+    self.close()
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/runners.py", line 70, in close
+    _cancel_all_tasks(loop)
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/runners.py", line 206, in _cancel_all_tasks
+    loop.run_until_complete(tasks.gather(*to_cancel, return_exceptions=True))
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/base_events.py", line 678, in run_until_complete
+    self.run_forever()
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/base_events.py", line 645, in run_forever
+    self._run_once()
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/base_events.py", line 1999, in _run_once
+    handle._run()
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/events.py", line 88, in _run
+    self._context.run(self._callback, *self._args)
+  File "/scratch/czr/env-gen/openenv/examples/grpo_web/train.py", line 168, in main
+    trainer, metrics = await run_training(
+                       ^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/env-gen/openenv/examples/grpo_web/train.py", line 68, in run_training
+    metrics = await trainer.run(steps=training_steps)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py", line 327, in run
+    await self.evaluate(
+  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py", line 466, in evaluate
+    all_results = await play_web_task_parallel(
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/rollout.py", line 284, in play_web_task_parallel
+    results = await asyncio.gather(*tasks)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/base_events.py", line 678, in run_until_complete
+    self.run_forever()
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/base_events.py", line 645, in run_forever
+    self._run_once()
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/base_events.py", line 1999, in _run_once
+    handle._run()
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/events.py", line 88, in _run
+    self._context.run(self._callback, *self._args)
+  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/rollout.py", line 267, in run_task_with_pool
+    return await play_web_task(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/rollout.py", line 176, in play_web_task
+    result = env.step(BrowserGymAction(action_str=action_str))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/env-gen/openenv/src/openenv/core/env_client.py", line 329, in step
+    response = self._send_and_receive(message)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/env-gen/openenv/src/openenv/core/env_client.py", line 149, in _send_and_receive
+    response = self._receive()
+               ^^^^^^^^^^^^^^^
+  File "/scratch/czr/env-gen/openenv/src/openenv/core/env_client.py", line 144, in _receive
+    return json.loads(raw)
+           ^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/json/decoder.py", line 338, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/json/decoder.py", line 354, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/runners.py", line 157, in _on_sigint
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+Exception ignored in atexit callback: <function _start_and_connect_service.<locals>.teardown_atexit at 0x7f3728734720>
+Traceback (most recent call last):
+
+TASK 14 (Rollout #0) - ID: 8fd56439
+Benchmark: miniwob, Task: identify-shape
+================================================================================
+
+GOAL: Click the button that best describes the figure below.
+Initial URL: http://127.0.0.1:8888/miniwob/identify-shape.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 15 (Rollout #0) - ID: 5867c09f
+Benchmark: miniwob, Task: click-scroll-list
+================================================================================
+
+GOAL: Select Nicaragua from the scroll list and click Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/click-scroll-list.html
+Action error: 
+Action error: 
+Action error: 
+Action error: 
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> hover('[16] option Nicaragua') -> click('[16] option Nicaragua') -> click('[25] button Submit') -> select('[16] option Nicaragua', 'Nicaragua')
+
+================================================================================
+TASK 16 (Rollout #0) - ID: 82e48b2b
+Benchmark: miniwob, Task: scroll-text
+================================================================================
+
+GOAL: Find the last word in the text area, enter it into the text field and hit Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/scroll-text.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 17 (Rollout #0) - ID: 33030aa2
+Benchmark: miniwob, Task: scroll-text-2
+================================================================================
+
+GOAL: Scroll the textarea to the top of the text hit submit.
+Initial URL: http://127.0.0.1:8888/miniwob/scroll-text-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 18 (Rollout #0) - ID: 04737a28
+Benchmark: miniwob, Task: click-tab
+================================================================================
+
+GOAL: Click on Tab #3.
+Initial URL: http://127.0.0.1:8888/miniwob/click-tab.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 19 (Rollout #0) - ID: d0dc593e
+Benchmark: miniwob, Task: click-tab-2
+================================================================================
+
+GOAL: Switch between the tabs to find and click on the link "curabitur".
+Initial URL: http://127.0.0.1:8888/miniwob/click-tab-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 20 (Rollout #0) - ID: 48d2fa55
+Benchmark: miniwob, Task: click-tab-2-hard
+================================================================================
+
+GOAL: Switch between the tabs to find and click on the link "Faucibus.".
+Initial URL: http://127.0.0.1:8888/miniwob/click-tab-2-hard.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 21 (Rollout #0) - ID: 02d230be
+Benchmark: miniwob, Task: click-widget
+================================================================================
+
+GOAL: Click on a "text" widget.
+Initial URL: http://127.0.0.1:8888/miniwob/click-widget.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 22 (Rollout #0) - ID: eaad7cbd
+Benchmark: miniwob, Task: click-collapsible
+================================================================================
+
+GOAL: Expand the section below and click submit.
+Initial URL: http://127.0.0.1:8888/miniwob/click-collapsible.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 23 (Rollout #0) - ID: 6b2c79b8
+Benchmark: miniwob, Task: click-collapsible-2
+================================================================================
+
+GOAL: Expand the sections below, to find and click on the link "amet.".
+Initial URL: http://127.0.0.1:8888/miniwob/click-collapsible-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 24 (Rollout #0) - ID: 5c067bef
+Benchmark: miniwob, Task: click-collapsible-nodelay
+================================================================================
+
+GOAL: Expand the section below and click submit.
+Initial URL: http://127.0.0.1:8888/miniwob/click-collapsible-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 25 (Rollout #0) - ID: b53ca303
+Benchmark: miniwob, Task: click-collapsible-2-nodelay
+================================================================================
+
+GOAL: Expand the sections below, to find and click on the link "ultrices.".
+Initial URL: http://127.0.0.1:8888/miniwob/click-collapsible-2-nodelay.html
+socket.send() raised exception.
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+socket.send() raised exception.
+    conn.teardown(hooks.exit_code)
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in teardown
+    return self._proc.join()
+           ^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/site-packages/wandb/sdk/lib/service/service_process.py", line 57, in join
+socket.send() raised exception.
+    return self._process.wait()
+socket.send() raised exception.
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/subprocess.py", line 1277, in wait
+socket.send() raised exception.
+socket.send() raised exception.
+    self._wait(timeout=sigint_timeout)
+socket.send() raised exception.
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/subprocess.py", line 2047, in _wait
+socket.send() raised exception.
+    time.sleep(delay)
+socket.send() raised exception.
+KeyboardInterrupt: 
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
+socket.send() raised exception.
