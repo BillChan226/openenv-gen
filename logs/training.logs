@@ -31,3 +31,91 @@ Spawning actor ReplayBuffer
 Spawning actor ComputeAdvantages
 Spawning service ReferenceModel
 Spawning service WebReward
+INFO 12-28 12:51:44 [__init__.py:235] Automatically detected platform cuda.
+/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:25: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
+  from forge.actors.trainer import RLTrainer
+WebEnvActor initialized:
+  Server: http://localhost:8005
+  Model: Qwen/Qwen3-1.7B
+  Benchmark: miniwob
+  (Task selection handled by trainer task_pool)
+INFO 12-28 12:51:49 [__init__.py:235] Automatically detected platform cuda.
+/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:25: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
+  from forge.actors.trainer import RLTrainer
+[34m[TitanTrainer-0/1] 2025-12-28 12:51:50 INFO[0m Compiling loss
+INFO 12-28 12:51:51 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 12:51:51 [__init__.py:235] Automatically detected platform cuda.
+[34m[TitanTrainer-0/1] 2025-12-28 12:51:52 INFO[0m Building 0-D device mesh with [], []
+[34m[TitanTrainer-0/1] 2025-12-28 12:51:52 INFO[0m [GC] Initial GC collection took 0.00 seconds
+/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:25: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
+  from forge.actors.trainer import RLTrainer
+/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:25: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
+  from forge.actors.trainer import RLTrainer
+[34m[TitanTrainer-0/1] 2025-12-28 12:51:53 WARNING[0m Sequence length 4200 exceeds original maximum 4096.
+[34m[TitanTrainer-0/1] 2025-12-28 12:51:53 INFO[0m Total parameter count: dense 2,031,739,904, sparse 0, active 2,031,739,904
+[34m[TitanTrainer-0/1] 2025-12-28 12:51:53 INFO[0m Applied selective activation checkpointing to the model
+[34m[TitanTrainer-0/1] 2025-12-28 12:51:53 INFO[0m Checkpointing active. Checkpoints will be loaded from and saved to checkpoint
+[34m[TitanTrainer-0/1] 2025-12-28 12:51:53 INFO[0m Mixed precision training is handled by AMP
+[34m[TitanTrainer-0/1] 2025-12-28 12:51:53 INFO[0m loading from HF safetensors from --checkpoint.initial_load_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
+[34m[TitanTrainer-0/1] 2025-12-28 12:51:53 INFO[0m Loading the checkpoint from /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e.
+[34m[TitanTrainer-0/1] 2025-12-28 12:51:54 INFO[0m [GC] GC collection for checkpoint loading. took 0.00 seconds
+[34m[TitanTrainer-0/1] 2025-12-28 12:51:54 INFO[0m Finished loading the checkpoint in 0.80 seconds.
+INFO 12-28 12:51:59 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 12:51:59 [__init__.py:235] Automatically detected platform cuda.
+[34m[ReferenceModel-1/2] 2025-12-28 12:51:59 INFO[0m Building 1-D device mesh with ['tp'], [2]
+[34m[ReferenceModel-0/2] 2025-12-28 12:51:59 INFO[0m Building 1-D device mesh with ['tp'], [2]
+[34m[ReferenceModel-1/2] 2025-12-28 12:51:59 INFO[0m [GC] Initial GC collection took 0.00 seconds
+[34m[ReferenceModel-0/2] 2025-12-28 12:51:59 INFO[0m [GC] Initial GC collection took 0.00 seconds
+/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:25: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
+  from forge.actors.trainer import RLTrainer
+[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 WARNING[0m Sequence length 4200 exceeds original maximum 4096.
+[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 WARNING[0m Sequence length 4200 exceeds original maximum 4096.
+[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 INFO[0m Total parameter count: dense 2,031,739,904, sparse 0, active 2,031,739,904
+[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 INFO[0m Total parameter count: dense 2,031,739,904, sparse 0, active 2,031,739,904
+[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 INFO[0m Applied Tensor Parallelism to the model
+[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 INFO[0m Applied selective activation checkpointing to the model
+[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 INFO[0m Applied Tensor Parallelism to the model
+[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 INFO[0m Applied selective activation checkpointing to the model
+[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 INFO[0m Checkpointing active. Checkpoints will be loaded from and saved to 
+[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 WARNING[0m Mixed precision training with TP or PP is only supported when FSDP/HSDP/CP is enabled.
+[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 INFO[0m Mixed precision training is disabled
+[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 INFO[0m loading from HF safetensors from --checkpoint.initial_load_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
+[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 INFO[0m Loading the checkpoint from /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e.
+[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 INFO[0m Checkpointing active. Checkpoints will be loaded from and saved to 
+[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 WARNING[0m Mixed precision training with TP or PP is only supported when FSDP/HSDP/CP is enabled.
+[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 INFO[0m Mixed precision training is disabled
+[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 INFO[0m loading from HF safetensors from --checkpoint.initial_load_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
+[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 INFO[0m Loading the checkpoint from /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e.
+[34m[ReferenceModel-1/2] 2025-12-28 12:52:02 INFO[0m [GC] GC collection for checkpoint loading. took 0.04 seconds
+[34m[ReferenceModel-1/2] 2025-12-28 12:52:02 INFO[0m Finished loading the checkpoint in 0.78 seconds.
+[34m[ReferenceModel-0/2] 2025-12-28 12:52:02 INFO[0m [GC] GC collection for checkpoint loading. took 0.06 seconds
+[34m[ReferenceModel-0/2] 2025-12-28 12:52:02 INFO[0m Finished loading the checkpoint in 0.81 seconds.
+`torch_dtype` is deprecated! Use `dtype` instead!
+INFO 12-28 12:52:06 [config.py:1604] Using max model len 40960
+INFO 12-28 12:52:06 [config.py:2434] Chunked prefill is enabled with max_num_batched_tokens=16384.
+INFO 12-28 12:52:09 [__init__.py:235] Automatically detected platform cuda.
+WARNING 12-28 12:52:10 [multiproc_worker_utils.py:307] Reducing Torch parallelism from 112 threads to 1 to avoid unnecessary CPU contention. Set OMP_NUM_THREADS in the external environment to tune this value as needed.
+[W1228 12:52:12.104807237 ProcessGroupNCCL.cpp:924] Warning: TORCH_NCCL_AVOID_RECORD_STREAMS is the default now, this environment variable is thus deprecated. (function operator())
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+INFO 12-28 12:52:12 [parallel_state.py:1102] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, TP rank 0, EP rank 0
+INFO 12-28 12:52:12 [topk_topp_sampler.py:49] Using FlashInfer for top-p & top-k sampling.
+INFO 12-28 12:52:12 [gpu_model_runner.py:1843] Starting to load model Qwen/Qwen3-1.7B...
+INFO 12-28 12:52:12 [gpu_model_runner.py:1875] Loading model from scratch...
+INFO 12-28 12:52:12 [cuda.py:290] Using Flash Attention backend on V1 engine.
+INFO 12-28 12:52:13 [weight_utils.py:296] Using model weights format ['*.safetensors']
+Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:00<00:00,  3.54it/s]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:00<00:00,  3.54it/s]
+
+INFO 12-28 12:52:14 [default_loader.py:262] Loading weights took 0.65 seconds
+INFO 12-28 12:52:14 [gpu_model_runner.py:1892] Model loading took 3.2152 GiB and 1.208351 seconds
+[-]E1228 12:52:15.307518 2006092 hyperactor/src/channel/net.rs:872] error_msg:session unix:@dAfZtuvOpl2LQaBO5709Sfd3.2230316847887212358: failed to deliver message within timeout
+[-]E1228 12:52:17.214857 2006092 hyperactor/src/channel/net.rs:872] error_msg:session unix:@dAfZtuvOpl2LQaBO5709Sfd3.777225928832420174: failed to deliver message within timeout
+INFO 12-28 12:52:20 [backends.py:530] Using cache directory: /home/macos/.cache/vllm/torch_compile_cache/6f37d2e49c/rank_0_0/backbone for vLLM's torch.compile
+INFO 12-28 12:52:20 [backends.py:541] Dynamo bytecode transform time: 5.02 s
+INFO 12-28 12:52:22 [backends.py:161] Directly load the compiled graph(s) for dynamic shape from the cache, took 1.841 s
+INFO 12-28 12:52:23 [monitor.py:34] torch.compile takes 5.02 s in total
