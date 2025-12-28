@@ -154,10 +154,11 @@ async def play_web_task(
             action_str = parse_web_action(response.text)
             action_history.append(action_str)
 
-            # task_log(f"Parsed action: {action_str}")
-            # Debug: if noop was parsed, show the full response
-            # if action_str == "noop()" and len(response.text) > 200:
-            #     print(f"  [DEBUG] Full response (noop parsed): {response.text[-300:]}")
+            # Debug: if noop was parsed, show the full response to understand why
+            if action_str == "noop()":
+                print(f"  [NOOP DEBUG] Task {task_id} Step {step_num + 1}")
+                print(f"  [NOOP DEBUG] Response length: {len(response.text)}")
+                print(f"  [NOOP DEBUG] Response (last 500 chars): {response.text[-500:]}")
 
             # Store step data
             task_steps.append({

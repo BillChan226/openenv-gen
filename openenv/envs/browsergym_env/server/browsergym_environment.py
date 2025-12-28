@@ -102,7 +102,6 @@ class BrowserGymEnvironment(Environment):
         viewport_height: int = 720,
         timeout: float = 10000.0,
         use_screenshot: bool = False,
-        use_screenshot: bool = False,
         **gym_kwargs: Any,
     ):
         """Initialize the BrowserGym environment.
@@ -117,8 +116,6 @@ class BrowserGymEnvironment(Environment):
             timeout: Action timeout in milliseconds
             use_screenshot: Whether to include screenshots in observations (default False).
                            Set to False for text-only LLMs like Llama to reduce message size.
-            use_screenshot: Whether to include screenshots in observations (default False).
-                           Set to False for text-only LLMs like Llama to reduce message size.
             **gym_kwargs: Additional arguments passed to gym.make()
         """
         super().__init__()
@@ -129,7 +126,6 @@ class BrowserGymEnvironment(Environment):
         self.viewport_width = viewport_width
         self.viewport_height = viewport_height
         self.timeout = timeout
-        self.use_screenshot = use_screenshot
         self.use_screenshot = use_screenshot
         self.gym_kwargs = dict(gym_kwargs)
 
@@ -165,10 +161,6 @@ class BrowserGymEnvironment(Environment):
         # is initialized in the same thread where it will be used.
         # This avoids threading issues when reset/step run in an executor.
         self.gym_env = None
-        # NOTE: gym_env is created lazily in reset() to ensure Playwright
-        # is initialized in the same thread where it will be used.
-        # This avoids threading issues when reset/step run in an executor.
-        self.gym_env = None
 
         # State tracking
         self._state = BrowserGymState(
@@ -180,35 +172,6 @@ class BrowserGymEnvironment(Environment):
 
         self._last_obs: Optional[Dict[str, Any]] = None
         self._last_info: Optional[Dict[str, Any]] = None
-
-    def _ensure_gym_env(self) -> None:
-        """Lazily create the gym environment.
-
-        This ensures Playwright is initialized in the same thread where
-        reset/step will be called (the executor thread), avoiding threading issues.
-        """
-        if self.gym_env is not None:
-            return
-
-        try:
-            # Note: BrowserGym always captures screenshots internally.
-            # We control whether to include them in responses via self.use_screenshot
-            # (checked in _create_observation), not via gym.make()
-            self.gym_env = gym.make(
-                self.env_id,
-                headless=self.headless,
-                viewport={"width": self.viewport_width, "height": self.viewport_height},
-                timeout=self.timeout,
-                **self.gym_kwargs,
-            )
-        except Exception as e:  # noqa: BLE001 - gym.make
-            message = (
-                "Failed to create BrowserGym environment "
-                f"'{self.env_id}': {e}\n"
-                "Make sure the benchmark package is installed "
-                f"(e.g., pip install browsergym-{self.benchmark})."
-            )
-            raise ValueError(message) from e
 
     def _ensure_gym_env(self) -> None:
         """Lazily create the gym environment.
@@ -411,10 +374,6 @@ class BrowserGymEnvironment(Environment):
         self._state.current_url = url
         self._state.goal = goal
 
-        # Extract additional observation modalities (only if enabled)
-        screenshot = None
-        if self.use_screenshot and isinstance(obs, dict):
-            screenshot = obs.get("screenshot")
         # Extract additional observation modalities (only if enabled)
         screenshot = None
         if self.use_screenshot and isinstance(obs, dict):

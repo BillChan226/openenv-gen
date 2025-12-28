@@ -1,6 +1,6 @@
 Warning: setting HYPERACTOR_CODEC_MAX_FRAME_LENGTH since this needs to be set to enable large RPC calls via Monarch
-INFO 12-28 12:51:33 [__init__.py:235] Automatically detected platform cuda.
-/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:25: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
+INFO 12-28 14:15:21 [__init__.py:235] Automatically detected platform cuda.
+/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:18: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
   from forge.actors.trainer import RLTrainer
 
 ============================================================
@@ -11,11 +11,11 @@ Initializing Forge infrastructure...
 Launcher not provided, remote allocations will not work.
 wandb: Currently logged in as: billchenzr226 to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
 wandb: Tracking run with wandb version 0.23.1
-wandb: Run data is saved locally in /scratch/czr/env-gen/openenv/wandb/run-20251228_125136-q9keuhxb
+wandb: Run data is saved locally in /scratch/czr/env-gen/openenv/wandb/run-20251228_141524-vqnkag8b
 wandb: Run `wandb offline` to turn off syncing.
 wandb: Syncing run miniwob-medium-5tasks
 wandb: ⭐️ View project at https://wandb.ai/billchenzr226/grpo-web
-wandb: 🚀 View run at https://wandb.ai/billchenzr226/grpo-web/runs/q9keuhxb
+wandb: 🚀 View run at https://wandb.ai/billchenzr226/grpo-web/runs/vqnkag8b
 wandb: Detected [openai] in use.
 wandb: Use W&B Weave for improved LLM call tracing. Install Weave with `pip install weave` then add `import weave` to the top of your script.
 wandb: For more information, check out the docs at: https://weave-docs.wandb.ai/
@@ -31,107 +31,107 @@ Spawning actor ReplayBuffer
 Spawning actor ComputeAdvantages
 Spawning service ReferenceModel
 Spawning service WebReward
-INFO 12-28 12:51:44 [__init__.py:235] Automatically detected platform cuda.
-/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:25: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
+INFO 12-28 14:15:32 [__init__.py:235] Automatically detected platform cuda.
+/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:18: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
   from forge.actors.trainer import RLTrainer
 WebEnvActor initialized:
   Server: http://localhost:8005
   Model: Qwen/Qwen3-1.7B
   Benchmark: miniwob
   (Task selection handled by trainer task_pool)
-INFO 12-28 12:51:49 [__init__.py:235] Automatically detected platform cuda.
-/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:25: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
+INFO 12-28 14:15:37 [__init__.py:235] Automatically detected platform cuda.
+/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:18: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
   from forge.actors.trainer import RLTrainer
-[34m[TitanTrainer-0/1] 2025-12-28 12:51:50 INFO[0m Compiling loss
-INFO 12-28 12:51:51 [__init__.py:235] Automatically detected platform cuda.
-INFO 12-28 12:51:51 [__init__.py:235] Automatically detected platform cuda.
-[34m[TitanTrainer-0/1] 2025-12-28 12:51:52 INFO[0m Building 0-D device mesh with [], []
-[34m[TitanTrainer-0/1] 2025-12-28 12:51:52 INFO[0m [GC] Initial GC collection took 0.00 seconds
-/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:25: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
+[34m[TitanTrainer-0/1] 2025-12-28 14:15:38 INFO[0m Compiling loss
+INFO 12-28 14:15:39 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 14:15:39 [__init__.py:235] Automatically detected platform cuda.
+[34m[TitanTrainer-0/1] 2025-12-28 14:15:40 INFO[0m Building 0-D device mesh with [], []
+[34m[TitanTrainer-0/1] 2025-12-28 14:15:40 INFO[0m [GC] Initial GC collection took 0.00 seconds
+/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:18: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
   from forge.actors.trainer import RLTrainer
-/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:25: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
+/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:18: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
   from forge.actors.trainer import RLTrainer
-[34m[TitanTrainer-0/1] 2025-12-28 12:51:53 WARNING[0m Sequence length 4200 exceeds original maximum 4096.
-[34m[TitanTrainer-0/1] 2025-12-28 12:51:53 INFO[0m Total parameter count: dense 2,031,739,904, sparse 0, active 2,031,739,904
-[34m[TitanTrainer-0/1] 2025-12-28 12:51:53 INFO[0m Applied selective activation checkpointing to the model
-[34m[TitanTrainer-0/1] 2025-12-28 12:51:53 INFO[0m Checkpointing active. Checkpoints will be loaded from and saved to checkpoint
-[34m[TitanTrainer-0/1] 2025-12-28 12:51:53 INFO[0m Mixed precision training is handled by AMP
-[34m[TitanTrainer-0/1] 2025-12-28 12:51:53 INFO[0m loading from HF safetensors from --checkpoint.initial_load_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
-[34m[TitanTrainer-0/1] 2025-12-28 12:51:53 INFO[0m Loading the checkpoint from /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e.
-[34m[TitanTrainer-0/1] 2025-12-28 12:51:54 INFO[0m [GC] GC collection for checkpoint loading. took 0.00 seconds
-[34m[TitanTrainer-0/1] 2025-12-28 12:51:54 INFO[0m Finished loading the checkpoint in 0.80 seconds.
-INFO 12-28 12:51:59 [__init__.py:235] Automatically detected platform cuda.
-INFO 12-28 12:51:59 [__init__.py:235] Automatically detected platform cuda.
-[34m[ReferenceModel-1/2] 2025-12-28 12:51:59 INFO[0m Building 1-D device mesh with ['tp'], [2]
-[34m[ReferenceModel-0/2] 2025-12-28 12:51:59 INFO[0m Building 1-D device mesh with ['tp'], [2]
-[34m[ReferenceModel-1/2] 2025-12-28 12:51:59 INFO[0m [GC] Initial GC collection took 0.00 seconds
-[34m[ReferenceModel-0/2] 2025-12-28 12:51:59 INFO[0m [GC] Initial GC collection took 0.00 seconds
-/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:25: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
+[34m[TitanTrainer-0/1] 2025-12-28 14:15:41 WARNING[0m Sequence length 4200 exceeds original maximum 4096.
+[34m[TitanTrainer-0/1] 2025-12-28 14:15:41 INFO[0m Total parameter count: dense 2,031,739,904, sparse 0, active 2,031,739,904
+[34m[TitanTrainer-0/1] 2025-12-28 14:15:41 INFO[0m Applied selective activation checkpointing to the model
+[34m[TitanTrainer-0/1] 2025-12-28 14:15:41 INFO[0m Checkpointing active. Checkpoints will be loaded from and saved to checkpoint
+[34m[TitanTrainer-0/1] 2025-12-28 14:15:41 INFO[0m Mixed precision training is handled by AMP
+[34m[TitanTrainer-0/1] 2025-12-28 14:15:41 INFO[0m loading from HF safetensors from --checkpoint.initial_load_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
+[34m[TitanTrainer-0/1] 2025-12-28 14:15:41 INFO[0m Loading the checkpoint from /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e.
+[34m[TitanTrainer-0/1] 2025-12-28 14:15:42 INFO[0m [GC] GC collection for checkpoint loading. took 0.00 seconds
+[34m[TitanTrainer-0/1] 2025-12-28 14:15:42 INFO[0m Finished loading the checkpoint in 0.78 seconds.
+INFO 12-28 14:15:46 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 14:15:47 [__init__.py:235] Automatically detected platform cuda.
+[34m[ReferenceModel-1/2] 2025-12-28 14:15:47 INFO[0m Building 1-D device mesh with ['tp'], [2]
+[34m[ReferenceModel-0/2] 2025-12-28 14:15:47 INFO[0m Building 1-D device mesh with ['tp'], [2]
+[34m[ReferenceModel-1/2] 2025-12-28 14:15:47 INFO[0m [GC] Initial GC collection took 0.00 seconds
+[34m[ReferenceModel-0/2] 2025-12-28 14:15:47 INFO[0m [GC] Initial GC collection took 0.00 seconds
+/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:18: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
   from forge.actors.trainer import RLTrainer
-[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 WARNING[0m Sequence length 4200 exceeds original maximum 4096.
-[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 WARNING[0m Sequence length 4200 exceeds original maximum 4096.
-[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 INFO[0m Total parameter count: dense 2,031,739,904, sparse 0, active 2,031,739,904
-[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 INFO[0m Total parameter count: dense 2,031,739,904, sparse 0, active 2,031,739,904
-[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 INFO[0m Applied Tensor Parallelism to the model
-[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 INFO[0m Applied selective activation checkpointing to the model
-[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 INFO[0m Applied Tensor Parallelism to the model
-[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 INFO[0m Applied selective activation checkpointing to the model
-[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 INFO[0m Checkpointing active. Checkpoints will be loaded from and saved to 
-[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 WARNING[0m Mixed precision training with TP or PP is only supported when FSDP/HSDP/CP is enabled.
-[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 INFO[0m Mixed precision training is disabled
-[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 INFO[0m loading from HF safetensors from --checkpoint.initial_load_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
-[34m[ReferenceModel-0/2] 2025-12-28 12:52:01 INFO[0m Loading the checkpoint from /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e.
-[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 INFO[0m Checkpointing active. Checkpoints will be loaded from and saved to 
-[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 WARNING[0m Mixed precision training with TP or PP is only supported when FSDP/HSDP/CP is enabled.
-[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 INFO[0m Mixed precision training is disabled
-[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 INFO[0m loading from HF safetensors from --checkpoint.initial_load_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
-[34m[ReferenceModel-1/2] 2025-12-28 12:52:01 INFO[0m Loading the checkpoint from /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e.
-[34m[ReferenceModel-1/2] 2025-12-28 12:52:02 INFO[0m [GC] GC collection for checkpoint loading. took 0.04 seconds
-[34m[ReferenceModel-1/2] 2025-12-28 12:52:02 INFO[0m Finished loading the checkpoint in 0.78 seconds.
-[34m[ReferenceModel-0/2] 2025-12-28 12:52:02 INFO[0m [GC] GC collection for checkpoint loading. took 0.06 seconds
-[34m[ReferenceModel-0/2] 2025-12-28 12:52:02 INFO[0m Finished loading the checkpoint in 0.81 seconds.
+[34m[ReferenceModel-1/2] 2025-12-28 14:15:49 WARNING[0m Sequence length 4200 exceeds original maximum 4096.
+[34m[ReferenceModel-1/2] 2025-12-28 14:15:49 INFO[0m Total parameter count: dense 2,031,739,904, sparse 0, active 2,031,739,904
+[34m[ReferenceModel-0/2] 2025-12-28 14:15:49 WARNING[0m Sequence length 4200 exceeds original maximum 4096.
+[34m[ReferenceModel-0/2] 2025-12-28 14:15:49 INFO[0m Total parameter count: dense 2,031,739,904, sparse 0, active 2,031,739,904
+[34m[ReferenceModel-1/2] 2025-12-28 14:15:49 INFO[0m Applied Tensor Parallelism to the model
+[34m[ReferenceModel-1/2] 2025-12-28 14:15:49 INFO[0m Applied selective activation checkpointing to the model
+[34m[ReferenceModel-0/2] 2025-12-28 14:15:49 INFO[0m Applied Tensor Parallelism to the model
+[34m[ReferenceModel-0/2] 2025-12-28 14:15:49 INFO[0m Applied selective activation checkpointing to the model
+[34m[ReferenceModel-1/2] 2025-12-28 14:15:49 INFO[0m Checkpointing active. Checkpoints will be loaded from and saved to 
+[34m[ReferenceModel-1/2] 2025-12-28 14:15:49 WARNING[0m Mixed precision training with TP or PP is only supported when FSDP/HSDP/CP is enabled.
+[34m[ReferenceModel-1/2] 2025-12-28 14:15:49 INFO[0m Mixed precision training is disabled
+[34m[ReferenceModel-1/2] 2025-12-28 14:15:49 INFO[0m loading from HF safetensors from --checkpoint.initial_load_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
+[34m[ReferenceModel-1/2] 2025-12-28 14:15:49 INFO[0m Loading the checkpoint from /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e.
+[34m[ReferenceModel-0/2] 2025-12-28 14:15:49 INFO[0m Checkpointing active. Checkpoints will be loaded from and saved to 
+[34m[ReferenceModel-0/2] 2025-12-28 14:15:49 WARNING[0m Mixed precision training with TP or PP is only supported when FSDP/HSDP/CP is enabled.
+[34m[ReferenceModel-0/2] 2025-12-28 14:15:49 INFO[0m Mixed precision training is disabled
+[34m[ReferenceModel-0/2] 2025-12-28 14:15:49 INFO[0m loading from HF safetensors from --checkpoint.initial_load_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
+[34m[ReferenceModel-0/2] 2025-12-28 14:15:49 INFO[0m Loading the checkpoint from /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e.
+[34m[ReferenceModel-1/2] 2025-12-28 14:15:50 INFO[0m [GC] GC collection for checkpoint loading. took 0.04 seconds
+[34m[ReferenceModel-1/2] 2025-12-28 14:15:50 INFO[0m Finished loading the checkpoint in 0.83 seconds.
+[34m[ReferenceModel-0/2] 2025-12-28 14:15:50 INFO[0m [GC] GC collection for checkpoint loading. took 0.07 seconds
+[34m[ReferenceModel-0/2] 2025-12-28 14:15:50 INFO[0m Finished loading the checkpoint in 0.81 seconds.
 `torch_dtype` is deprecated! Use `dtype` instead!
-INFO 12-28 12:52:06 [config.py:1604] Using max model len 40960
-INFO 12-28 12:52:06 [config.py:2434] Chunked prefill is enabled with max_num_batched_tokens=16384.
-INFO 12-28 12:52:09 [__init__.py:235] Automatically detected platform cuda.
-WARNING 12-28 12:52:10 [multiproc_worker_utils.py:307] Reducing Torch parallelism from 112 threads to 1 to avoid unnecessary CPU contention. Set OMP_NUM_THREADS in the external environment to tune this value as needed.
-[W1228 12:52:12.104807237 ProcessGroupNCCL.cpp:924] Warning: TORCH_NCCL_AVOID_RECORD_STREAMS is the default now, this environment variable is thus deprecated. (function operator())
+INFO 12-28 14:15:54 [config.py:1604] Using max model len 40960
+INFO 12-28 14:15:55 [config.py:2434] Chunked prefill is enabled with max_num_batched_tokens=16384.
+INFO 12-28 14:15:57 [__init__.py:235] Automatically detected platform cuda.
+WARNING 12-28 14:15:58 [multiproc_worker_utils.py:307] Reducing Torch parallelism from 112 threads to 1 to avoid unnecessary CPU contention. Set OMP_NUM_THREADS in the external environment to tune this value as needed.
+[W1228 14:16:00.297277115 ProcessGroupNCCL.cpp:924] Warning: TORCH_NCCL_AVOID_RECORD_STREAMS is the default now, this environment variable is thus deprecated. (function operator())
 [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
 [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
 [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
 [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
 [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-INFO 12-28 12:52:12 [parallel_state.py:1102] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, TP rank 0, EP rank 0
-INFO 12-28 12:52:12 [topk_topp_sampler.py:49] Using FlashInfer for top-p & top-k sampling.
-INFO 12-28 12:52:12 [gpu_model_runner.py:1843] Starting to load model Qwen/Qwen3-1.7B...
-INFO 12-28 12:52:12 [gpu_model_runner.py:1875] Loading model from scratch...
-INFO 12-28 12:52:12 [cuda.py:290] Using Flash Attention backend on V1 engine.
-INFO 12-28 12:52:13 [weight_utils.py:296] Using model weights format ['*.safetensors']
+INFO 12-28 14:16:00 [parallel_state.py:1102] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, TP rank 0, EP rank 0
+INFO 12-28 14:16:00 [topk_topp_sampler.py:49] Using FlashInfer for top-p & top-k sampling.
+INFO 12-28 14:16:00 [gpu_model_runner.py:1843] Starting to load model Qwen/Qwen3-1.7B...
+INFO 12-28 14:16:01 [gpu_model_runner.py:1875] Loading model from scratch...
+INFO 12-28 14:16:01 [cuda.py:290] Using Flash Attention backend on V1 engine.
+INFO 12-28 14:16:01 [weight_utils.py:296] Using model weights format ['*.safetensors']
 Loading safetensors checkpoint shards:   0% Completed | 0/2 [00:00<?, ?it/s]
-Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:00<00:00,  3.54it/s]
-Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:00<00:00,  3.54it/s]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:00<00:00,  3.59it/s]
+Loading safetensors checkpoint shards: 100% Completed | 2/2 [00:00<00:00,  3.59it/s]
 
-INFO 12-28 12:52:14 [default_loader.py:262] Loading weights took 0.65 seconds
-INFO 12-28 12:52:14 [gpu_model_runner.py:1892] Model loading took 3.2152 GiB and 1.208351 seconds
-[-]E1228 12:52:15.307518 2006092 hyperactor/src/channel/net.rs:872] error_msg:session unix:@dAfZtuvOpl2LQaBO5709Sfd3.2230316847887212358: failed to deliver message within timeout
-[-]E1228 12:52:17.214857 2006092 hyperactor/src/channel/net.rs:872] error_msg:session unix:@dAfZtuvOpl2LQaBO5709Sfd3.777225928832420174: failed to deliver message within timeout
-INFO 12-28 12:52:20 [backends.py:530] Using cache directory: /home/macos/.cache/vllm/torch_compile_cache/6f37d2e49c/rank_0_0/backbone for vLLM's torch.compile
-INFO 12-28 12:52:20 [backends.py:541] Dynamo bytecode transform time: 5.02 s
-INFO 12-28 12:52:22 [backends.py:161] Directly load the compiled graph(s) for dynamic shape from the cache, took 1.841 s
-INFO 12-28 12:52:23 [monitor.py:34] torch.compile takes 5.02 s in total
-INFO 12-28 12:52:24 [gpu_worker.py:255] Available KV cache memory: 120.54 GiB
-INFO 12-28 12:52:24 [kv_cache_utils.py:833] GPU KV cache size: 1,128,512 tokens
-INFO 12-28 12:52:24 [kv_cache_utils.py:837] Maximum concurrency for 40,960 tokens per request: 27.55x
-Capturing CUDA graph shapes:   0%|          | 0/67 [00:00<?, ?it/s]Capturing CUDA graph shapes:   6%|▌         | 4/67 [00:00<00:01, 33.66it/s]Capturing CUDA graph shapes:  12%|█▏        | 8/67 [00:00<00:01, 34.18it/s]Capturing CUDA graph shapes:  18%|█▊        | 12/67 [00:00<00:01, 33.07it/s]Capturing CUDA graph shapes:  24%|██▍       | 16/67 [00:00<00:01, 30.00it/s]Capturing CUDA graph shapes:  30%|██▉       | 20/67 [00:00<00:01, 28.23it/s]Capturing CUDA graph shapes:  36%|███▌      | 24/67 [00:00<00:01, 29.60it/s]Capturing CUDA graph shapes:  42%|████▏     | 28/67 [00:00<00:01, 29.54it/s]Capturing CUDA graph shapes:  46%|████▋     | 31/67 [00:01<00:01, 28.08it/s]Capturing CUDA graph shapes:  51%|█████     | 34/67 [00:01<00:01, 28.40it/s]Capturing CUDA graph shapes:  55%|█████▌    | 37/67 [00:01<00:01, 28.71it/s]Capturing CUDA graph shapes:  60%|█████▉    | 40/67 [00:01<00:00, 28.17it/s]Capturing CUDA graph shapes:  64%|██████▍   | 43/67 [00:01<00:00, 27.91it/s]Capturing CUDA graph shapes:  70%|███████   | 47/67 [00:01<00:00, 28.98it/s]Capturing CUDA graph shapes:  75%|███████▍  | 50/67 [00:01<00:00, 28.27it/s]Capturing CUDA graph shapes:  79%|███████▉  | 53/67 [00:01<00:00, 28.30it/s]Capturing CUDA graph shapes:  84%|████████▎ | 56/67 [00:01<00:00, 28.26it/s]Capturing CUDA graph shapes:  90%|████████▉ | 60/67 [00:02<00:00, 29.01it/s]Capturing CUDA graph shapes:  96%|█████████▌| 64/67 [00:02<00:00, 29.64it/s]Capturing CUDA graph shapes: 100%|██████████| 67/67 [00:02<00:00, 29.34it/s]
-INFO 12-28 12:52:26 [gpu_model_runner.py:2485] Graph capturing finished in 3 secs, took 0.61 GiB
-INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
-INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
-INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
-INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
-INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
-INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
-INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
-INFO 12-28 12:52:41 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 14:16:02 [default_loader.py:262] Loading weights took 0.64 seconds
+INFO 12-28 14:16:02 [gpu_model_runner.py:1892] Model loading took 3.2152 GiB and 1.148991 seconds
+[-]E1228 14:16:03.013015 2104246 hyperactor/src/channel/net.rs:872] error_msg:session unix:@mVjrlWYopu19DtM0MPTTg9pU.3936981858370948178: failed to deliver message within timeout
+[-]E1228 14:16:05.047709 2104246 hyperactor/src/channel/net.rs:872] error_msg:session unix:@mVjrlWYopu19DtM0MPTTg9pU.1129541850309220608: failed to deliver message within timeout
+INFO 12-28 14:16:08 [backends.py:530] Using cache directory: /home/macos/.cache/vllm/torch_compile_cache/6f37d2e49c/rank_0_0/backbone for vLLM's torch.compile
+INFO 12-28 14:16:08 [backends.py:541] Dynamo bytecode transform time: 4.99 s
+INFO 12-28 14:16:10 [backends.py:161] Directly load the compiled graph(s) for dynamic shape from the cache, took 1.831 s
+INFO 12-28 14:16:11 [monitor.py:34] torch.compile takes 4.99 s in total
+INFO 12-28 14:16:12 [gpu_worker.py:255] Available KV cache memory: 120.54 GiB
+INFO 12-28 14:16:12 [kv_cache_utils.py:833] GPU KV cache size: 1,128,512 tokens
+INFO 12-28 14:16:12 [kv_cache_utils.py:837] Maximum concurrency for 40,960 tokens per request: 27.55x
+Capturing CUDA graph shapes:   0%|          | 0/67 [00:00<?, ?it/s]Capturing CUDA graph shapes:   6%|▌         | 4/67 [00:00<00:01, 35.67it/s]Capturing CUDA graph shapes:  12%|█▏        | 8/67 [00:00<00:01, 36.37it/s]Capturing CUDA graph shapes:  18%|█▊        | 12/67 [00:00<00:01, 32.44it/s]Capturing CUDA graph shapes:  24%|██▍       | 16/67 [00:00<00:01, 33.61it/s]Capturing CUDA graph shapes:  30%|██▉       | 20/67 [00:00<00:01, 34.42it/s]Capturing CUDA graph shapes:  36%|███▌      | 24/67 [00:00<00:01, 34.00it/s]Capturing CUDA graph shapes:  42%|████▏     | 28/67 [00:00<00:01, 33.59it/s]Capturing CUDA graph shapes:  48%|████▊     | 32/67 [00:00<00:01, 33.85it/s]Capturing CUDA graph shapes:  54%|█████▎    | 36/67 [00:01<00:00, 31.93it/s]Capturing CUDA graph shapes:  60%|█████▉    | 40/67 [00:01<00:00, 31.25it/s]Capturing CUDA graph shapes:  66%|██████▌   | 44/67 [00:01<00:00, 30.82it/s]Capturing CUDA graph shapes:  72%|███████▏  | 48/67 [00:01<00:00, 30.24it/s]Capturing CUDA graph shapes:  78%|███████▊  | 52/67 [00:01<00:00, 29.11it/s]Capturing CUDA graph shapes:  82%|████████▏ | 55/67 [00:01<00:00, 28.01it/s]Capturing CUDA graph shapes:  88%|████████▊ | 59/67 [00:01<00:00, 28.62it/s]Capturing CUDA graph shapes:  94%|█████████▍| 63/67 [00:02<00:00, 28.73it/s]Capturing CUDA graph shapes: 100%|██████████| 67/67 [00:02<00:00, 30.07it/s]Capturing CUDA graph shapes: 100%|██████████| 67/67 [00:02<00:00, 31.19it/s]
+INFO 12-28 14:16:14 [gpu_model_runner.py:2485] Graph capturing finished in 2 secs, took 0.61 GiB
+INFO 12-28 14:16:28 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 14:16:28 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 14:16:28 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 14:16:28 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 14:16:29 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 14:16:29 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 14:16:29 [__init__.py:235] Automatically detected platform cuda.
+INFO 12-28 14:16:29 [__init__.py:235] Automatically detected platform cuda.
   [OK] All services initialized
   [OK] Torchstore
 
@@ -146,7 +146,7 @@ Environment pool: 1 server(s) available
 Task pool: 53 tasks
   First 10: ['click-checkboxes', 'click-checkboxes-large', 'click-checkboxes-soft', 'click-checkboxes-transfer', 'click-button-sequence', 'choose-list', 'click-menu', 'click-menu-2', 'click-pie', 'click-pie-nodelay']...
 ================================================================================
-GRPO Web Training - Task Log Started at 2025-12-28 12:52:40.915426
+GRPO Web Training - Task Log Started at 2025-12-28 14:16:28.524048
 ================================================================================
 
 Evaluation: every 5 steps, 32 tasks
@@ -160,26 +160,23 @@ Task pool sample: ['click-checkboxes', 'click-checkboxes-large', 'click-checkbox
 ============================================================
 
 ================================================================================
-TASK 1 (Rollout #0) - ID: e0a093e7
+TASK 1 (Rollout #0) - ID: f482d3bc
 Benchmark: miniwob, Task: click-checkboxes
 ================================================================================
 
-GOAL: Select v3q, T1qNmX, EL6T and click Submit.
+GOAL: Select BLD, 8FGI, jq and click Submit.
 Initial URL: http://127.0.0.1:8888/miniwob/click-checkboxes.html
-Action error: 
-Action error: 
-Action error: 
 
 FAILED - Reward: 0.0
 Task length: 10 steps
-Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> click('v3q') -> click('EL6T') -> click('T1qNmX')
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
 
 ================================================================================
-TASK 2 (Rollout #0) - ID: b96c46ba
+TASK 2 (Rollout #0) - ID: 139f70bd
 Benchmark: miniwob, Task: click-checkboxes-large
 ================================================================================
 
-GOAL: Select lb3SPJK, O0Z3, oz, ixD, hg, Qeyj84G and click Submit.
+GOAL: Select T0P, 1EFcHs9, 7X5pxJ7, 9Cz62Q, zJNgM8j, Dc9w6bp, juZzI, dMrtf2, 5J, GOqA9GJ, 3r, m3J2 and click Submit.
 Initial URL: http://127.0.0.1:8888/miniwob/click-checkboxes-large.html
 
 FAILED - Reward: 0.0
@@ -187,11 +184,11 @@ Task length: 10 steps
 Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
 
 ================================================================================
-TASK 3 (Rollout #0) - ID: 89bd026c
+TASK 3 (Rollout #0) - ID: 0c122698
 Benchmark: miniwob, Task: click-checkboxes-soft
 ================================================================================
 
-GOAL: Select words similar to mistaken, car, conceal, despise, savory and click Submit.
+GOAL: Select words similar to water and click Submit.
 Initial URL: http://127.0.0.1:8888/miniwob/click-checkboxes-soft.html
 
 FAILED - Reward: 0.0
@@ -199,19 +196,20 @@ Task length: 10 steps
 Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
 
 ================================================================================
-TASK 4 (Rollout #0) - ID: 85a1079a
+TASK 4 (Rollout #0) - ID: 8117c73d
 Benchmark: miniwob, Task: click-checkboxes-transfer
 ================================================================================
 
-GOAL: Select kYH, ztwY, sFB8 and click Submit.
+GOAL: Select LJfaT4, J0woW3, a9 and click Submit.
 Initial URL: http://127.0.0.1:8888/miniwob/click-checkboxes-transfer.html
+Task completed!
 
 FAILED - Reward: 0.0
-Task length: 10 steps
-Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+Task length: 7 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> click('27')
 
 ================================================================================
-TASK 5 (Rollout #0) - ID: c5a85a1b
+TASK 5 (Rollout #0) - ID: 0c1d350c
 Benchmark: miniwob, Task: click-button-sequence
 ================================================================================
 
@@ -224,11 +222,11 @@ Task length: 2 steps
 Actions: click('12') -> click('13')
 
 ================================================================================
-TASK 6 (Rollout #0) - ID: a8b1e3ba
+TASK 6 (Rollout #0) - ID: 824def8c
 Benchmark: miniwob, Task: choose-list
 ================================================================================
 
-GOAL: Select Delinda from the list and click Submit.
+GOAL: Select Iceland from the list and click Submit.
 Initial URL: http://127.0.0.1:8888/miniwob/choose-list.html
 Action error: 
 Action error: 
@@ -238,42 +236,42 @@ Action error:
 Action error: 
 Action error: 
 Action error: 
+Action error: 
 
 FAILED - Reward: 0.0
 Task length: 10 steps
-Actions: noop() -> hover('[17] option "Delinda"') -> click('[17] option "Delinda"') -> click('[23] button "Submit"') -> click('[23] button "Submit"') -> click('[23] button "Submit"') -> noop() -> click('[23] button "Submit"') -> select('[13] combobox', 'Delinda') -> click('[23] button "Submit"')
+Actions: noop() -> hover('[12]') -> click('[22]') -> click('[22]') -> click('[22]') -> click('[22]') -> click('[22]') -> click('[22]') -> click('[22]') -> click('[22]')
 
 ================================================================================
-TASK 7 (Rollout #0) - ID: 384d5f6d
+TASK 7 (Rollout #0) - ID: ffaf7282
 Benchmark: miniwob, Task: click-menu
 ================================================================================
 
-GOAL: Select Mercy
+GOAL: Select Kat>Fleur
 Initial URL: http://127.0.0.1:8888/miniwob/click-menu.html
-Task completed!
 
-SUCCESS - Reward: 1.0
-Task length: 3 steps
-Actions: noop() -> noop() -> click('69')
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
 
 ================================================================================
-TASK 8 (Rollout #0) - ID: fd9f3209
+TASK 8 (Rollout #0) - ID: 672e8c5a
 Benchmark: miniwob, Task: click-menu-2
 ================================================================================
 
-GOAL: Click the "Menu" button, and then find and click on the item labeled "Play".
+GOAL: Click the "Menu" button, and then find and click on the item with the "ui-icon-play" icon.
 Initial URL: http://127.0.0.1:8888/miniwob/click-menu-2.html
 
 FAILED - Reward: 0.0
 Task length: 10 steps
-Actions: click('16') -> click('16') -> noop() -> click('16') -> click('16') -> click('16') -> click('16') -> noop() -> noop() -> click('16')
+Actions: click('16') -> click('16') -> noop() -> click('16') -> click('16') -> noop() -> noop() -> click('16') -> noop() -> click('16')
 
 ================================================================================
-TASK 9 (Rollout #0) - ID: 5f4b9a26
+TASK 9 (Rollout #0) - ID: ee4987bf
 Benchmark: miniwob, Task: click-pie
 ================================================================================
 
-GOAL: Expand the pie menu below and click on the item labeled "N".
+GOAL: Expand the pie menu below and click on the item labeled "P".
 Initial URL: http://127.0.0.1:8888/miniwob/click-pie.html
 
 FAILED - Reward: 0.0
@@ -281,11 +279,11 @@ Task length: 10 steps
 Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
 
 ================================================================================
-TASK 10 (Rollout #0) - ID: ae9b924b
+TASK 10 (Rollout #0) - ID: e1be8fee
 Benchmark: miniwob, Task: click-pie-nodelay
 ================================================================================
 
-GOAL: Expand the pie menu below and click on the item labeled "Z".
+GOAL: Expand the pie menu below and click on the item labeled "V".
 Initial URL: http://127.0.0.1:8888/miniwob/click-pie-nodelay.html
 
 FAILED - Reward: 0.0
@@ -293,7 +291,7 @@ Task length: 10 steps
 Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
 
 ================================================================================
-TASK 11 (Rollout #0) - ID: b0431f88
+TASK 11 (Rollout #0) - ID: 455dd77a
 Benchmark: miniwob, Task: click-shades
 ================================================================================
 
@@ -305,11 +303,11 @@ Task length: 10 steps
 Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> goto('http://127.0.0.1:8888/miniwob/click-shades.html') -> noop() -> noop()
 
 ================================================================================
-TASK 12 (Rollout #0) - ID: e8d3c84c
+TASK 12 (Rollout #0) - ID: f15fc087
 Benchmark: miniwob, Task: count-shape
 ================================================================================
 
-GOAL: How many 7s are there?
+GOAL: How many shapes are there?
 Initial URL: http://127.0.0.1:8888/miniwob/count-shape.html
 
 FAILED - Reward: 0.0
@@ -317,7 +315,7 @@ Task length: 10 steps
 Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
 
 ================================================================================
-TASK 13 (Rollout #0) - ID: 94b48c5f
+TASK 13 (Rollout #0) - ID: ff47fe92
 Benchmark: miniwob, Task: count-sides
 ================================================================================
 
@@ -328,8 +326,1859 @@ FAILED - Reward: 0.0
 Task length: 10 steps
 Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
 
-================================================================================[-]E1228 12:58:59.297949 2006092 hyperactor/src/channel/net.rs:793] session unix:@koNvTlm8drdWWW4CqWsJaU7r.11282728972829097649: failed while receiving ack: Connection reset by peer (os error 104)
-[-]E1228 12:58:59.297974 2006092 hyperactor/src/channel/net.rs:793] session unix:@koNvTlm8drdWWW4CqWsJaU7r.18426997098203439307: failed while receiving ack: Connection reset by peer (os error 104)
+================================================================================
+TASK 14 (Rollout #0) - ID: 5e6ba9fd
+Benchmark: miniwob, Task: identify-shape
+================================================================================
+
+GOAL: Click the button that best describes the figure below.
+Initial URL: http://127.0.0.1:8888/miniwob/identify-shape.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 15 (Rollout #0) - ID: 22d5272f
+Benchmark: miniwob, Task: click-scroll-list
+================================================================================
+
+GOAL: Select Myanmar, Oman from the scroll list and click Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/click-scroll-list.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> hover('16') -> click('16') -> click('14')
+
+================================================================================
+TASK 16 (Rollout #0) - ID: c06b5e65
+Benchmark: miniwob, Task: scroll-text
+================================================================================
+
+GOAL: Find the last word in the text area, enter it into the text field and hit Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/scroll-text.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 17 (Rollout #0) - ID: 6579dff8
+Benchmark: miniwob, Task: scroll-text-2
+================================================================================
+
+GOAL: Scroll the textarea to the top of the text hit submit.
+Initial URL: http://127.0.0.1:8888/miniwob/scroll-text-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 18 (Rollout #0) - ID: 4e4cdd1c
+Benchmark: miniwob, Task: click-tab
+================================================================================
+
+GOAL: Click on Tab #2.
+Initial URL: http://127.0.0.1:8888/miniwob/click-tab.html
+Task completed!
+
+SUCCESS - Reward: 1.0
+Task length: 1 steps
+Actions: click('20')
+
+================================================================================
+TASK 19 (Rollout #0) - ID: 0a3fdcd7
+Benchmark: miniwob, Task: click-tab-2
+================================================================================
+
+GOAL: Switch between the tabs to find and click on the link "at".
+Initial URL: http://127.0.0.1:8888/miniwob/click-tab-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 20 (Rollout #0) - ID: 39174621
+Benchmark: miniwob, Task: click-tab-2-hard
+================================================================================
+
+GOAL: Switch between the tabs to find and click on the link "fermentum.".
+Initial URL: http://127.0.0.1:8888/miniwob/click-tab-2-hard.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 21 (Rollout #0) - ID: 011252b1
+Benchmark: miniwob, Task: click-widget
+================================================================================
+
+GOAL: Click on a "text" widget.
+Initial URL: http://127.0.0.1:8888/miniwob/click-widget.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 22 (Rollout #0) - ID: e8a0043d
+Benchmark: miniwob, Task: click-collapsible
+================================================================================
+
+GOAL: Expand the section below and click submit.
+Initial URL: http://127.0.0.1:8888/miniwob/click-collapsible.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 23 (Rollout #0) - ID: a2483e74
+Benchmark: miniwob, Task: click-collapsible-2
+================================================================================
+
+GOAL: Expand the sections below, to find and click on the link "viverra".
+Initial URL: http://127.0.0.1:8888/miniwob/click-collapsible-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 24 (Rollout #0) - ID: 43468207
+Benchmark: miniwob, Task: click-collapsible-nodelay
+================================================================================
+
+GOAL: Expand the section below and click submit.
+Initial URL: http://127.0.0.1:8888/miniwob/click-collapsible-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 25 (Rollout #0) - ID: 2f6811d1
+Benchmark: miniwob, Task: click-collapsible-2-nodelay
+================================================================================
+
+GOAL: Expand the sections below, to find and click on the link "netus".
+Initial URL: http://127.0.0.1:8888/miniwob/click-collapsible-2-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 26 (Rollout #0) - ID: 29bc5e0e
+Benchmark: miniwob, Task: resize-textarea
+================================================================================
+
+GOAL: Resize the textarea so that the height is larger than its initial size then press Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/resize-textarea.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 27 (Rollout #0) - ID: 5aa52721
+Benchmark: miniwob, Task: text-transform
+================================================================================
+
+GOAL: Type the text below into the text field and press Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/text-transform.html
+Action error: 
+Action error: 
+Action error: 
+Action error: 
+Action error: 
+Action error: 
+Action error: 
+Action error: 
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> type('[18]', '') -> type('[18]', 'Type the text below') -> click('[19]') -> click('[19]') -> click('[19]') -> noop() -> type('[18]', 'Type the text below') -> click('[19]') -> type('[18]', 'Type the text below')
+
+================================================================================
+TASK 28 (Rollout #0) - ID: e6779081
+Benchmark: miniwob, Task: text-editor
+================================================================================
+
+GOAL: Using the text editor, give the text Felis. the style italics and press Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/text-editor.html
+Action error: 
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> type('101', 'Felis.')
+
+================================================================================
+TASK 29 (Rollout #0) - ID: 24d00a6a
+Benchmark: miniwob, Task: copy-paste
+================================================================================
+
+GOAL: Copy the text in the textarea below, paste it into the textbox and press Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/copy-paste.html
+
+FAILED - Reward: 0.0/scratch/czr/env-gen/openenv/examples/grpo_web/utils/data.py:70: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  tensor = torch.tensor(request_tokens, dtype=torch.long)
+/scratch/czr/env-gen/openenv/examples/grpo_web/utils/data.py:90: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  tensor = torch.tensor(response_tokens, dtype=torch.long)
+
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 30 (Rollout #0) - ID: a7d94db5
+Benchmark: miniwob, Task: copy-paste-2
+================================================================================
+
+GOAL: Copy the text from the 2nd text area below and paste it into the text input, then press Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/copy-paste-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 31 (Rollout #0) - ID: bafe62c3
+Benchmark: miniwob, Task: enter-date
+================================================================================
+
+GOAL: Enter 04/03/2014 as the date and hit submit.
+Initial URL: http://127.0.0.1:8888/miniwob/enter-date.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 32 (Rollout #0) - ID: 3276c852
+Benchmark: miniwob, Task: enter-time
+================================================================================
+
+GOAL: Enter 3:05 AM as the time and press submit.
+Initial URL: http://127.0.0.1:8888/miniwob/enter-time.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+  [EVAL] Task 0 (click-checkboxes): FAILED, reward=0.0
+  [EVAL] Task 1 (click-checkboxes-large): FAILED, reward=0.0
+  [EVAL] Task 2 (click-checkboxes-soft): FAILED, reward=0.0
+  [EVAL] Task 3 (click-checkboxes-transfer): FAILED, reward=0.0
+  [EVAL] Task 4 (click-button-sequence): SUCCESS in 2 steps
+  [EVAL] Task 5 (choose-list): FAILED, reward=0.0
+  [EVAL] Task 6 (click-menu): FAILED, reward=0.0
+  [EVAL] Task 7 (click-menu-2): FAILED, reward=0.0
+  [EVAL] Task 8 (click-pie): FAILED, reward=0.0
+  [EVAL] Task 9 (click-pie-nodelay): FAILED, reward=0.0
+  [EVAL] Task 10 (click-shades): FAILED, reward=0.0
+  [EVAL] Task 11 (count-shape): FAILED, reward=0.0
+  [EVAL] Task 12 (count-sides): FAILED, reward=0.0
+  [EVAL] Task 13 (identify-shape): FAILED, reward=0.0
+  [EVAL] Task 14 (click-scroll-list): FAILED, reward=0.0
+  [EVAL] Task 15 (scroll-text): FAILED, reward=0.0
+  [EVAL] Task 16 (scroll-text-2): FAILED, reward=0.0
+  [EVAL] Task 17 (click-tab): SUCCESS in 1 steps
+  [EVAL] Task 18 (click-tab-2): FAILED, reward=0.0
+  [EVAL] Task 19 (click-tab-2-hard): FAILED, reward=0.0
+  [EVAL] Task 20 (click-widget): FAILED, reward=0.0
+  [EVAL] Task 21 (click-collapsible): FAILED, reward=0.0
+  [EVAL] Task 22 (click-collapsible-2): FAILED, reward=0.0
+  [EVAL] Task 23 (click-collapsible-nodelay): FAILED, reward=0.0
+  [EVAL] Task 24 (click-collapsible-2-nodelay): FAILED, reward=0.0
+  [EVAL] Task 25 (resize-textarea): FAILED, reward=0.0
+  [EVAL] Task 26 (text-transform): FAILED, reward=0.0
+  [EVAL] Task 27 (text-editor): FAILED, reward=0.0
+  [EVAL] Task 28 (copy-paste): FAILED, reward=0.0
+  [EVAL] Task 29 (copy-paste-2): FAILED, reward=0.0
+  [EVAL] Task 30 (enter-date): FAILED, reward=0.0
+  [EVAL] Task 31 (enter-time): FAILED, reward=0.0
+
+============================================================
+EVAL RESULTS: 2/32 = 6.2% success rate
+Avg reward: 0.062, Avg steps: 9.4
+============================================================
+
+
+================================================================================
+TASK 1 (Rollout #1) - ID: 137f657e
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Sam" and ends with "amoa".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 2 (Rollout #1) - ID: d045489c
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Thai" and ends with "land".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 3 (Rollout #1) - ID: 5c80bed8
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Anti" and ends with "uda".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 4 (Rollout #1) - ID: 485e5b5b
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Ni".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 5 (Rollout #1) - ID: dc0c0c6d
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "We" and ends with "hara".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 6 (Rollout #1) - ID: 1d5ab49d
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Cam" and ends with "roon".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 7 (Rollout #1) - ID: ea84fef0
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Ba" and ends with "ados".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 8 (Rollout #1) - ID: 6fb2e091
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Sin".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+[TRAINER DEBUG] Computing reward for episode 1/80...
+[TRAINER DEBUG] Episode 1 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 2/80...
+[TRAINER DEBUG] Episode 2 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 3/80...
+[TRAINER DEBUG] Episode 3 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 4/80...[ADVANTAGES] Skipping zero-variance group: all rewards = -0.500
+
+[TRAINER DEBUG] Episode 4 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 5/80...
+[TRAINER DEBUG] Episode 5 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 6/80...
+[TRAINER DEBUG] Episode 6 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 7/80...
+[TRAINER DEBUG] Episode 7 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 8/80...
+[TRAINER DEBUG] Episode 8 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 9/80...
+[TRAINER DEBUG] Episode 9 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 10/80...
+[TRAINER DEBUG] Episode 10 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 11/80...
+[TRAINER DEBUG] Episode 11 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 12/80...
+[TRAINER DEBUG] Episode 12 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 13/80...
+[TRAINER DEBUG] Episode 13 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 14/80...
+[TRAINER DEBUG] Episode 14 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 15/80...
+[TRAINER DEBUG] Episode 15 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 16/80...
+[TRAINER DEBUG] Episode 16 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 17/80...
+[TRAINER DEBUG] Episode 17 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 18/80...
+[TRAINER DEBUG] Episode 18 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 19/80...
+[TRAINER DEBUG] Episode 19 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 20/80...
+[TRAINER DEBUG] Episode 20 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 21/80...
+[TRAINER DEBUG] Episode 21 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 22/80...
+[TRAINER DEBUG] Episode 22 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 23/80...
+[TRAINER DEBUG] Episode 23 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 24/80...
+[TRAINER DEBUG] Episode 24 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 25/80...
+[TRAINER DEBUG] Episode 25 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 26/80...
+[TRAINER DEBUG] Episode 26 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 27/80...
+[TRAINER DEBUG] Episode 27 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 28/80...
+[TRAINER DEBUG] Episode 28 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 29/80...
+[TRAINER DEBUG] Episode 29 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 30/80...
+[TRAINER DEBUG] Episode 30 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 31/80...
+[TRAINER DEBUG] Episode 31 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 32/80...
+[TRAINER DEBUG] Episode 32 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 33/80...
+[TRAINER DEBUG] Episode 33 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 34/80...
+[TRAINER DEBUG] Episode 34 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 35/80...
+[TRAINER DEBUG] Episode 35 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 36/80...
+[TRAINER DEBUG] Episode 36 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 37/80...
+[TRAINER DEBUG] Episode 37 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 38/80...
+[TRAINER DEBUG] Episode 38 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 39/80...
+[TRAINER DEBUG] Episode 39 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 40/80...
+[TRAINER DEBUG] Episode 40 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 41/80...
+[TRAINER DEBUG] Episode 41 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 42/80...
+[TRAINER DEBUG] Episode 42 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 43/80...
+[TRAINER DEBUG] Episode 43 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 44/80...
+[TRAINER DEBUG] Episode 44 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 45/80...
+[TRAINER DEBUG] Episode 45 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 46/80...
+[TRAINER DEBUG] Episode 46 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 47/80...
+[TRAINER DEBUG] Episode 47 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 48/80...
+[TRAINER DEBUG] Episode 48 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 49/80...
+[TRAINER DEBUG] Episode 49 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 50/80...
+[TRAINER DEBUG] Episode 50 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 51/80...
+[TRAINER DEBUG] Episode 51 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 52/80...
+[TRAINER DEBUG] Episode 52 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 53/80...
+[TRAINER DEBUG] Episode 53 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 54/80...
+[TRAINER DEBUG] Episode 54 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 55/80...
+[TRAINER DEBUG] Episode 55 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 56/80...
+[TRAINER DEBUG] Episode 56 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 57/80...
+[TRAINER DEBUG] Episode 57 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 58/80...
+[TRAINER DEBUG] Episode 58 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 59/80...
+[TRAINER DEBUG] Episode 59 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 60/80...
+[TRAINER DEBUG] Episode 60 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 61/80...
+[TRAINER DEBUG] Episode 61 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 62/80...
+[TRAINER DEBUG] Episode 62 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 63/80...
+[TRAINER DEBUG] Episode 63 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 64/80...
+[TRAINER DEBUG] Episode 64 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 65/80...
+[TRAINER DEBUG] Episode 65 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 66/80...
+[TRAINER DEBUG] Episode 66 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 67/80...
+[TRAINER DEBUG] Episode 67 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 68/80...
+[TRAINER DEBUG] Episode 68 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 69/80...
+[TRAINER DEBUG] Episode 69 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 70/80...
+[TRAINER DEBUG] Episode 70 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 71/80...
+[TRAINER DEBUG] Episode 71 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 72/80...
+[TRAINER DEBUG] Episode 72 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 73/80...
+[TRAINER DEBUG] Episode 73 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 74/80...
+[TRAINER DEBUG] Episode 74 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 75/80...
+[TRAINER DEBUG] Episode 75 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 76/80...
+[TRAINER DEBUG] Episode 76 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 77/80...
+[TRAINER DEBUG] Episode 77 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 78/80...
+[TRAINER DEBUG] Episode 78 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 79/80...
+[TRAINER DEBUG] Episode 79 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 80/80...
+[TRAINER DEBUG] Episode 80 reward: -0.5
+[TRAINER DEBUG] Getting ref model logprobs for 80 episodes...
+[TRAINER DEBUG] Got ref logprobs
+[TRAINER DEBUG] Computing advantages...
+[TRAINER] Skipping rollout 1: zero-variance group
+
+================================================================================
+TASK 1 (Rollout #2) - ID: 84aadd27
+Benchmark: miniwob, Task: read-table-2
+================================================================================
+
+GOAL: Enter the value that corresponds with each label into the form and submit when done.
+Initial URL: http://127.0.0.1:8888/miniwob/read-table-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 2 (Rollout #2) - ID: c4d2e35c
+Benchmark: miniwob, Task: read-table-2
+================================================================================
+
+GOAL: Enter the value that corresponds with each label into the form and submit when done.
+Initial URL: http://127.0.0.1:8888/miniwob/read-table-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 3 (Rollout #2) - ID: 6ee52a78
+Benchmark: miniwob, Task: read-table-2
+================================================================================
+
+GOAL: Enter the value that corresponds with each label into the form and submit when done.
+Initial URL: http://127.0.0.1:8888/miniwob/read-table-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 4 (Rollout #2) - ID: c86a2813
+Benchmark: miniwob, Task: read-table-2
+================================================================================
+
+GOAL: Enter the value that corresponds with each label into the form and submit when done.
+Initial URL: http://127.0.0.1:8888/miniwob/read-table-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 5 (Rollout #2) - ID: d12a4424
+Benchmark: miniwob, Task: read-table-2
+================================================================================
+
+GOAL: Enter the value that corresponds with each label into the form and submit when done.
+Initial URL: http://127.0.0.1:8888/miniwob/read-table-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 6 (Rollout #2) - ID: 655af624
+Benchmark: miniwob, Task: read-table-2
+================================================================================
+
+GOAL: Enter the value that corresponds with each label into the form and submit when done.
+Initial URL: http://127.0.0.1:8888/miniwob/read-table-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 7 (Rollout #2) - ID: 2f610f74
+Benchmark: miniwob, Task: read-table-2
+================================================================================
+
+GOAL: Enter the value that corresponds with each label into the form and submit when done.
+Initial URL: http://127.0.0.1:8888/miniwob/read-table-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 8 (Rollout #2) - ID: 0bee81db
+Benchmark: miniwob, Task: read-table-2
+================================================================================
+
+GOAL: Enter the value that corresponds with each label into the form and submit when done.
+Initial URL: http://127.0.0.1:8888/miniwob/read-table-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+[TRAINER DEBUG] Computing reward for episode 1/80...
+[TRAINER DEBUG] Episode 1 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 2/80...
+[TRAINER DEBUG] Episode 2 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 3/80...
+[TRAINER DEBUG] Episode 3 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 4/80...
+[TRAINER DEBUG] Episode 4 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 5/80...
+[TRAINER DEBUG] Episode 5 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 6/80...
+[TRAINER DEBUG] Episode 6 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 7/80...
+[TRAINER DEBUG] Episode 7 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 8/80...
+[TRAINER DEBUG] Episode 8 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 9/80...
+[TRAINER DEBUG] Episode 9 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 10/80...
+[TRAINER DEBUG] Episode 10 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 11/80...
+[TRAINER DEBUG] Episode 11 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 12/80...
+[TRAINER DEBUG] Episode 12 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 13/80...
+[TRAINER DEBUG] Episode 13 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 14/80...
+[TRAINER DEBUG] Episode 14 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 15/80...
+[TRAINER DEBUG] Episode 15 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 16/80...
+[TRAINER DEBUG] Episode 16 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 17/80...
+[TRAINER DEBUG] Episode 17 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 18/80...
+[TRAINER DEBUG] Episode 18 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 19/80...
+[TRAINER DEBUG] Episode 19 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 20/80...
+[TRAINER DEBUG] Episode 20 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 21/80...
+[TRAINER DEBUG] Episode 21 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 22/80...
+[TRAINER DEBUG] Episode 22 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 23/80...
+[TRAINER DEBUG] Episode 23 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 24/80...
+[TRAINER DEBUG] Episode 24 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 25/80...
+[TRAINER DEBUG] Episode 25 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 26/80...
+[TRAINER DEBUG] Episode 26 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 27/80...
+[TRAINER DEBUG] Episode 27 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 28/80...
+[TRAINER DEBUG] Episode 28 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 29/80...
+[TRAINER DEBUG] Episode 29 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 30/80...
+[TRAINER DEBUG] Episode 30 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 31/80...
+[TRAINER DEBUG] Episode 31 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 32/80...
+[TRAINER DEBUG] Episode 32 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 33/80...
+[TRAINER DEBUG] Episode 33 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 34/80...
+[TRAINER DEBUG] Episode 34 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 35/80...
+[TRAINER DEBUG] Episode 35 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 36/80...
+[TRAINER DEBUG] Episode 36 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 37/80...
+[TRAINER DEBUG] Episode 37 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 38/80...
+[TRAINER DEBUG] Episode 38 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 39/80...
+[TRAINER DEBUG] Episode 39 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 40/80...
+[TRAINER DEBUG] Episode 40 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 41/80...
+[TRAINER DEBUG] Episode 41 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 42/80...
+[TRAINER DEBUG] Episode 42 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 43/80...
+[TRAINER DEBUG] Episode 43 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 44/80...
+[TRAINER DEBUG] Episode 44 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 45/80...
+[TRAINER DEBUG] Episode 45 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 46/80...
+[TRAINER DEBUG] Episode 46 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 47/80...
+[TRAINER DEBUG] Episode 47 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 48/80...
+[TRAINER DEBUG] Episode 48 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 49/80...
+[TRAINER DEBUG] Episode 49 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 50/80...
+[TRAINER DEBUG] Episode 50 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 51/80...
+[TRAINER DEBUG] Episode 51 reward: -0.5[ADVANTAGES] Skipping zero-variance group: all rewards = -0.500
+
+[TRAINER DEBUG] Computing reward for episode 52/80...
+[TRAINER DEBUG] Episode 52 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 53/80...
+[TRAINER DEBUG] Episode 53 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 54/80...
+[TRAINER DEBUG] Episode 54 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 55/80...
+[TRAINER DEBUG] Episode 55 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 56/80...
+[TRAINER DEBUG] Episode 56 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 57/80...
+[TRAINER DEBUG] Episode 57 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 58/80...
+[TRAINER DEBUG] Episode 58 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 59/80...
+[TRAINER DEBUG] Episode 59 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 60/80...
+[TRAINER DEBUG] Episode 60 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 61/80...
+[TRAINER DEBUG] Episode 61 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 62/80...
+[TRAINER DEBUG] Episode 62 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 63/80...
+[TRAINER DEBUG] Episode 63 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 64/80...
+[TRAINER DEBUG] Episode 64 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 65/80...
+[TRAINER DEBUG] Episode 65 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 66/80...
+[TRAINER DEBUG] Episode 66 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 67/80...
+[TRAINER DEBUG] Episode 67 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 68/80...
+[TRAINER DEBUG] Episode 68 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 69/80...
+[TRAINER DEBUG] Episode 69 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 70/80...
+[TRAINER DEBUG] Episode 70 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 71/80...
+[TRAINER DEBUG] Episode 71 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 72/80...
+[TRAINER DEBUG] Episode 72 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 73/80...
+[TRAINER DEBUG] Episode 73 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 74/80...
+[TRAINER DEBUG] Episode 74 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 75/80...
+[TRAINER DEBUG] Episode 75 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 76/80...
+[TRAINER DEBUG] Episode 76 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 77/80...
+[TRAINER DEBUG] Episode 77 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 78/80...
+[TRAINER DEBUG] Episode 78 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 79/80...
+[TRAINER DEBUG] Episode 79 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 80/80...
+[TRAINER DEBUG] Episode 80 reward: -0.5
+[TRAINER DEBUG] Getting ref model logprobs for 80 episodes...
+[TRAINER DEBUG] Got ref logprobs
+[TRAINER DEBUG] Computing advantages...
+[TRAINER] Skipping rollout 2: zero-variance group
+
+================================================================================
+TASK 1 (Rollout #3) - ID: ae3491a4
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Co" and ends with "Rica".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 2 (Rollout #3) - ID: 4bf5cf4f
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Tu" and ends with "alu".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 3 (Rollout #3) - ID: 28dded92
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Co" and ends with "ongo".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 4 (Rollout #3) - ID: 3653609e
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Un" and ends with "tes".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 5 (Rollout #3) - ID: 52b454f7
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Fiji".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 6 (Rollout #3) - ID: bce71b3b
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Trin" and ends with "go".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 7 (Rollout #3) - ID: 76f3367e
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Vene".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 8 (Rollout #3) - ID: 3fe8afec
+Benchmark: miniwob, Task: use-autocomplete-nodelay
+================================================================================
+
+GOAL: Enter an item that starts with "Con" and ends with "ngo".
+Initial URL: http://127.0.0.1:8888/miniwob/use-autocomplete-nodelay.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+[TRAINER DEBUG] Computing reward for episode 1/80...
+[TRAINER DEBUG] Episode 1 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 2/80...
+[TRAINER DEBUG] Episode 2 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 3/80...
+[TRAINER DEBUG] Episode 3 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 4/80...
+[TRAINER DEBUG] Episode 4 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 5/80...
+[TRAINER DEBUG] Episode 5 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 6/80...
+[TRAINER DEBUG] Episode 6 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 7/80...
+[TRAINER DEBUG] Episode 7 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 8/80...
+[TRAINER DEBUG] Episode 8 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 9/80...
+[TRAINER DEBUG] Episode 9 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 10/80...
+[TRAINER DEBUG] Episode 10 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 11/80...
+[TRAINER DEBUG] Episode 11 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 12/80...[34m[ReferenceModel-1/2] 2025-12-28 14:31:51 INFO[0m [GC] Performing periodic GC collection took 0.01 seconds
+[34m[ReferenceModel-0/2] 2025-12-28 14:31:51 INFO[0m [GC] Performing periodic GC collection took 0.02 seconds
+[ADVANTAGES] Skipping zero-variance group: all rewards = -0.500
+
+[TRAINER DEBUG] Episode 12 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 13/80...
+[TRAINER DEBUG] Episode 13 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 14/80...
+[TRAINER DEBUG] Episode 14 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 15/80...
+[TRAINER DEBUG] Episode 15 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 16/80...
+[TRAINER DEBUG] Episode 16 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 17/80...
+[TRAINER DEBUG] Episode 17 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 18/80...
+[TRAINER DEBUG] Episode 18 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 19/80...
+[TRAINER DEBUG] Episode 19 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 20/80...
+[TRAINER DEBUG] Episode 20 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 21/80...
+[TRAINER DEBUG] Episode 21 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 22/80...
+[TRAINER DEBUG] Episode 22 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 23/80...
+[TRAINER DEBUG] Episode 23 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 24/80...
+[TRAINER DEBUG] Episode 24 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 25/80...
+[TRAINER DEBUG] Episode 25 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 26/80...
+[TRAINER DEBUG] Episode 26 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 27/80...
+[TRAINER DEBUG] Episode 27 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 28/80...
+[TRAINER DEBUG] Episode 28 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 29/80...
+[TRAINER DEBUG] Episode 29 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 30/80...
+[TRAINER DEBUG] Episode 30 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 31/80...
+[TRAINER DEBUG] Episode 31 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 32/80...
+[TRAINER DEBUG] Episode 32 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 33/80...
+[TRAINER DEBUG] Episode 33 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 34/80...
+[TRAINER DEBUG] Episode 34 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 35/80...
+[TRAINER DEBUG] Episode 35 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 36/80...
+[TRAINER DEBUG] Episode 36 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 37/80...
+[TRAINER DEBUG] Episode 37 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 38/80...
+[TRAINER DEBUG] Episode 38 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 39/80...
+[TRAINER DEBUG] Episode 39 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 40/80...
+[TRAINER DEBUG] Episode 40 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 41/80...
+[TRAINER DEBUG] Episode 41 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 42/80...
+[TRAINER DEBUG] Episode 42 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 43/80...
+[TRAINER DEBUG] Episode 43 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 44/80...
+[TRAINER DEBUG] Episode 44 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 45/80...
+[TRAINER DEBUG] Episode 45 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 46/80...
+[TRAINER DEBUG] Episode 46 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 47/80...
+[TRAINER DEBUG] Episode 47 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 48/80...
+[TRAINER DEBUG] Episode 48 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 49/80...
+[TRAINER DEBUG] Episode 49 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 50/80...
+[TRAINER DEBUG] Episode 50 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 51/80...
+[TRAINER DEBUG] Episode 51 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 52/80...
+[TRAINER DEBUG] Episode 52 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 53/80...
+[TRAINER DEBUG] Episode 53 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 54/80...
+[TRAINER DEBUG] Episode 54 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 55/80...
+[TRAINER DEBUG] Episode 55 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 56/80...
+[TRAINER DEBUG] Episode 56 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 57/80...
+[TRAINER DEBUG] Episode 57 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 58/80...
+[TRAINER DEBUG] Episode 58 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 59/80...
+[TRAINER DEBUG] Episode 59 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 60/80...
+[TRAINER DEBUG] Episode 60 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 61/80...
+[TRAINER DEBUG] Episode 61 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 62/80...
+[TRAINER DEBUG] Episode 62 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 63/80...
+[TRAINER DEBUG] Episode 63 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 64/80...
+[TRAINER DEBUG] Episode 64 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 65/80...
+[TRAINER DEBUG] Episode 65 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 66/80...
+[TRAINER DEBUG] Episode 66 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 67/80...
+[TRAINER DEBUG] Episode 67 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 68/80...
+[TRAINER DEBUG] Episode 68 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 69/80...
+[TRAINER DEBUG] Episode 69 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 70/80...
+[TRAINER DEBUG] Episode 70 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 71/80...
+[TRAINER DEBUG] Episode 71 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 72/80...
+[TRAINER DEBUG] Episode 72 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 73/80...
+[TRAINER DEBUG] Episode 73 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 74/80...
+[TRAINER DEBUG] Episode 74 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 75/80...
+[TRAINER DEBUG] Episode 75 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 76/80...
+[TRAINER DEBUG] Episode 76 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 77/80...
+[TRAINER DEBUG] Episode 77 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 78/80...
+[TRAINER DEBUG] Episode 78 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 79/80...
+[TRAINER DEBUG] Episode 79 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 80/80...
+[TRAINER DEBUG] Episode 80 reward: -0.5
+[TRAINER DEBUG] Getting ref model logprobs for 80 episodes...
+[TRAINER DEBUG] Got ref logprobs
+[TRAINER DEBUG] Computing advantages...
+[TRAINER] Skipping rollout 3: zero-variance group
+
+================================================================================
+TASK 1 (Rollout #4) - ID: 9ba77b8b
+Benchmark: miniwob, Task: use-colorwheel-2
+================================================================================
+
+GOAL: Select the following color #40fc1c with the color picker and hit Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/use-colorwheel-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 2 (Rollout #4) - ID: 5ceeed8f
+Benchmark: miniwob, Task: use-colorwheel-2
+================================================================================
+
+GOAL: Select the following color #2e7dcc with the color picker and hit Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/use-colorwheel-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 3 (Rollout #4) - ID: f90f5309
+Benchmark: miniwob, Task: use-colorwheel-2
+================================================================================
+
+GOAL: Select the following color #f8da57 with the color picker and hit Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/use-colorwheel-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 4 (Rollout #4) - ID: 8853f79d
+Benchmark: miniwob, Task: use-colorwheel-2
+================================================================================
+
+GOAL: Select the following color #bd6189 with the color picker and hit Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/use-colorwheel-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 5 (Rollout #4) - ID: 0d31eef6
+Benchmark: miniwob, Task: use-colorwheel-2
+================================================================================
+
+GOAL: Select the following color #043bc8 with the color picker and hit Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/use-colorwheel-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 6 (Rollout #4) - ID: 156464e9
+Benchmark: miniwob, Task: use-colorwheel-2
+================================================================================
+
+GOAL: Select the following color #920ada with the color picker and hit Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/use-colorwheel-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 7 (Rollout #4) - ID: 24c7db28
+Benchmark: miniwob, Task: use-colorwheel-2
+================================================================================
+
+GOAL: Select the following color #1e721e with the color picker and hit Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/use-colorwheel-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 8 (Rollout #4) - ID: 9a76ada1
+Benchmark: miniwob, Task: use-colorwheel-2
+================================================================================
+
+GOAL: Select the following color #2dd8c6 with the color picker and hit Submit.
+Initial URL: http://127.0.0.1:8888/miniwob/use-colorwheel-2.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+[TRAINER DEBUG] Computing reward for episode 1/80...
+[TRAINER DEBUG] Episode 1 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 2/80...
+[TRAINER DEBUG] Episode 2 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 3/80...
+[TRAINER DEBUG] Episode 3 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 4/80...
+[TRAINER DEBUG] Episode 4 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 5/80...
+[TRAINER DEBUG] Episode 5 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 6/80...
+[TRAINER DEBUG] Episode 6 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 7/80...
+[TRAINER DEBUG] Episode 7 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 8/80...
+[TRAINER DEBUG] Episode 8 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 9/80...
+[TRAINER DEBUG] Episode 9 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 10/80...
+[TRAINER DEBUG] Episode 10 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 11/80...
+[TRAINER DEBUG] Episode 11 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 12/80...
+[TRAINER DEBUG] Episode 12 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 13/80...
+[TRAINER DEBUG] Episode 13 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 14/80...
+[TRAINER DEBUG] Episode 14 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 15/80...
+[TRAINER DEBUG] Episode 15 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 16/80...
+[TRAINER DEBUG] Episode 16 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 17/80...
+[TRAINER DEBUG] Episode 17 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 18/80...
+[TRAINER DEBUG] Episode 18 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 19/80...
+[TRAINER DEBUG] Episode 19 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 20/80...
+[TRAINER DEBUG] Episode 20 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 21/80...
+[TRAINER DEBUG] Episode 21 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 22/80...
+[TRAINER DEBUG] Episode 22 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 23/80...
+[TRAINER DEBUG] Episode 23 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 24/80...
+[TRAINER DEBUG] Episode 24 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 25/80...
+[TRAINER DEBUG] Episode 25 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 26/80...
+[TRAINER DEBUG] Episode 26 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 27/80...
+[TRAINER DEBUG] Episode 27 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 28/80...
+[TRAINER DEBUG] Episode 28 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 29/80...
+[TRAINER DEBUG] Episode 29 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 30/80...
+[TRAINER DEBUG] Episode 30 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 31/80...
+[TRAINER DEBUG] Episode 31 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 32/80...
+[TRAINER DEBUG] Episode 32 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 33/80...
+[TRAINER DEBUG] Episode 33 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 34/80...
+[TRAINER DEBUG] Episode 34 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 35/80...
+[TRAINER DEBUG] Episode 35 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 36/80...
+[TRAINER DEBUG] Episode 36 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 37/80...
+[TRAINER DEBUG] Episode 37 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 38/80...
+[TRAINER DEBUG] Episode 38 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 39/80...
+[TRAINER DEBUG] Episode 39 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 40/80...
+[TRAINER DEBUG] Episode 40 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 41/80...
+[TRAINER DEBUG] Episode 41 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 42/80...
+[TRAINER DEBUG] Episode 42 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 43/80...
+[TRAINER DEBUG] Episode 43 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 44/80...
+[TRAINER DEBUG] Episode 44 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 45/80...
+[TRAINER DEBUG] Episode 45 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 46/80...
+[TRAINER DEBUG] Episode 46 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 47/80...
+[TRAINER DEBUG] Episode 47 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 48/80...
+[TRAINER DEBUG] Episode 48 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 49/80...
+[TRAINER DEBUG] Episode 49 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 50/80...
+[TRAINER DEBUG] Episode 50 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 51/80...
+[TRAINER DEBUG] Episode 51 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 52/80...
+[TRAINER DEBUG] Episode 52 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 53/80...
+[TRAINER DEBUG] Episode 53 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 54/80...
+[TRAINER DEBUG] Episode 54 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 55/80...
+[TRAINER DEBUG] Episode 55 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 56/80...
+[TRAINER DEBUG] Episode 56 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 57/80...
+[TRAINER DEBUG] Episode 57 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 58/80...
+[TRAINER DEBUG] Episode 58 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 59/80...
+[TRAINER DEBUG] Episode 59 reward: -0.5[34m[ReferenceModel-0/2] 2025-12-28 14:34:12 INFO[0m [GC] Performing periodic GC collection took 0.01 seconds
+[34m[ReferenceModel-1/2] 2025-12-28 14:34:12 INFO[0m [GC] Performing periodic GC collection took 0.01 seconds
+[ADVANTAGES] Skipping zero-variance group: all rewards = -0.500
+
+[TRAINER DEBUG] Computing reward for episode 60/80...
+[TRAINER DEBUG] Episode 60 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 61/80...
+[TRAINER DEBUG] Episode 61 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 62/80...
+[TRAINER DEBUG] Episode 62 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 63/80...
+[TRAINER DEBUG] Episode 63 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 64/80...
+[TRAINER DEBUG] Episode 64 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 65/80...
+[TRAINER DEBUG] Episode 65 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 66/80...
+[TRAINER DEBUG] Episode 66 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 67/80...
+[TRAINER DEBUG] Episode 67 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 68/80...
+[TRAINER DEBUG] Episode 68 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 69/80...
+[TRAINER DEBUG] Episode 69 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 70/80...
+[TRAINER DEBUG] Episode 70 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 71/80...
+[TRAINER DEBUG] Episode 71 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 72/80...
+[TRAINER DEBUG] Episode 72 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 73/80...
+[TRAINER DEBUG] Episode 73 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 74/80...
+[TRAINER DEBUG] Episode 74 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 75/80...
+[TRAINER DEBUG] Episode 75 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 76/80...
+[TRAINER DEBUG] Episode 76 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 77/80...
+[TRAINER DEBUG] Episode 77 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 78/80...
+[TRAINER DEBUG] Episode 78 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 79/80...
+[TRAINER DEBUG] Episode 79 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 80/80...
+[TRAINER DEBUG] Episode 80 reward: -0.5
+[TRAINER DEBUG] Getting ref model logprobs for 80 episodes...
+[TRAINER DEBUG] Got ref logprobs
+[TRAINER DEBUG] Computing advantages...
+[TRAINER] Skipping rollout 4: zero-variance group
+
+================================================================================
+TASK 1 (Rollout #5) - ID: eb52424d
+Benchmark: miniwob, Task: click-tab-2-hard
+================================================================================
+
+GOAL: Switch between the tabs to find and click on the link "aliquam.".
+Initial URL: http://127.0.0.1:8888/miniwob/click-tab-2-hard.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 2 (Rollout #5) - ID: b12021d5
+Benchmark: miniwob, Task: click-tab-2-hard
+================================================================================
+
+GOAL: Switch between the tabs to find and click on the link "Eget".
+Initial URL: http://127.0.0.1:8888/miniwob/click-tab-2-hard.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 3 (Rollout #5) - ID: 1a6b7097
+Benchmark: miniwob, Task: click-tab-2-hard
+================================================================================
+
+GOAL: Switch between the tabs to find and click on the link "etiam".
+Initial URL: http://127.0.0.1:8888/miniwob/click-tab-2-hard.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 4 (Rollout #5) - ID: 2efa65c1
+Benchmark: miniwob, Task: click-tab-2-hard
+================================================================================
+
+GOAL: Switch between the tabs to find and click on the link "Arcu".
+Initial URL: http://127.0.0.1:8888/miniwob/click-tab-2-hard.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 5 (Rollout #5) - ID: 4e56ba04
+Benchmark: miniwob, Task: click-tab-2-hard
+================================================================================
+
+GOAL: Switch between the tabs to find and click on the link "duis".
+Initial URL: http://127.0.0.1:8888/miniwob/click-tab-2-hard.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 6 (Rollout #5) - ID: 0aa09915
+Benchmark: miniwob, Task: click-tab-2-hard
+================================================================================
+
+GOAL: Switch between the tabs to find and click on the link "sodales.".
+Initial URL: http://127.0.0.1:8888/miniwob/click-tab-2-hard.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 7 (Rollout #5) - ID: ae849999
+Benchmark: miniwob, Task: click-tab-2-hard
+================================================================================
+
+GOAL: Switch between the tabs to find and click on the link "sagittis".
+Initial URL: http://127.0.0.1:8888/miniwob/click-tab-2-hard.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 8 (Rollout #5) - ID: 77fb40a5
+Benchmark: miniwob, Task: click-tab-2-hard
+================================================================================
+
+GOAL: Switch between the tabs to find and click on the link "morbi".
+Initial URL: http://127.0.0.1:8888/miniwob/click-tab-2-hard.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+[TRAINER DEBUG] Computing reward for episode 1/80...
+[TRAINER DEBUG] Episode 1 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 2/80...
+[TRAINER DEBUG] Episode 2 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 3/80...
+[TRAINER DEBUG] Episode 3 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 4/80...
+[TRAINER DEBUG] Episode 4 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 5/80...
+[TRAINER DEBUG] Episode 5 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 6/80...
+[TRAINER DEBUG] Episode 6 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 7/80...
+[TRAINER DEBUG] Episode 7 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 8/80...
+[TRAINER DEBUG] Episode 8 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 9/80...
+[TRAINER DEBUG] Episode 9 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 10/80...
+[TRAINER DEBUG] Episode 10 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 11/80...
+[TRAINER DEBUG] Episode 11 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 12/80...
+[TRAINER DEBUG] Episode 12 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 13/80...
+[TRAINER DEBUG] Episode 13 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 14/80...
+[TRAINER DEBUG] Episode 14 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 15/80...
+[TRAINER DEBUG] Episode 15 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 16/80...
+[TRAINER DEBUG] Episode 16 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 17/80...
+[TRAINER DEBUG] Episode 17 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 18/80...
+[TRAINER DEBUG] Episode 18 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 19/80...
+[TRAINER DEBUG] Episode 19 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 20/80...[34m[ReferenceModel-0/2] 2025-12-28 14:36:34 INFO[0m [GC] Performing periodic GC collection took 0.01 seconds
+[34m[ReferenceModel-1/2] 2025-12-28 14:36:34 INFO[0m [GC] Performing periodic GC collection took 0.00 seconds
+[ADVANTAGES] Skipping zero-variance group: all rewards = -0.500
+
+[TRAINER DEBUG] Episode 20 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 21/80...
+[TRAINER DEBUG] Episode 21 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 22/80...
+[TRAINER DEBUG] Episode 22 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 23/80...
+[TRAINER DEBUG] Episode 23 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 24/80...
+[TRAINER DEBUG] Episode 24 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 25/80...
+[TRAINER DEBUG] Episode 25 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 26/80...
+[TRAINER DEBUG] Episode 26 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 27/80...
+[TRAINER DEBUG] Episode 27 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 28/80...
+[TRAINER DEBUG] Episode 28 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 29/80...
+[TRAINER DEBUG] Episode 29 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 30/80...
+[TRAINER DEBUG] Episode 30 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 31/80...
+[TRAINER DEBUG] Episode 31 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 32/80...
+[TRAINER DEBUG] Episode 32 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 33/80...
+[TRAINER DEBUG] Episode 33 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 34/80...
+[TRAINER DEBUG] Episode 34 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 35/80...
+[TRAINER DEBUG] Episode 35 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 36/80...
+[TRAINER DEBUG] Episode 36 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 37/80...
+[TRAINER DEBUG] Episode 37 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 38/80...
+[TRAINER DEBUG] Episode 38 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 39/80...
+[TRAINER DEBUG] Episode 39 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 40/80...
+[TRAINER DEBUG] Episode 40 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 41/80...
+[TRAINER DEBUG] Episode 41 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 42/80...
+[TRAINER DEBUG] Episode 42 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 43/80...
+[TRAINER DEBUG] Episode 43 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 44/80...
+[TRAINER DEBUG] Episode 44 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 45/80...
+[TRAINER DEBUG] Episode 45 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 46/80...
+[TRAINER DEBUG] Episode 46 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 47/80...
+[TRAINER DEBUG] Episode 47 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 48/80...
+[TRAINER DEBUG] Episode 48 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 49/80...
+[TRAINER DEBUG] Episode 49 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 50/80...
+[TRAINER DEBUG] Episode 50 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 51/80...
+[TRAINER DEBUG] Episode 51 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 52/80...
+[TRAINER DEBUG] Episode 52 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 53/80...
+[TRAINER DEBUG] Episode 53 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 54/80...
+[TRAINER DEBUG] Episode 54 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 55/80...
+[TRAINER DEBUG] Episode 55 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 56/80...
+[TRAINER DEBUG] Episode 56 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 57/80...
+[TRAINER DEBUG] Episode 57 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 58/80...
+[TRAINER DEBUG] Episode 58 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 59/80...
+[TRAINER DEBUG] Episode 59 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 60/80...
+[TRAINER DEBUG] Episode 60 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 61/80...
+[TRAINER DEBUG] Episode 61 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 62/80...
+[TRAINER DEBUG] Episode 62 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 63/80...
+[TRAINER DEBUG] Episode 63 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 64/80...
+[TRAINER DEBUG] Episode 64 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 65/80...
+[TRAINER DEBUG] Episode 65 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 66/80...
+[TRAINER DEBUG] Episode 66 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 67/80...
+[TRAINER DEBUG] Episode 67 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 68/80...
+[TRAINER DEBUG] Episode 68 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 69/80...
+[TRAINER DEBUG] Episode 69 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 70/80...
+[TRAINER DEBUG] Episode 70 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 71/80...
+[TRAINER DEBUG] Episode 71 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 72/80...
+[TRAINER DEBUG] Episode 72 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 73/80...
+[TRAINER DEBUG] Episode 73 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 74/80...
+[TRAINER DEBUG] Episode 74 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 75/80...
+[TRAINER DEBUG] Episode 75 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 76/80...
+[TRAINER DEBUG] Episode 76 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 77/80...
+[TRAINER DEBUG] Episode 77 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 78/80...
+[TRAINER DEBUG] Episode 78 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 79/80...
+[TRAINER DEBUG] Episode 79 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 80/80...
+[TRAINER DEBUG] Episode 80 reward: -0.5
+[TRAINER DEBUG] Getting ref model logprobs for 80 episodes...
+[TRAINER DEBUG] Got ref logprobs
+[TRAINER DEBUG] Computing advantages...
+[TRAINER] Skipping rollout 5: zero-variance group
+
+================================================================================
+TASK 1 (Rollout #6) - ID: f1407ddc
+Benchmark: miniwob, Task: find-word
+================================================================================
+
+GOAL: Find the 9th word in the paragraph, type that into the textbox and press "Submit".
+Initial URL: http://127.0.0.1:8888/miniwob/find-word.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 2 (Rollout #6) - ID: 80c92326
+Benchmark: miniwob, Task: find-word
+================================================================================
+
+GOAL: Find the 3rd word in the paragraph, type that into the textbox and press "Submit".
+Initial URL: http://127.0.0.1:8888/miniwob/find-word.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 3 (Rollout #6) - ID: cc31d096
+Benchmark: miniwob, Task: find-word
+================================================================================
+
+GOAL: Find the 5th word in the paragraph, type that into the textbox and press "Submit".
+Initial URL: http://127.0.0.1:8888/miniwob/find-word.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 4 (Rollout #6) - ID: cb939c8a
+Benchmark: miniwob, Task: find-word
+================================================================================
+
+GOAL: Find the 6th word in the paragraph, type that into the textbox and press "Submit".
+Initial URL: http://127.0.0.1:8888/miniwob/find-word.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 5 (Rollout #6) - ID: e1f31647
+Benchmark: miniwob, Task: find-word
+================================================================================
+
+GOAL: Find the 6th word in the paragraph, type that into the textbox and press "Submit".
+Initial URL: http://127.0.0.1:8888/miniwob/find-word.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 6 (Rollout #6) - ID: 34ea706a
+Benchmark: miniwob, Task: find-word
+================================================================================
+
+GOAL: Find the 7th word in the paragraph, type that into the textbox and press "Submit".
+Initial URL: http://127.0.0.1:8888/miniwob/find-word.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 7 (Rollout #6) - ID: 2532bd39
+Benchmark: miniwob, Task: find-word
+================================================================================
+
+GOAL: Find the 4th word in the paragraph, type that into the textbox and press "Submit".
+Initial URL: http://127.0.0.1:8888/miniwob/find-word.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 8 (Rollout #6) - ID: 25a28516
+Benchmark: miniwob, Task: find-word
+================================================================================
+
+GOAL: Find the 2nd word in the paragraph, type that into the textbox and press "Submit".
+Initial URL: http://127.0.0.1:8888/miniwob/find-word.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+[TRAINER DEBUG] Computing reward for episode 1/80...
+[TRAINER DEBUG] Episode 1 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 2/80...
+[TRAINER DEBUG] Episode 2 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 3/80...
+[TRAINER DEBUG] Episode 3 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 4/80...
+[TRAINER DEBUG] Episode 4 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 5/80...
+[TRAINER DEBUG] Episode 5 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 6/80...
+[TRAINER DEBUG] Episode 6 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 7/80...
+[TRAINER DEBUG] Episode 7 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 8/80...
+[TRAINER DEBUG] Episode 8 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 9/80...
+[TRAINER DEBUG] Episode 9 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 10/80...
+[TRAINER DEBUG] Episode 10 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 11/80...
+[TRAINER DEBUG] Episode 11 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 12/80...
+[TRAINER DEBUG] Episode 12 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 13/80...
+[TRAINER DEBUG] Episode 13 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 14/80...
+[TRAINER DEBUG] Episode 14 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 15/80...
+[TRAINER DEBUG] Episode 15 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 16/80...
+[TRAINER DEBUG] Episode 16 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 17/80...
+[TRAINER DEBUG] Episode 17 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 18/80...
+[TRAINER DEBUG] Episode 18 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 19/80...
+[TRAINER DEBUG] Episode 19 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 20/80...
+[TRAINER DEBUG] Episode 20 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 21/80...
+[TRAINER DEBUG] Episode 21 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 22/80...
+[TRAINER DEBUG] Episode 22 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 23/80...
+[TRAINER DEBUG] Episode 23 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 24/80...
+[TRAINER DEBUG] Episode 24 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 25/80...
+[TRAINER DEBUG] Episode 25 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 26/80...
+[TRAINER DEBUG] Episode 26 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 27/80...
+[TRAINER DEBUG] Episode 27 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 28/80...
+[TRAINER DEBUG] Episode 28 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 29/80...
+[TRAINER DEBUG] Episode 29 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 30/80...
+[TRAINER DEBUG] Episode 30 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 31/80...
+[TRAINER DEBUG] Episode 31 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 32/80...
+[TRAINER DEBUG] Episode 32 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 33/80...
+[TRAINER DEBUG] Episode 33 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 34/80...
+[TRAINER DEBUG] Episode 34 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 35/80...
+[TRAINER DEBUG] Episode 35 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 36/80...
+[TRAINER DEBUG] Episode 36 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 37/80...
+[TRAINER DEBUG] Episode 37 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 38/80...
+[TRAINER DEBUG] Episode 38 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 39/80...
+[TRAINER DEBUG] Episode 39 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 40/80...
+[TRAINER DEBUG] Episode 40 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 41/80...
+[TRAINER DEBUG] Episode 41 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 42/80...
+[TRAINER DEBUG] Episode 42 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 43/80...
+[TRAINER DEBUG] Episode 43 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 44/80...
+[TRAINER DEBUG] Episode 44 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 45/80...
+[TRAINER DEBUG] Episode 45 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 46/80...
+[TRAINER DEBUG] Episode 46 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 47/80...
+[TRAINER DEBUG] Episode 47 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 48/80...
+[TRAINER DEBUG] Episode 48 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 49/80...
+[TRAINER DEBUG] Episode 49 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 50/80...
+[TRAINER DEBUG] Episode 50 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 51/80...
+[TRAINER DEBUG] Episode 51 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 52/80...
+[TRAINER DEBUG] Episode 52 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 53/80...
+[TRAINER DEBUG] Episode 53 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 54/80...
+[TRAINER DEBUG] Episode 54 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 55/80...
+[TRAINER DEBUG] Episode 55 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 56/80...
+[TRAINER DEBUG] Episode 56 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 57/80...
+[TRAINER DEBUG] Episode 57 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 58/80...
+[TRAINER DEBUG] Episode 58 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 59/80...
+[TRAINER DEBUG] Episode 59 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 60/80...
+[TRAINER DEBUG] Episode 60 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 61/80...
+[TRAINER DEBUG] Episode 61 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 62/80...
+[TRAINER DEBUG] Episode 62 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 63/80...
+[TRAINER DEBUG] Episode 63 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 64/80...
+[TRAINER DEBUG] Episode 64 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 65/80...
+[TRAINER DEBUG] Episode 65 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 66/80...
+[TRAINER DEBUG] Episode 66 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 67/80...
+[TRAINER DEBUG] Episode 67 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 68/80...[34m[ReferenceModel-0/2] 2025-12-28 14:38:54 INFO[0m [GC] Performing periodic GC collection took 0.01 seconds
+[34m[ReferenceModel-1/2] 2025-12-28 14:38:54 INFO[0m [GC] Performing periodic GC collection took 0.01 seconds
+[ADVANTAGES] Skipping zero-variance group: all rewards = -0.500
+[-]E1228 14:40:07.181627 2104246 hyperactor/src/channel/net.rs:793] session unix:@YrwRNajFh8yAhFjXVD1kjcWf.1464713507284612111: failed while receiving ack: Connection reset by peer (os error 104)
+[-]E1228 14:40:07.181717 2104246 hyperactor/src/channel/net.rs:793] session unix:@YrwRNajFh8yAhFjXVD1kjcWf.11985328780724060663: failed while receiving ack: Connection reset by peer (os error 104)
+Traceback (most recent call last):
+  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/rollout.py", line 117, in play_web_task
+    result = env.reset(task_name=task_name)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/env-gen/openenv/src/openenv/core/env_client.py", line 311, in reset
+    response = self._send_and_receive(message)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/env-gen/openenv/src/openenv/core/env_client.py", line 149, in _send_and_receive
+    response = self._receive()
+               ^^^^^^^^^^^^^^^
+  File "/scratch/czr/env-gen/openenv/src/openenv/core/env_client.py", line 143, in _receive
+    raw = self._ws.recv(timeout=self._message_timeout)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/site-packages/websockets/sync/connection.py", line 317, in recv
+    return self.recv_messages.get(timeout, decode)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/site-packages/websockets/sync/messages.py", line 169, in get
+    frame = self.get_next_frame(deadline.timeout(raise_if_elapsed=False))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/site-packages/websockets/sync/messages.py", line 87, in get_next_frame
+    frame = self.frames.get(block=True, timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/runners.py", line 157, in _on_sigint
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
 Traceback (most recent call last):
   File "<frozen runpy>", line 198, in _run_module_as_main
   File "<frozen runpy>", line 88, in _run_code
@@ -352,19 +2201,11 @@ Traceback (most recent call last):
     handle._run()
   File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/events.py", line 88, in _run
     self._context.run(self._callback, *self._args)
-  File "/scratch/czr/env-gen/openenv/examples/grpo_web/train.py", line 168, in main
-    trainer, metrics = await run_training(
-                       ^^^^^^^^^^^^^^^^^^^
-  File "/scratch/czr/env-gen/openenv/examples/grpo_web/train.py", line 68, in run_training
-    metrics = await trainer.run(steps=training_steps)
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py", line 327, in run
-    await self.evaluate(
-  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py", line 466, in evaluate
-    all_results = await play_web_task_parallel(
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/rollout.py", line 284, in play_web_task_parallel
-    results = await asyncio.gather(*tasks)
+  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py", line 200, in continuous_rollouts
+    all_step_results = await play_web_task_parallel(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/rollout.py", line 280, in play_web_task_parallel
+    # Run all tasks - pool automatically limits to available servers
               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/runners.py", line 195, in run
     return runner.run(main)
@@ -380,249 +2221,130 @@ Traceback (most recent call last):
     handle._run()
   File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/events.py", line 88, in _run
     self._context.run(self._callback, *self._args)
-  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/rollout.py", line 267, in run_task_with_pool
-    return await play_web_task(
-           ^^^^^^^^^^^^^^^^^^^^
-  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/rollout.py", line 176, in play_web_task
-    result = env.step(BrowserGymAction(action_str=action_str))
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/scratch/czr/env-gen/openenv/src/openenv/core/env_client.py", line 329, in step
-    response = self._send_and_receive(message)
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/scratch/czr/env-gen/openenv/src/openenv/core/env_client.py", line 149, in _send_and_receive
-    response = self._receive()
-               ^^^^^^^^^^^^^^^
-  File "/scratch/czr/env-gen/openenv/src/openenv/core/env_client.py", line 144, in _receive
-    return json.loads(raw)
-           ^^^^^^^^^^^^^^^
-  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/json/__init__.py", line 346, in loads
-    return _default_decoder.decode(s)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/json/decoder.py", line 338, in decode
-    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/json/decoder.py", line 354, in raw_decode
-    obj, end = self.scan_once(s, idx)
-               ^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/rollout.py", line 263, in run_task_with_pool
+    async with env_pool.acquire() as server_url:
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/env-gen/openenv/examples/grpo_web/utils/rollout.py", line 220, in play_web_task
+    finally:
+        ^^^^^
+  File "/scratch/czr/env-gen/openenv/src/openenv/core/env_client.py", line 350, in close
+    self.disconnect()
+  File "/scratch/czr/env-gen/openenv/src/openenv/core/env_client.py", line 124, in disconnect
+    self._ws.close()
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/site-packages/websockets/sync/connection.py", line 588, in close
+    with self.send_context():
+         ^^^^^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/site-packages/websockets/sync/connection.py", line 993, in send_context
+    self.recv_events_thread.join(timeout)
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/threading.py", line 1153, in join
+    self._wait_for_tstate_lock(timeout=max(timeout, 0))
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/threading.py", line 1169, in _wait_for_tstate_lock
+    if lock.acquire(block, timeout):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/asyncio/runners.py", line 157, in _on_sigint
     raise KeyboardInterrupt()
 KeyboardInterrupt
-Exception ignored in atexit callback: <function _start_and_connect_service.<locals>.teardown_atexit at 0x7f3728734720>
+Exception ignored in atexit callback: <function _start_and_connect_service.<locals>.teardown_atexit at 0x7f1c118e8cc0>
 Traceback (most recent call last):
-
-TASK 14 (Rollout #0) - ID: 8fd56439
-Benchmark: miniwob, Task: identify-shape
-================================================================================
-
-GOAL: Click the button that best describes the figure below.
-Initial URL: http://127.0.0.1:8888/miniwob/identify-shape.html
-
-FAILED - Reward: 0.0
-Task length: 10 steps
-Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
-
-================================================================================
-TASK 15 (Rollout #0) - ID: 5867c09f
-Benchmark: miniwob, Task: click-scroll-list
-================================================================================
-
-GOAL: Select Nicaragua from the scroll list and click Submit.
-Initial URL: http://127.0.0.1:8888/miniwob/click-scroll-list.html
-Action error: 
-Action error: 
-Action error: 
-Action error: 
-
-FAILED - Reward: 0.0
-Task length: 10 steps
-Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> hover('[16] option Nicaragua') -> click('[16] option Nicaragua') -> click('[25] button Submit') -> select('[16] option Nicaragua', 'Nicaragua')
-
-================================================================================
-TASK 16 (Rollout #0) - ID: 82e48b2b
-Benchmark: miniwob, Task: scroll-text
-================================================================================
-
-GOAL: Find the last word in the text area, enter it into the text field and hit Submit.
-Initial URL: http://127.0.0.1:8888/miniwob/scroll-text.html
-
-FAILED - Reward: 0.0
-Task length: 10 steps
-Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
-
-================================================================================
-TASK 17 (Rollout #0) - ID: 33030aa2
-Benchmark: miniwob, Task: scroll-text-2
-================================================================================
-
-GOAL: Scroll the textarea to the top of the text hit submit.
-Initial URL: http://127.0.0.1:8888/miniwob/scroll-text-2.html
-
-FAILED - Reward: 0.0
-Task length: 10 steps
-Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
-
-================================================================================
-TASK 18 (Rollout #0) - ID: 04737a28
-Benchmark: miniwob, Task: click-tab
-================================================================================
-
-GOAL: Click on Tab #3.
-Initial URL: http://127.0.0.1:8888/miniwob/click-tab.html
-
-FAILED - Reward: 0.0
-Task length: 10 steps
-Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
-
-================================================================================
-TASK 19 (Rollout #0) - ID: d0dc593e
-Benchmark: miniwob, Task: click-tab-2
-================================================================================
-
-GOAL: Switch between the tabs to find and click on the link "curabitur".
-Initial URL: http://127.0.0.1:8888/miniwob/click-tab-2.html
-
-FAILED - Reward: 0.0
-Task length: 10 steps
-Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
-
-================================================================================
-TASK 20 (Rollout #0) - ID: 48d2fa55
-Benchmark: miniwob, Task: click-tab-2-hard
-================================================================================
-
-GOAL: Switch between the tabs to find and click on the link "Faucibus.".
-Initial URL: http://127.0.0.1:8888/miniwob/click-tab-2-hard.html
-
-FAILED - Reward: 0.0
-Task length: 10 steps
-Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
-
-================================================================================
-TASK 21 (Rollout #0) - ID: 02d230be
-Benchmark: miniwob, Task: click-widget
-================================================================================
-
-GOAL: Click on a "text" widget.
-Initial URL: http://127.0.0.1:8888/miniwob/click-widget.html
-
-FAILED - Reward: 0.0
-Task length: 10 steps
-Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
-
-================================================================================
-TASK 22 (Rollout #0) - ID: eaad7cbd
-Benchmark: miniwob, Task: click-collapsible
-================================================================================
-
-GOAL: Expand the section below and click submit.
-Initial URL: http://127.0.0.1:8888/miniwob/click-collapsible.html
-
-FAILED - Reward: 0.0
-Task length: 10 steps
-Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
-
-================================================================================
-TASK 23 (Rollout #0) - ID: 6b2c79b8
-Benchmark: miniwob, Task: click-collapsible-2
-================================================================================
-
-GOAL: Expand the sections below, to find and click on the link "amet.".
-Initial URL: http://127.0.0.1:8888/miniwob/click-collapsible-2.html
-
-FAILED - Reward: 0.0
-Task length: 10 steps
-Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
-
-================================================================================
-TASK 24 (Rollout #0) - ID: 5c067bef
-Benchmark: miniwob, Task: click-collapsible-nodelay
-================================================================================
-
-GOAL: Expand the section below and click submit.
-Initial URL: http://127.0.0.1:8888/miniwob/click-collapsible-nodelay.html
-
-FAILED - Reward: 0.0
-Task length: 10 steps
-Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
-
-================================================================================
-TASK 25 (Rollout #0) - ID: b53ca303
-Benchmark: miniwob, Task: click-collapsible-2-nodelay
-================================================================================
-
-GOAL: Expand the sections below, to find and click on the link "ultrices.".
-Initial URL: http://127.0.0.1:8888/miniwob/click-collapsible-2-nodelay.html
-socket.send() raised exception.
   File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+
+[TRAINER DEBUG] Episode 68 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 69/80...
+[TRAINER DEBUG] Episode 69 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 70/80...
+[TRAINER DEBUG] Episode 70 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 71/80...
+[TRAINER DEBUG] Episode 71 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 72/80...
+[TRAINER DEBUG] Episode 72 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 73/80...
+[TRAINER DEBUG] Episode 73 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 74/80...
+[TRAINER DEBUG] Episode 74 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 75/80...
+[TRAINER DEBUG] Episode 75 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 76/80...
+[TRAINER DEBUG] Episode 76 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 77/80...
+[TRAINER DEBUG] Episode 77 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 78/80...
+[TRAINER DEBUG] Episode 78 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 79/80...
+[TRAINER DEBUG] Episode 79 reward: -0.5
+[TRAINER DEBUG] Computing reward for episode 80/80...
+[TRAINER DEBUG] Episode 80 reward: -0.5
+[TRAINER DEBUG] Getting ref model logprobs for 80 episodes...
+[TRAINER DEBUG] Got ref logprobs
+[TRAINER DEBUG] Computing advantages...
+[TRAINER] Skipping rollout 6: zero-variance group
+
+================================================================================
+TASK 1 (Rollout #7) - ID: 1f2d1294
+Benchmark: miniwob, Task: enter-time
+================================================================================
+
+GOAL: Enter 6:24 PM as the time and press submit.
+Initial URL: http://127.0.0.1:8888/miniwob/enter-time.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 2 (Rollout #7) - ID: c28dc029
+Benchmark: miniwob, Task: enter-time
+================================================================================
+
+GOAL: Enter 7:17 AM as the time and press submit.
+Initial URL: http://127.0.0.1:8888/miniwob/enter-time.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 3 (Rollout #7) - ID: 06d8a4df
+Benchmark: miniwob, Task: enter-time
+================================================================================
+
+GOAL: Enter 12:48 AM as the time and press submit.
+Initial URL: http://127.0.0.1:8888/miniwob/enter-time.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 4 (Rollout #7) - ID: 512ef7d2
+Benchmark: miniwob, Task: enter-time
+================================================================================
+
+GOAL: Enter 12:47 PM as the time and press submit.
+Initial URL: http://127.0.0.1:8888/miniwob/enter-time.html
+
+FAILED - Reward: 0.0
+Task length: 10 steps
+Actions: noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop() -> noop()
+
+================================================================================
+TASK 5 (Rollout #7) - ID: 543e18f7
+Benchmark: miniwob, Task: enter-time
+================================================================================
+socket.send() raised exception.
 socket.send() raised exception.
     conn.teardown(hooks.exit_code)
-  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/site-packages/wandb/sdk/lib/service/service_connection.py", line 301, in teardown
-    return self._proc.join()
-           ^^^^^^^^^^^^^^^^^
-  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/site-packages/wandb/sdk/lib/service/service_process.py", line 57, in join
-socket.send() raised exception.
-    return self._process.wait()
-socket.send() raised exception.
-           ^^^^^^^^^^^^^^^^^^^^
-  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/subprocess.py", line 1277, in wait
-socket.send() raised exception.
-socket.send() raised exception.
-    self._wait(timeout=sigint_timeout)
-socket.send() raised exception.
-  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/subprocess.py", line 2047, in _wait
-socket.send() raised exception.
-    time.sleep(delay)
-socket.send() raised exception.
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/site-packages/wandb/sdk/lib/service/service_connection.py", line 299, in teardown
+    self._asyncer.run(publish_teardown_and_close)
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/concurrent/futures/_base.py", line 451, in result
+    self._condition.wait(timeout)
+  File "/scratch/czr/anaconda3/envs/openenv/lib/python3.12/threading.py", line 355, in wait
+    waiter.acquire()
 KeyboardInterrupt: 
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
-socket.send() raised exception.
 socket.send() raised exception.
 socket.send() raised exception.
 socket.send() raised exception.

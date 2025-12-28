@@ -1,7 +1,7 @@
 group_size: 8
-local_batch_size: 4
-max_req_tokens: 2048
-max_res_tokens: 1024
+local_batch_size: 8
+max_req_tokens: 1024
+max_res_tokens: 256
 model: Qwen/Qwen3-1.7B
 model_local_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
 off_by_n: 1
@@ -17,14 +17,8 @@ web_env:
   server_url: http://localhost:8005
   model: ${model}
   benchmark: miniwob
-  task_name: click-test
   max_steps: 10
-  task_pool:
-  - enter-text
-  - click-button-sequence
-  - click-checkboxes
-  - choose-list
-  - focus-text
+  task_pool: medium
 policy:
   engine_args:
     model: ${model}
@@ -43,15 +37,15 @@ trainer:
     hf_assets_path: ${model_local_path}
   optimizer:
     name: AdamW
-    lr: 5.0e-06
+    lr: 1.0e-05
     eps: 1.0e-08
   lr_scheduler:
-    warmup_steps: 10
+    warmup_steps: 1
   training:
     local_batch_size: ${local_batch_size}
     seq_len: 4200
     max_norm: 1.0
-    steps: 2000
+    steps: 500
     dtype: bfloat16
     gc_freq: 1
   compile:
@@ -74,10 +68,14 @@ trainer:
   activation_checkpoint:
     mode: selective
     selective_ac_option: op
+evaluation:
+  eval_interval: 5
+  eval_tasks: 32
+  quiet: false
 replay_buffer:
   batch_size: ${local_batch_size}
   max_policy_age: ${off_by_n}
-  dp_size: ${trainer.parallelism.data_parallel_shard_degree}
+  dp_size: 1
 ref_model:
   model:
     name: qwen3
