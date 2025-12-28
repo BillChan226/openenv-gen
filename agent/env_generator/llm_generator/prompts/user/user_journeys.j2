@@ -1,0 +1,251 @@
+## User Journey Simulation Patterns
+
+Use these patterns to simulate real user behavior during verification.
+The goal is to test the application as a real user would use it.
+
+---
+
+### Journey 1: New User Onboarding
+
+```
+# 1. First visit - unauthenticated
+browser_navigate("http://localhost:3000")
+browser_screenshot(save_path="journey/01_landing.png")
+browser_a11y_tree(selector="main")  # Check what actions are available
+
+# 2. Navigate to login/register
+browser_click(text="Sign Up") OR browser_click(text="Register")
+browser_wait("[role=dialog], .modal, form", state="visible")
+browser_screenshot(save_path="journey/02_register_form.png")
+
+# 3. Fill registration form (use seed data credentials)
+browser_fill("[name=email]", "newuser@example.com")
+browser_fill("[name=password]", "SecurePass123!")
+browser_fill("[name=displayName]", "New User")
+browser_click(text="Create Account")
+
+# 4. Verify registration success
+browser_wait_for_url("*/dashboard*", timeout=10000)
+browser_network_errors()  # Must be empty
+browser_console(filter_type="error")  # Must be empty
+browser_screenshot(save_path="journey/03_after_register.png")
+```
+
+---
+
+### Journey 2: Returning User Login
+
+```
+# 1. Navigate to login page
+browser_navigate("http://localhost:3000/login")
+browser_a11y_tree(selector="form")  # Check form fields
+
+# 2. Login with existing seed data user
+browser_fill("[name=email]", "alice@example.com")
+browser_fill("[name=password]", "password")
+browser_click(text="Sign In")
+
+# 3. Verify login success
+browser_wait_for_url("*/dashboard*|*/projects*", timeout=10000)
+browser_get_url()  # Confirm redirect
+browser_network_errors()  # Must be empty
+
+# 4. Verify user context
+browser_get_text("[data-testid=user-name], .user-name, header")
+# Should contain "Alice" or similar
+```
+
+---
+
+### Journey 3: Core Feature Usage (Jira-like)
+
+```
+# --- Part A: Browse Projects ---
+browser_click(text="Projects") OR browser_navigate("/projects")
+browser_wait(".project-list, [data-testid=projects]", state="visible")
+browser_elements(".project-card, tr")  # Should have seed data projects
+browser_screenshot(save_path="journey/04_projects_list.png")
+
+# --- Part B: Open a Project ---
+browser_click(text="Main Project") OR browser_click("[data-project-key=MAIN]")
+browser_wait_for_url("*/project*", timeout=5000)
+browser_network_errors()
+
+# --- Part C: View Board ---
+browser_click(text="Board") OR browser_navigate to board URL
+browser_wait(".board, .kanban, [data-testid=board]", state="visible")
+browser_screenshot(save_path="journey/05_board_view.png")
+
+# Verify board has columns with issues
+browser_elements(".column, .board-column")  # Should have columns
+browser_elements(".issue-card, .card")  # Should have issues from seed data
+
+# --- Part D: Open Issue Detail ---
+browser_click(text="Setup CI/CD pipeline") OR first .issue-card
+browser_wait("[role=dialog], .modal, .issue-detail", state="visible")
+browser_a11y_tree(selector="[role=dialog], .modal")  # Check dialog content
+browser_screenshot(save_path="journey/06_issue_detail.png")
+
+# Verify issue details
+browser_get_text(".issue-title, h2")  # Should show issue title
+browser_get_text(".issue-description, .description")  # Should show description
+
+# --- Part E: Close Detail and Verify Navigation ---
+browser_press_key("Escape") OR browser_click(text="Close")
+browser_wait("[role=dialog], .modal", state="hidden", timeout=3000)
+browser_get_url()  # Should still be on board
+browser_elements(".issue-card")  # Board should still show issues
+```
+
+---
+
+### Journey 4: Create New Content
+
+```
+# 1. Find create button
+browser_a11y_tree(selector="header, nav, .toolbar")  # Look for Create action
+browser_click(text="Create") OR browser_click(role="button", name="Create")
+
+# 2. Fill create form
+browser_wait("[role=dialog], .modal, form", state="visible")
+browser_screenshot(save_path="journey/07_create_form.png")
+browser_a11y_tree(selector="form")  # Check form fields
+
+browser_fill("[name=title]", "Test Issue from User Agent")
+browser_fill("[name=description]", "This issue was created during automated verification")
+browser_select("[name=type]", "task") OR browser_click(text="Task")
+browser_select("[name=priority]", "medium")
+
+# 3. Submit
+browser_click(text="Submit") OR browser_click(text="Create Issue")
+browser_network_errors()  # Must be empty - API should succeed
+
+# 4. Verify creation
+browser_wait("[role=dialog]", state="hidden", timeout=5000)  # Modal closes
+# Either refresh board or check toast notification
+browser_get_text(".toast, .notification, .success-message")  # Success message
+# OR
+browser_elements(".issue-card")  # Should have one more issue
+```
+
+---
+
+### Journey 5: Search Functionality
+
+```
+# 1. Find and open search
+browser_click("[data-testid=search], .search-icon") OR browser_press_key("Ctrl+K")
+browser_wait(".search-input, [role=searchbox], input[type=search]", state="visible")
+
+# 2. Search for existing content
+browser_fill(".search-input, [role=searchbox]", "authentication")
+browser_press_key("Enter") OR browser_wait(".search-results", state="visible")
+browser_screenshot(save_path="journey/08_search_results.png")
+
+# 3. Verify results
+browser_elements(".search-result, .result-item")  # Should have results
+browser_get_text(".search-result")  # Should mention "authentication"
+browser_network_errors()  # Must be empty
+
+# 4. Click a result
+browser_click(text="Implement user authentication")  # From seed data
+browser_wait_for_url("*/issue*", timeout=5000)
+```
+
+---
+
+### Journey 6: Settings & Preferences
+
+```
+# 1. Navigate to settings
+browser_click(text="Settings") OR browser_navigate("/settings")
+browser_wait(".settings-page, [data-testid=settings]", state="visible")
+browser_screenshot(save_path="journey/09_settings.png")
+
+# 2. Change a setting
+browser_click(text="Notifications") OR navigate to notifications section
+browser_click("[type=checkbox]") OR browser_click(".toggle")  # Toggle a setting
+browser_network_errors()  # Setting should auto-save or have save button
+
+# 3. Navigate away and back
+browser_click(text="Dashboard")
+browser_wait_for_url("*/dashboard*", timeout=5000)
+browser_click(text="Settings")
+
+# 4. Verify setting persisted
+browser_get_attribute("[type=checkbox]", "checked")  # Should match what we set
+```
+
+---
+
+### Journey 7: Error Handling
+
+```
+# 1. Test 404 page
+browser_navigate("http://localhost:3000/nonexistent-page-xyz")
+browser_screenshot(save_path="journey/10_404.png")
+browser_get_text("body")  # Should show 404 message, not blank
+browser_console(filter_type="error")  # Should NOT have JS errors
+
+# 2. Test with bad data (if form validation exists)
+browser_navigate("/create-issue")
+browser_fill("[name=title]", "")  # Empty required field
+browser_click(text="Submit")
+browser_wait(".error, .validation-error, [role=alert]", state="visible")
+browser_screenshot(save_path="journey/11_validation_error.png")
+browser_network_errors()  # Should be empty (client-side validation)
+
+# 3. Navigate back to valid state
+browser_click(text="Cancel") OR browser_press_key("Escape")
+browser_navigate("/dashboard")
+browser_network_errors()  # Verify app recovered
+```
+
+---
+
+### Journey 8: Mobile Responsiveness (Optional)
+
+```
+# This requires viewport resizing - may not work in all setups
+# If supported:
+browser_evaluate("window.innerWidth = 375; window.innerHeight = 667;")  # iPhone SE
+browser_navigate("http://localhost:3000")
+browser_screenshot(save_path="journey/12_mobile.png")
+
+# Check mobile nav
+browser_click(".hamburger, .menu-toggle, [aria-label*=menu]")
+browser_wait(".mobile-nav, .drawer", state="visible")
+browser_screenshot(save_path="journey/13_mobile_nav.png")
+```
+
+---
+
+## Verification Checklist After User Journeys
+
+After completing user journeys, verify:
+
+- [ ] All navigation paths work (no dead links)
+- [ ] All forms submit successfully to API
+- [ ] All CRUD operations complete (Create, Read, Update, Delete)
+- [ ] Search returns relevant results
+- [ ] Error states show meaningful messages
+- [ ] Navigation after actions works (can always go back)
+- [ ] Console has no JavaScript errors
+- [ ] Network has no 4xx/5xx errors on valid operations
+- [ ] All interactive elements have visible feedback
+- [ ] Modal/dialog close buttons work
+
+## Test Data Credentials (from seed data)
+
+Use these accounts for testing:
+
+| Email | Password | Role |
+|-------|----------|------|
+| admin@example.com | password | Admin |
+| alice@example.com | password | Developer |
+| bob@example.com | password | Developer |
+| test@example.com | password | User |
+
+Note: Actual passwords in seed data are hashed. For testing, ensure 
+backend accepts "password" or generate valid test tokens.
+

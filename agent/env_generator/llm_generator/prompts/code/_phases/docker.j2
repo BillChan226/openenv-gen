@@ -1,0 +1,141 @@
+<DOCKER_FRONTEND_API_PROXY_GUIDANCE>
+CRITICAL (Docker frontend/backend integration): Avoid "it works locally but breaks in Docker/browser".
+
+You MUST ensure the browser can reach the backend API in both dev and prod Docker modes.
+
+1) Production (nginx/static) frontend:
+- Do NOT set `VITE_API_BASE_URL` to `http://jira-backend:3000/...` or other docker-only hostnames.
+- Prefer same-origin API: set frontend to call `/api/...` (relative path).
+- Configure nginx (or whichever static server) to reverse-proxy `/api/*` to the backend service inside Docker network:
+  - proxy_pass `http://jira-backend:<container_port>/api/`
+- This avoids CORS and avoids host DNS issues (browser cannot resolve docker service names).
+
+2) Dev (Vite in container) frontend:
+- Host browser visits frontend at host port 3000 (or chosen).
+- Vite server in container must proxy `/api` to backend service name inside docker network:
+  - proxy target `http://jira-backend:<container_port>`
+- Backend should be published on a different host port (default 8000) to avoid clashing with frontend port 3000.
+
+3) Health endpoints:
+- `/health` or `/api/health` must return JSON/text status, NEVER an HTML app shell.
+  If verification sees HTML, your ports/proxy are wrong.
+</DOCKER_FRONTEND_API_PROXY_GUIDANCE>
+
+<DOCKER_HEALTHCHECK>
+**Docker Healthcheck Patterns (REQUIRED)**
+
+**1. Backend Dockerfile with Healthcheck:**
+```dockerfile
+# Dockerfile
+FROM node:20-alpine
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+
+EXPOSE 3000
+
+# Healthcheck - verify app responds
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+CMD ["node", "src/server.js"]
+```
+
+**2. docker-compose.yml with Healthcheck:**
+```yaml
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: myapp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./app/database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./app/backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/myapp
+      - JWT_SECRET=your-secret-key
+      - NODE_ENV=production
+    ports:
+      - "8000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./app/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+```
+
+**3. Backend Health Endpoint (routes/health.js):**
+```javascript
+import express from 'express';
+import pool from '../config/database.js';
+
+const router = express.Router();
+
+router.get('/health', async (req, res) => {
+  const checks = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    checks: {}
+  };
+
+  // Database check
+  try {
+    await pool.query('SELECT 1');
+    checks.checks.database = 'healthy';
+  } catch (err) {
+    checks.status = 'degraded';
+    checks.checks.database = 'unhealthy';
+  }
+
+  const statusCode = checks.status === 'ok' ? 200 : 503;
+  res.status(statusCode).json(checks);
+});
+
+export default router;
+```
+
+**Healthcheck Best Practices:**
+- Use lightweight checks (SELECT 1, not complex queries)
+- Set reasonable timeouts (10s max)
+- Use depends_on with condition: service_healthy
+- Include start_period for slow-starting services
+- Return JSON with status details
+</DOCKER_HEALTHCHECK>

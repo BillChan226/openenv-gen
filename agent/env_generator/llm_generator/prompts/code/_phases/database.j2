@@ -1,0 +1,189 @@
+<DATABASE_SCHEMA_REQUIREMENTS>
+**CRITICAL: Align database schema with spec.project.json entities**
+
+Before writing SQL, read `design/spec.project.json` to understand:
+- Entity names and fields
+- Relationships between entities
+- Required constraints
+
+**Standard PostgreSQL Schema Pattern:**
+
+```sql
+-- 01_schema.sql
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Users table (always first - other tables reference it)
+CREATE TABLE app_user (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    avatar_url TEXT,
+    role VARCHAR(50) DEFAULT 'user',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Example entity with foreign keys
+CREATE TABLE project (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    key VARCHAR(10) UNIQUE NOT NULL,
+    description TEXT,
+    lead_id UUID REFERENCES app_user(id) ON DELETE SET NULL,
+    is_archived BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Example many-to-one relationship
+CREATE TABLE issue (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    project_id UUID NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    title VARCHAR(500) NOT NULL,
+    description TEXT,
+    type VARCHAR(50) NOT NULL DEFAULT 'task',  -- task, bug, story, epic
+    status VARCHAR(50) NOT NULL DEFAULT 'backlog',
+    priority VARCHAR(20) DEFAULT 'medium',
+    reporter_id UUID REFERENCES app_user(id) ON DELETE SET NULL,
+    assignee_id UUID REFERENCES app_user(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for common queries
+CREATE INDEX idx_issue_project_id ON issue(project_id);
+CREATE INDEX idx_issue_status ON issue(status);
+CREATE INDEX idx_issue_assignee_id ON issue(assignee_id);
+
+-- Updated_at trigger function
+CREATE OR REPLACE FUNCTION update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply trigger to all tables
+CREATE TRIGGER update_app_user_updated_at BEFORE UPDATE ON app_user FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER update_project_updated_at BEFORE UPDATE ON project FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER update_issue_updated_at BEFORE UPDATE ON issue FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+```
+
+**Seed Data Pattern (02_seed.sql):**
+
+```sql
+-- 02_seed.sql
+
+-- Demo users (password: 'password' hashed with bcrypt)
+INSERT INTO app_user (id, email, password_hash, display_name, role) VALUES
+    ('00000000-0000-0000-0000-000000000001', 'alice@example.com', '$2b$10$..hashed..', 'Alice Demo', 'admin'),
+    ('00000000-0000-0000-0000-000000000002', 'bob@example.com', '$2b$10$..hashed..', 'Bob Developer', 'user');
+
+-- Demo project
+INSERT INTO project (id, name, key, description, lead_id) VALUES
+    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Demo Project', 'DEMO', 'A demo project for testing', '00000000-0000-0000-0000-000000000001');
+
+-- Demo issues
+INSERT INTO issue (project_id, title, type, status, priority, reporter_id, assignee_id) VALUES
+    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Setup project', 'task', 'done', 'high', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'),
+    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Implement login', 'task', 'in_progress', 'high', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'),
+    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Add search feature', 'story', 'backlog', 'medium', '00000000-0000-0000-0000-000000000001', NULL);
+```
+
+**IMPORTANT RULES:**
+- Use `app_user` instead of `user` (reserved keyword in PostgreSQL)
+- Use UUID for all primary keys
+- Add foreign key constraints with appropriate ON DELETE behavior
+- Add indexes for frequently queried columns
+- Use TIMESTAMPTZ for timestamps
+- Create update triggers for `updated_at` columns
+
+**SEED DATA REQUIREMENTS (CRITICAL for testing):**
+
+============================================================
+COMPREHENSIVE SEED DATA (CRITICAL FOR TESTING)
+============================================================
+
+The seed data MUST be comprehensive enough to test ALL features.
+Without sufficient data, User Agent cannot properly verify the application!
+
+Generate:
+
+1. **Users** (at least 5-10):
+   - 1 admin user
+   - 2-3 regular users with different roles
+   - 1 test user for login testing
+   
+2. **Projects** (at least 3):
+   - 1 active project with many items
+   - 1 project with minimal items
+   - 1 archived/inactive project
+
+3. **Main Entities** (at least 15-20 items total):
+   - Items in ALL possible states (draft, active, done, archived)
+   - Items assigned to different users
+   - Items with different priorities/types
+   - Items with descriptions, comments, attachments references
+
+4. **Related Data**:
+   - Comments on items (at least 10)
+   - Activity logs / history
+   - Settings / preferences
+
+**Example Comprehensive Seed (02_seed.sql):**
+```sql
+-- Users: admin, developers, reporter, viewer
+INSERT INTO app_user (id, email, password_hash, display_name, role) VALUES
+  ('00000000-0000-0000-0000-000000000001', 'admin@example.com', '$2b$10$hashedpassword...', 'Admin User', 'admin'),
+  ('00000000-0000-0000-0000-000000000002', 'alice@example.com', '$2b$10$hashedpassword...', 'Alice Developer', 'developer'),
+  ('00000000-0000-0000-0000-000000000003', 'bob@example.com', '$2b$10$hashedpassword...', 'Bob Developer', 'developer'),
+  ('00000000-0000-0000-0000-000000000004', 'carol@example.com', '$2b$10$hashedpassword...', 'Carol Reporter', 'reporter'),
+  ('00000000-0000-0000-0000-000000000005', 'test@example.com', '$2b$10$hashedpassword...', 'Test User', 'user');
+
+-- Projects: active, minimal, archived
+INSERT INTO project (id, name, key, description, lead_id, is_archived) VALUES
+  ('aaaaaaaa-0000-0000-0000-000000000001', 'Main Project', 'MAIN', 'Primary active project with full data', '00000000-0000-0000-0000-000000000002', false),
+  ('aaaaaaaa-0000-0000-0000-000000000002', 'Side Project', 'SIDE', 'Smaller project', '00000000-0000-0000-0000-000000000003', false),
+  ('aaaaaaaa-0000-0000-0000-000000000003', 'Old Project', 'OLD', 'Archived project', '00000000-0000-0000-0000-000000000001', true);
+
+-- Issues: various states, types, assignees (at least 15)
+INSERT INTO issue (id, project_id, title, description, type, status, priority, reporter_id, assignee_id) VALUES
+  -- MAIN project issues (10)
+  ('bbbbbbbb-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000001', 'Setup CI/CD pipeline', 'Configure GitHub Actions for auto-deploy', 'task', 'done', 'high', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'),
+  ('bbbbbbbb-0000-0000-0000-000000000002', 'aaaaaaaa-0000-0000-0000-000000000001', 'Implement user authentication', 'JWT-based auth with refresh tokens', 'story', 'done', 'high', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000002'),
+  ('bbbbbbbb-0000-0000-0000-000000000003', 'aaaaaaaa-0000-0000-0000-000000000001', 'Create dashboard page', 'Main dashboard with statistics', 'story', 'in_progress', 'high', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003'),
+  ('bbbbbbbb-0000-0000-0000-000000000004', 'aaaaaaaa-0000-0000-0000-000000000001', 'Fix login redirect bug', 'Users not redirected after login', 'bug', 'in_progress', 'critical', '00000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000002'),
+  ('bbbbbbbb-0000-0000-0000-000000000005', 'aaaaaaaa-0000-0000-0000-000000000001', 'Add search functionality', 'Full-text search across all items', 'story', 'backlog', 'medium', '00000000-0000-0000-0000-000000000002', NULL),
+  ('bbbbbbbb-0000-0000-0000-000000000006', 'aaaaaaaa-0000-0000-0000-000000000001', 'Improve mobile responsiveness', 'Layout breaks on small screens', 'bug', 'backlog', 'low', '00000000-0000-0000-0000-000000000004', NULL),
+  ('bbbbbbbb-0000-0000-0000-000000000007', 'aaaaaaaa-0000-0000-0000-000000000001', 'Add dark mode', 'Theme toggle in settings', 'story', 'backlog', 'low', '00000000-0000-0000-0000-000000000003', NULL),
+  ('bbbbbbbb-0000-0000-0000-000000000008', 'aaaaaaaa-0000-0000-0000-000000000001', 'API rate limiting', 'Prevent abuse with rate limits', 'task', 'in_review', 'medium', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000002'),
+  ('bbbbbbbb-0000-0000-0000-000000000009', 'aaaaaaaa-0000-0000-0000-000000000001', 'Write unit tests', 'Coverage for auth module', 'task', 'in_progress', 'medium', '00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003'),
+  ('bbbbbbbb-0000-0000-0000-000000000010', 'aaaaaaaa-0000-0000-0000-000000000001', 'Documentation update', 'Update README and API docs', 'task', 'done', 'low', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000004'),
+  -- SIDE project issues (3)
+  ('bbbbbbbb-0000-0000-0000-000000000011', 'aaaaaaaa-0000-0000-0000-000000000002', 'Initial setup', 'Bootstrap project', 'task', 'done', 'high', '00000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003'),
+  ('bbbbbbbb-0000-0000-0000-000000000012', 'aaaaaaaa-0000-0000-0000-000000000002', 'Design mockups', 'Create Figma designs', 'story', 'in_progress', 'medium', '00000000-0000-0000-0000-000000000003', NULL),
+  ('bbbbbbbb-0000-0000-0000-000000000013', 'aaaaaaaa-0000-0000-0000-000000000002', 'Tech stack decision', 'Choose frontend framework', 'task', 'backlog', 'high', '00000000-0000-0000-0000-000000000003', NULL),
+  -- OLD project issues (2)
+  ('bbbbbbbb-0000-0000-0000-000000000014', 'aaaaaaaa-0000-0000-0000-000000000003', 'Legacy feature', 'Old completed work', 'story', 'done', 'medium', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'),
+  ('bbbbbbbb-0000-0000-0000-000000000015', 'aaaaaaaa-0000-0000-0000-000000000003', 'Archived bug', 'Fixed long ago', 'bug', 'done', 'low', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000003');
+
+-- Comments on issues
+INSERT INTO comment (id, issue_id, author_id, content, created_at) VALUES
+  ('cccccccc-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002', 'Pipeline is working now!', NOW() - INTERVAL '5 days'),
+  ('cccccccc-0000-0000-0000-000000000002', 'bbbbbbbb-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003', 'Almost done, need review', NOW() - INTERVAL '1 day'),
+  ('cccccccc-0000-0000-0000-000000000003', 'bbbbbbbb-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000002', 'Looks good, minor fixes needed', NOW() - INTERVAL '12 hours'),
+  ('cccccccc-0000-0000-0000-000000000004', 'bbbbbbbb-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000004', 'Reproduced on Chrome and Firefox', NOW() - INTERVAL '2 days'),
+  ('cccccccc-0000-0000-0000-000000000005', 'bbbbbbbb-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000002', 'Working on a fix', NOW() - INTERVAL '1 day');
+```
+
+**WHY comprehensive seed data matters:**
+- User Agent can test login with real credentials
+- User Agent can verify CRUD operations work
+- User Agent can test filtering/searching with real data
+- User Agent can verify different user roles/permissions
+- User Agent can test edge cases (empty states, archived items)
+</DATABASE_SCHEMA_REQUIREMENTS>

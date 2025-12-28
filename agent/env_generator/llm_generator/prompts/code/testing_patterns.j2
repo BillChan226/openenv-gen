@@ -1,0 +1,420 @@
+## Testing Patterns Reference
+
+### Frontend Testing (React + Vitest/Jest)
+
+**Setup (package.json):**
+```json
+{
+  "devDependencies": {
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/jest-dom": "^6.0.0",
+    "@testing-library/user-event": "^14.0.0",
+    "vitest": "^1.0.0",
+    "jsdom": "^23.0.0"
+  },
+  "scripts": {
+    "test": "vitest",
+    "test:coverage": "vitest --coverage"
+  }
+}
+```
+
+**vite.config.js with testing:**
+```javascript
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.js',
+  },
+});
+```
+
+**Test Setup (src/test/setup.js):**
+```javascript
+import '@testing-library/jest-dom';
+import { cleanup } from '@testing-library/react';
+import { afterEach, vi } from 'vitest';
+
+afterEach(() => {
+  cleanup();
+});
+
+// Mock fetch
+global.fetch = vi.fn();
+
+// Mock localStorage
+const localStorageMock = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+};
+global.localStorage = localStorageMock;
+```
+
+---
+
+### Component Testing Patterns
+
+**1. Basic Component Test:**
+```javascript
+// components/Button.test.jsx
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi } from 'vitest';
+import { Button } from './Button';
+
+describe('Button', () => {
+  it('renders with text', () => {
+    render(<Button>Click me</Button>);
+    expect(screen.getByRole('button', { name: /click me/i })).toBeInTheDocument();
+  });
+
+  it('calls onClick when clicked', async () => {
+    const handleClick = vi.fn();
+    render(<Button onClick={handleClick}>Click</Button>);
+    
+    await userEvent.click(screen.getByRole('button'));
+    expect(handleClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('is disabled when disabled prop is true', () => {
+    render(<Button disabled>Disabled</Button>);
+    expect(screen.getByRole('button')).toBeDisabled();
+  });
+
+  it('shows loading state', () => {
+    render(<Button loading>Loading</Button>);
+    expect(screen.getByRole('button')).toBeDisabled();
+    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+  });
+});
+```
+
+**2. Testing with API Mocks:**
+```javascript
+// pages/ProjectList.test.jsx
+import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ProjectList } from './ProjectList';
+import * as api from '../services/api';
+
+// Mock the API module
+vi.mock('../services/api');
+
+describe('ProjectList', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows loading state initially', () => {
+    api.getProjects.mockReturnValue(new Promise(() => {})); // Never resolves
+    render(<ProjectList />);
+    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+  });
+
+  it('displays projects when loaded', async () => {
+    const mockProjects = [
+      { id: '1', name: 'Project A', key: 'PROJA' },
+      { id: '2', name: 'Project B', key: 'PROJB' },
+    ];
+    api.getProjects.mockResolvedValue(mockProjects);
+
+    render(<ProjectList />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Project A')).toBeInTheDocument();
+      expect(screen.getByText('Project B')).toBeInTheDocument();
+    });
+  });
+
+  it('shows error message on API failure', async () => {
+    api.getProjects.mockRejectedValue(new Error('Network error'));
+
+    render(<ProjectList />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/failed to load/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows empty state when no projects', async () => {
+    api.getProjects.mockResolvedValue([]);
+
+    render(<ProjectList />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/no projects/i)).toBeInTheDocument();
+    });
+  });
+});
+```
+
+**3. Testing Forms:**
+```javascript
+// components/CreateIssueForm.test.jsx
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi } from 'vitest';
+import { CreateIssueForm } from './CreateIssueForm';
+import * as api from '../services/api';
+
+vi.mock('../services/api');
+
+describe('CreateIssueForm', () => {
+  const mockOnSuccess = vi.fn();
+
+  it('submits form with valid data', async () => {
+    api.createIssue.mockResolvedValue({ id: '1', title: 'New Issue' });
+    render(<CreateIssueForm onSuccess={mockOnSuccess} />);
+
+    await userEvent.type(screen.getByLabelText(/title/i), 'New Issue');
+    await userEvent.type(screen.getByLabelText(/description/i), 'Description text');
+    await userEvent.click(screen.getByRole('button', { name: /create/i }));
+
+    await waitFor(() => {
+      expect(api.createIssue).toHaveBeenCalledWith({
+        title: 'New Issue',
+        description: 'Description text',
+      });
+      expect(mockOnSuccess).toHaveBeenCalled();
+    });
+  });
+
+  it('shows validation errors for empty required fields', async () => {
+    render(<CreateIssueForm onSuccess={mockOnSuccess} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /create/i }));
+
+    expect(screen.getByText(/title is required/i)).toBeInTheDocument();
+  });
+
+  it('shows API error message', async () => {
+    api.createIssue.mockRejectedValue(new Error('Server error'));
+    render(<CreateIssueForm onSuccess={mockOnSuccess} />);
+
+    await userEvent.type(screen.getByLabelText(/title/i), 'New Issue');
+    await userEvent.click(screen.getByRole('button', { name: /create/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/server error/i)).toBeInTheDocument();
+    });
+  });
+});
+```
+
+**4. Testing Hooks:**
+```javascript
+// hooks/useProjects.test.js
+import { renderHook, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { useProjects } from './useProjects';
+import * as api from '../services/api';
+
+vi.mock('../services/api');
+
+describe('useProjects', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns loading state initially', () => {
+    api.getProjects.mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => useProjects());
+    
+    expect(result.current.loading).toBe(true);
+    expect(result.current.data).toBe(null);
+  });
+
+  it('returns data when loaded', async () => {
+    const mockData = [{ id: '1', name: 'Test' }];
+    api.getProjects.mockResolvedValue(mockData);
+    
+    const { result } = renderHook(() => useProjects());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+      expect(result.current.data).toEqual(mockData);
+    });
+  });
+
+  it('refetch updates data', async () => {
+    api.getProjects.mockResolvedValueOnce([{ id: '1' }]);
+    api.getProjects.mockResolvedValueOnce([{ id: '1' }, { id: '2' }]);
+    
+    const { result } = renderHook(() => useProjects());
+
+    await waitFor(() => expect(result.current.data).toHaveLength(1));
+    
+    result.current.refetch();
+
+    await waitFor(() => expect(result.current.data).toHaveLength(2));
+  });
+});
+```
+
+---
+
+### Backend Testing (Jest + Supertest)
+
+**Setup (package.json):**
+```json
+{
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "supertest": "^6.0.0"
+  },
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  }
+}
+```
+
+**jest.config.js:**
+```javascript
+module.exports = {
+  testEnvironment: 'node',
+  testMatch: ['**/*.test.js'],
+  collectCoverageFrom: ['src/**/*.js', '!src/server.js'],
+  setupFilesAfterEnv: ['./src/test/setup.js'],
+};
+```
+
+**API Route Testing:**
+```javascript
+// routes/issues.test.js
+const request = require('supertest');
+const app = require('../app');
+const db = require('../config/database');
+
+describe('Issues API', () => {
+  let authToken;
+  
+  beforeAll(async () => {
+    // Login and get token
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'test@example.com', password: 'password' });
+    authToken = res.body.token;
+  });
+
+  afterAll(async () => {
+    await db.end();
+  });
+
+  describe('GET /api/issues', () => {
+    it('returns issues list', async () => {
+      const res = await request(app)
+        .get('/api/issues')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.items)).toBe(true);
+    });
+
+    it('supports pagination', async () => {
+      const res = await request(app)
+        .get('/api/issues?limit=5&offset=0')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items.length).toBeLessThanOrEqual(5);
+      expect(res.body).toHaveProperty('total');
+    });
+  });
+
+  describe('POST /api/issues', () => {
+    it('creates issue with valid data', async () => {
+      const newIssue = {
+        title: 'Test Issue',
+        projectId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        type: 'task',
+      };
+
+      const res = await request(app)
+        .post('/api/issues')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(newIssue);
+
+      expect(res.status).toBe(201);
+      expect(res.body).toHaveProperty('id');
+      expect(res.body.title).toBe('Test Issue');
+    });
+
+    it('returns 400 for missing required fields', async () => {
+      const res = await request(app)
+        .post('/api/issues')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('validation_error');
+    });
+
+    it('returns 401 without auth token', async () => {
+      const res = await request(app)
+        .post('/api/issues')
+        .send({ title: 'Test' });
+
+      expect(res.status).toBe(401);
+    });
+  });
+
+  describe('GET /api/issues/:id', () => {
+    it('returns issue by ID', async () => {
+      const res = await request(app)
+        .get('/api/issues/existing-issue-id')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('id');
+    });
+
+    it('returns 404 for non-existent ID', async () => {
+      const res = await request(app)
+        .get('/api/issues/00000000-0000-0000-0000-000000000000')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(404);
+    });
+  });
+});
+```
+
+---
+
+### Test File Naming Convention
+
+```
+src/
+  components/
+    Button.jsx
+    Button.test.jsx          # Component test
+    __snapshots__/           # Snapshot tests (auto-generated)
+  hooks/
+    useProjects.js
+    useProjects.test.js      # Hook test
+  pages/
+    Dashboard.jsx
+    Dashboard.test.jsx       # Page test
+  services/
+    api.js
+    api.test.js              # Service test
+  test/
+    setup.js                 # Test setup
+    mocks/                   # Shared mocks
+```
+
+### Test Coverage Goals
+
+- **Unit tests**: Individual components, hooks, utilities
+- **Integration tests**: API routes, database operations
+- **Minimum coverage**: 70% for critical paths (auth, CRUD operations)
+

@@ -1,0 +1,90 @@
+<IMPORTANT_RULES>
+- Do NOT lint the same file multiple times
+- Do NOT repeat the same operation twice
+- If you created a plan(), you MUST complete ALL items before calling finish()
+- Use think() for reasoning about HOW to implement something
+- Use plan() for WHAT you will implement (creates enforced checklist)
+- Mark each plan item complete with plan(action="complete", item_text="...")
+- finish() will FAIL if you have incomplete plan items!
+</IMPORTANT_RULES>
+
+<PATH_RULES>
+CRITICAL - Use RELATIVE paths only:
+- CORRECT: view("app/backend/src/routes/issues.js")
+- CORRECT: str_replace_editor(path="app/backend/package.json", ...)
+- WRONG: view("/Users/.../generated/jira/app/backend/...")   (absolute path)
+- WRONG: view("jira/app/backend/...")                        (project name prefix)
+
+The workspace root is already set. All paths are relative to it.
+</PATH_RULES>
+
+<TOOL_USAGE>
+**Context & Planning:**
+- **read_memory_bank()**: Read project context, goals, tech stack, progress
+- **plan(action="create", items=[...])**: Create tracked checklist (enforced)
+- **plan(action="status")**: Check your progress on the plan
+- **plan(action="complete", item_text="...")**: Mark item as done
+- **think("...")**: Free-form reasoning and analysis
+
+**User Agent Interaction:**
+- **request_review(subject="plan", message="...")**: Ask User Agent to review your plan
+  - Use after plan(action="create") to get feedback before starting!
+  - User Agent will approve, suggest changes, or identify missing items
+  
+- **ask_user_agent(question="...", context="...")**: Ask User Agent for help
+  - Use when unclear about requirements
+  - Use when need to make design decisions
+  - Use when stuck or need guidance
+
+**Completion:**
+- **finish("summary")**: Complete task (fails if plan incomplete)
+</TOOL_USAGE>
+
+<PROCESS_MANAGEMENT_TOOLS>
+**IMPORTANT: Background Processes & Servers**
+
+execute_bash will AUTO-REJECT server commands and suggest run_background instead.
+Detected patterns include: node server, npm start/dev, python app.py, uvicorn, gunicorn, flask, nodemon, etc.
+
+ALWAYS use run_background for servers and background processes:
+```
+# Start a server with port
+run_background("npm start", port=8000, name="backend", cwd="app/backend")
+run_background("npm run dev", port=3000, name="frontend", cwd="app/frontend")
+
+# Start a background task (no port)
+run_background("npm run build", cwd="app/frontend")
+
+# With auto-timeout (kills after 60s)
+run_background("npm test", timeout=60, cwd="app/backend")
+```
+
+Process Management Tools:
+- list_processes()                  - see all running processes
+- get_process_output("backend")     - get logs from a process (by name or PID)
+- stop_process("backend")           - stop a process gracefully
+- stop_process("backend", force=true) - force kill a process
+- interrupt_process("backend")      - send Ctrl+C to a process
+- wait_for_process("build-task")    - wait for process to complete
+- cleanup_ports([8000, 3000])       - free stuck ports
+
+The ProcessManager tracks ALL background processes (servers and tasks) in a unified registry.
+You can reference processes by name (if provided) or by PID.
+</PROCESS_MANAGEMENT_TOOLS>
+
+<RECOMMENDED_WORKFLOW>
+1. read_memory_bank()                    # Understand project context
+2. project_structure()                   # See what exists
+3. plan(action="create", items=[...])    # Create your plan
+4. request_review(subject="plan", ...)   # Get User Agent feedback!
+5. [If rejected: revise plan, request_review again]
+6. For each item:
+   - think("how to implement...")
+   - create file / lint
+   - plan(action="complete", ...)
+   - [If stuck: ask_user_agent() for help]
+7. finish()                              # Only when plan complete
+</RECOMMENDED_WORKFLOW>
+
+Begin by examining the current project state and planning your approach.
+

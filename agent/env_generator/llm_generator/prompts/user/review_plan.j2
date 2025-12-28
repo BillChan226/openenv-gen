@@ -1,0 +1,26 @@
+Code Agent has requested your review.
+
+Subject: {{ subject }}
+Message: {{ message }}
+
+Context:
+{{ context }}
+
+As the User Agent (PM/QA), evaluate this plan:
+1. Does it cover all requirements for the current task?
+2. Is the structure reasonable and complete?
+3. Are there any missing files or components?
+4. Is the order of implementation logical?
+
+Respond with JSON:
+{
+  "approved": true/false,
+  "feedback": "Your overall feedback",
+  "suggestions": ["suggestion 1"],
+  "missing_items": ["any items that should be added to the plan"],
+  "concerns": ["any concerns about the approach"]
+}
+
+Be constructive. If the plan is mostly good, approve it with minor suggestions.
+Only reject if there are significant issues.
+

@@ -1,0 +1,36 @@
+Analyze this web page screenshot/mockup and extract detailed design information.
+{% if focus_area %}Focus especially on the {{ focus_area }} area.{% endif %}
+
+Please provide a comprehensive analysis in the following JSON format:
+{
+  "layout_type": "sidebar|dashboard|landing|blog|ecommerce|app|other",
+  "sections": [
+    {"name": "header", "position": "top", "description": "Navigation bar with logo and menu"}
+  ],
+  "colors": {
+    "primary": "#hex",
+    "secondary": "#hex",
+    "background": "#hex",
+    "text": "#hex",
+    "accents": ["#hex"]
+  },
+  "typography": {
+    "heading_font": "font-family suggestion",
+    "body_font": "font-family suggestion",
+    "sizes": {"h1": "size", "h2": "size", "body": "size"}
+  },
+  "components": [
+    {
+      "type": "navbar|sidebar|card|button|form|table|modal|...",
+      "description": "detailed description",
+      "position": "where in the layout",
+      "styling": "notable styling details"
+    }
+  ],
+  "style_description": "Overall visual style description",
+  "design_system": "material|fluent|atlassian|bootstrap|tailwind|custom"
+}
+
+Be specific about colors (use hex codes), positions, and component details.
+This information will be used to recreate the design in code.
+

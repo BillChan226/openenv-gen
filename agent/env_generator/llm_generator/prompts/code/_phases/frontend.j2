@@ -1,0 +1,768 @@
+<FRONTEND_QUALITY_REQUIREMENTS>
+CRITICAL: Generate COMPLETE, PRODUCTION-READY frontend code. NOT placeholder code!
+
+============================================================
+CORE PRINCIPLES - READ THIS FIRST
+============================================================
+
+1. **FUNCTIONAL COMPLETENESS**: Every feature must WORK end-to-end
+   - Create, Read, Update, Delete operations must all function
+   - Search/filter must return real results
+   - Navigation must work between all pages
+   - Forms must submit and show results
+
+2. **USER-TESTABLE**: Built for real user testing
+   - Database has comprehensive seed data (5+ users, 10+ projects, 50+ issues)
+   - Login works with test accounts (admin@example.com / password)
+   - All features can be exercised without additional setup
+
+3. **PROFESSIONAL UI**: Use established component patterns
+   - Use lucide-react or react-icons for ALL icons (mandatory)
+   - Consider Radix UI / shadcn for complex components (modals, dropdowns)
+   - Consistent spacing, colors, typography
+   - Loading states, error states, empty states
+
+4. **REAL API INTEGRATION**: No mock data in production code
+   - Every component fetches from real backend endpoints
+   - Proper error handling and user feedback
+   - Optimistic updates where appropriate
+
+============================================================
+
+**MUST HAVE:**
+
+0. **Correct Vite + React Project Layout (MANDATORY)**
+   - Create `app/frontend/index.html` at the project root (NOT under public/).
+   - Create `app/frontend/vite.config.js`.
+   - Create `app/frontend/src/main.jsx` and `app/frontend/src/App.jsx`.
+   - Put routes/pages/components under `app/frontend/src/`.
+   - Use `app/frontend/public/` ONLY for static assets (icons, images). Do NOT put `index.html` there.
+   - `index.html` MUST reference `/src/main.jsx`.
+
+1. **Real API Integration**
+   - Import and use API service functions
+   - Fetch data in useEffect hooks
+   - Handle loading, success, and error states
+   - Display real data from backend, NOT hardcoded values
+
+2. **Functional Components**
+   - Every button MUST have a meaningful onClick handler
+   - Every form MUST submit to the API
+   - Every link MUST navigate to a real page
+   - Every input MUST be controlled and functional
+
+2.5 **No Dead UI / Robust Navigation**
+   - If a control is visible (button/link/menu item), it MUST work.
+   - If not implemented yet, hide it or show a disabled state with an explanation (tooltip/helper text).
+   - Switching pages and switching back must keep the UI usable (no broken state).
+   - Menus/panels (e.g., "System") must open/close reliably and not break returning to Projects/Board.
+   - Create Issue MUST exist and be usable: visible entry point -> open modal/page -> validate -> submit -> UI updates.
+
+3. **State Management**
+   - Use useState for component state
+   - Use useEffect for data fetching
+   - Implement proper loading states (isLoading)
+   - Implement error handling (error message display)
+
+4. **User Experience**
+   - Show loading spinners while fetching
+   - Show error messages when API fails
+   - Show empty state when no data exists
+   - Provide visual feedback on user actions
+
+5. **Icons - USE REACT ICON LIBRARIES (MANDATORY)**
+   
+   **PREFERRED: Use `lucide-react` or `react-icons` - NO custom SVGs or emoji!**
+   
+   First, add the icon library to package.json:
+   ```json
+   "dependencies": {
+     "lucide-react": "^0.400.0"
+   }
+   ```
+   
+   **lucide-react (Recommended - clean, consistent):**
+   ```jsx
+   import { Search, Settings, User, Plus, X, ChevronDown, Menu, Home, Folder, FileText, Check, AlertCircle } from 'lucide-react';
+   
+   // Usage
+   <Search className="w-4 h-4" />
+   <Button><Plus className="w-4 h-4 mr-2" /> Create</Button>
+   ```
+   
+   **react-icons (Alternative - huge icon set):**
+   ```jsx
+   import { FiSearch, FiSettings, FiUser, FiPlus } from 'react-icons/fi';  // Feather
+   import { HiOutlineHome, HiOutlineFolder } from 'react-icons/hi';       // Heroicons
+   import { BiTask, BiGitBranch } from 'react-icons/bi';                  // BoxIcons
+   
+   <FiSearch size={16} />
+   ```
+   
+   **Common Icon Mappings:**
+   | Purpose | lucide-react | react-icons |
+   |---------|-------------|-------------|
+   | Search | `Search` | `FiSearch` |
+   | Settings | `Settings` | `FiSettings` |
+   | User/Profile | `User` | `FiUser` |
+   | Add/Create | `Plus` | `FiPlus` |
+   | Close | `X` | `FiX` |
+   | Menu | `Menu` | `FiMenu` |
+   | Home | `Home` | `FiHome` |
+   | Folder/Project | `Folder` | `FiFolder` |
+   | File/Issue | `FileText` | `FiFileText` |
+   | Check/Done | `Check` | `FiCheck` |
+   | Warning | `AlertCircle` | `FiAlertCircle` |
+   | Edit | `Pencil` | `FiEdit2` |
+   | Delete | `Trash2` | `FiTrash2` |
+   | Arrow Right | `ChevronRight` | `FiChevronRight` |
+   | Dropdown | `ChevronDown` | `FiChevronDown` |
+   
+   **DO NOT:**
+   - Use emoji as icons (X, checkmark, gear symbols)
+   - Create custom SVG files for common icons
+   - Use text symbols like [X] or [+]
+   
+   **For images/photos (not icons):**
+   - Use `google_image_search` or `search_image` to find assets
+   - Use `download_image` to save to `app/frontend/public/assets/`
+
+6. **UI Component Libraries (HIGHLY RECOMMENDED)**
+   
+   For professional, accessible UI with minimal effort, USE these libraries:
+   
+   **RECOMMENDED: Radix UI + Tailwind (shadcn/ui pattern)**
+   ```json
+   "dependencies": {
+     "lucide-react": "^0.400.0",
+     "@radix-ui/react-dialog": "^1.0.0",
+     "@radix-ui/react-dropdown-menu": "^2.0.0",
+     "@radix-ui/react-tooltip": "^1.0.0",
+     "@radix-ui/react-select": "^2.0.0",
+     "@radix-ui/react-popover": "^1.0.0",
+     "tailwindcss": "^3.4.0",
+     "class-variance-authority": "^0.7.0",
+     "clsx": "^2.1.0"
+   }
+   ```
+   
+   **Alternative: Headless UI (simpler)**
+   ```json
+   "dependencies": {
+     "@headlessui/react": "^2.0.0"
+   }
+   ```
+   
+   **When to use component libraries:**
+   - Modals/Dialogs: Use @radix-ui/react-dialog
+   - Dropdowns/Menus: Use @radix-ui/react-dropdown-menu
+   - Select inputs: Use @radix-ui/react-select
+   - Tooltips: Use @radix-ui/react-tooltip
+   - Tabs: Use @radix-ui/react-tabs
+   
+   **DO NOT hand-roll these complex components from scratch!**
+   Component libraries handle accessibility, keyboard navigation, and edge cases.
+
+**EXAMPLE - WRONG (placeholder):**
+```jsx
+const Dashboard = () => {
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      <p>Welcome to the dashboard</p>
+    </div>
+  );
+};
+```
+
+**EXAMPLE - CORRECT (functional):**
+```jsx
+import { useState, useEffect } from 'react';
+import { getDashboardData } from '../services/api';
+import { Spinner } from './ui/Spinner';
+import { DashboardCard } from './DashboardCard';
+
+const Dashboard = () => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const result = await getDashboardData();
+        setData(result);
+      } catch (err) {
+        setError('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) return <Spinner />;
+  if (error) return <div className="error">{error}</div>;
+  if (!data) return <div>No data available</div>;
+
+  return (
+    <div className="dashboard">
+      <h1>Dashboard</h1>
+      <div className="dashboard-grid">
+        {data.cards.map(card => (
+          <DashboardCard key={card.id} {...card} />
+        ))}
+      </div>
+    </div>
+  );
+};
+```
+
+**API Service Pattern (MANDATORY - use this exact pattern):**
+
+```javascript
+// services/api.js - Complete API client with auth support
+
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+const TOKEN_KEY = 'auth_token';
+
+// ============ Token Management ============
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setAuthToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+// ============ Request Helper ============
+function buildHeaders({ json = true, auth = true } = {}) {
+  const headers = {};
+  if (json) headers['Content-Type'] = 'application/json';
+  if (auth) {
+    const token = getToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+async function handleResponse(res) {
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(error.message || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+async function request(path, { method = 'GET', body, auth = true } = {}) {
+  const res = await fetch(`${API_URL}${path}`, {
+    method,
+    headers: buildHeaders({ json: !!body, auth }),
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return handleResponse(res);
+}
+
+// ============ Auth API ============
+export async function login(email, password) {
+  const data = await request('/auth/login', {
+    method: 'POST',
+    body: { email, password },
+    auth: false,
+  });
+  setAuthToken(data.token);
+  return data;
+}
+
+export async function register(email, password, displayName) {
+  const data = await request('/auth/register', {
+    method: 'POST',
+    body: { email, password, displayName },
+    auth: false,
+  });
+  setAuthToken(data.token);
+  return data;
+}
+
+export async function getMe() {
+  return request('/auth/me');
+}
+
+export function logout() {
+  setAuthToken(null);
+}
+
+// ============ Resource API (example for Issues) ============
+export async function getIssues(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  return request(`/issues${query ? '?' + query : ''}`);
+}
+
+export async function getIssueById(id) {
+  return request(`/issues/${id}`);
+}
+
+export async function createIssue(data) {
+  return request('/issues', { method: 'POST', body: data });
+}
+
+export async function updateIssue(id, data) {
+  return request(`/issues/${id}`, { method: 'PUT', body: data });
+}
+
+export async function deleteIssue(id) {
+  return request(`/issues/${id}`, { method: 'DELETE' });
+}
+
+export async function searchIssues(query) {
+  return request(`/issues/search?q=${encodeURIComponent(query)}`);
+}
+
+// ============ Add more resource APIs following same pattern ============
+```
+
+**Auth Context Pattern (React):**
+```jsx
+// contexts/AuthContext.jsx
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { getMe, login as apiLogin, logout as apiLogout, setAuthToken } from '../services/api';
+
+const AuthContext = createContext(null);
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if user is already logged in
+    getMe()
+      .then(setUser)
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const login = useCallback(async (email, password) => {
+    const data = await apiLogin(email, password);
+    setUser(data.user);
+    return data;
+  }, []);
+
+  const logout = useCallback(() => {
+    apiLogout();
+    setUser(null);
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
+}
+```
+
+**Data Fetching Hook Pattern (Recommended):**
+```jsx
+// hooks/useResource.js - Generic data fetching hook
+import { useState, useEffect, useCallback } from 'react';
+
+export function useResource(fetchFn, deps = []) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const refetch = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await fetchFn();
+      setData(result);
+    } catch (err) {
+      setError(err.message || 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchFn, ...deps]);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  return { data, loading, error, refetch };
+}
+
+// hooks/useProjects.js - Specific resource hook
+import { getProjects } from '../services/api';
+import { useResource } from './useResource';
+
+export function useProjects() {
+  return useResource(() => getProjects());
+}
+
+// hooks/useIssue.js - Resource with parameter
+export function useIssue(issueId) {
+  return useResource(() => getIssueById(issueId), [issueId]);
+}
+
+// Usage in component
+function ProjectList() {
+  const { data: projects, loading, error, refetch } = useProjects();
+  
+  if (loading) return <Spinner />;
+  if (error) return <ErrorMessage message={error} onRetry={refetch} />;
+  if (!projects?.length) return <EmptyState message="No projects found" />;
+  
+  return (
+    <div className="project-list">
+      {projects.map(project => (
+        <ProjectCard key={project.id} project={project} />
+      ))}
+    </div>
+  );
+}
+```
+
+**Mutation Pattern (Create/Update/Delete):**
+```jsx
+// hooks/useMutation.js
+export function useMutation(mutationFn) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const mutate = useCallback(async (...args) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await mutationFn(...args);
+      return result;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [mutationFn]);
+
+  return { mutate, loading, error };
+}
+
+// Usage
+function CreateIssueForm({ onSuccess }) {
+  const { mutate: create, loading, error } = useMutation(createIssue);
+  
+  const handleSubmit = async (formData) => {
+    try {
+      const newIssue = await create(formData);
+      onSuccess(newIssue);
+    } catch {
+      // error is already set in the hook
+    }
+  };
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      {error && <Alert variant="error">{error}</Alert>}
+      {/* form fields */}
+      <Button type="submit" loading={loading}>Create</Button>
+    </form>
+  );
+}
+```
+
+**ErrorBoundary Pattern (REQUIRED):**
+```jsx
+// components/ErrorBoundary.jsx
+import { Component } from 'react';
+
+export class ErrorBoundary extends Component {
+  state = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error('ErrorBoundary caught:', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <div className="error-page">
+          <h2>Something went wrong</h2>
+          <p>{this.state.error?.message}</p>
+          <button onClick={() => window.location.reload()}>
+            Reload Page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// Usage in App.jsx
+import { ErrorBoundary } from './components/ErrorBoundary';
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <AuthProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
+      </AuthProvider>
+    </ErrorBoundary>
+  );
+}
+```
+
+**Common UI Components (REQUIRED):**
+```jsx
+// components/ui/Spinner.jsx
+export function Spinner({ size = 'md', className = '' }) {
+  const sizes = { sm: 'w-4 h-4', md: 'w-8 h-8', lg: 'w-12 h-12' };
+  return (
+    <div className={`animate-spin rounded-full border-2 border-current border-t-transparent ${sizes[size]} ${className}`} />
+  );
+}
+
+// components/ui/EmptyState.jsx
+export function EmptyState({ icon: Icon, title, description, action }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 text-center">
+      {Icon && <Icon className="w-12 h-12 text-gray-400 mb-4" />}
+      <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+      {description && <p className="text-gray-500 mt-1">{description}</p>}
+      {action && <div className="mt-4">{action}</div>}
+    </div>
+  );
+}
+
+// components/ui/Alert.jsx
+import { AlertCircle, CheckCircle, Info, X } from 'lucide-react';
+
+const variants = {
+  error: { icon: AlertCircle, className: 'bg-red-50 text-red-800 border-red-200' },
+  success: { icon: CheckCircle, className: 'bg-green-50 text-green-800 border-green-200' },
+  info: { icon: Info, className: 'bg-blue-50 text-blue-800 border-blue-200' },
+};
+
+export function Alert({ variant = 'info', children, onClose }) {
+  const { icon: Icon, className } = variants[variant];
+  return (
+    <div className={`flex items-center gap-3 p-4 rounded-lg border ${className}`} role="alert">
+      <Icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+      <div className="flex-1">{children}</div>
+      {onClose && (
+        <button onClick={onClose} className="p-1 hover:opacity-70" aria-label="Dismiss">
+          <X className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+**Accessibility Patterns (a11y - REQUIRED):**
+
+```jsx
+// ============ ARIA Attributes ============
+
+// Interactive elements MUST have accessible names
+<button aria-label="Close dialog">
+  <X className="w-4 h-4" />
+</button>
+
+// Icons are decorative - hide from screen readers
+<Search className="w-4 h-4" aria-hidden="true" />
+<span>Search</span>
+
+// Live regions for dynamic content
+<div aria-live="polite" aria-atomic="true">
+  {statusMessage}
+</div>
+
+// ============ Focus Management ============
+
+// Modal focus trap
+function Modal({ isOpen, onClose, children }) {
+  const modalRef = useRef(null);
+  
+  useEffect(() => {
+    if (isOpen) {
+      // Store previous focus and focus modal
+      const previousFocus = document.activeElement;
+      modalRef.current?.focus();
+      
+      return () => previousFocus?.focus();
+    }
+  }, [isOpen]);
+  
+  return isOpen ? (
+    <div 
+      ref={modalRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      tabIndex={-1}
+      onKeyDown={(e) => e.key === 'Escape' && onClose()}
+    >
+      <h2 id="modal-title">Modal Title</h2>
+      {children}
+    </div>
+  ) : null;
+}
+
+// ============ Keyboard Navigation ============
+
+// Custom dropdown with keyboard support
+function Dropdown({ options, value, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  
+  const handleKeyDown = (e) => {
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setActiveIndex(i => Math.min(i + 1, options.length - 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setActiveIndex(i => Math.max(i - 1, 0));
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        onChange(options[activeIndex]);
+        setIsOpen(false);
+        break;
+      case 'Escape':
+        setIsOpen(false);
+        break;
+    }
+  };
+  
+  return (
+    <div onKeyDown={handleKeyDown}>
+      <button
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        {value}
+      </button>
+      {isOpen && (
+        <ul role="listbox">
+          {options.map((opt, i) => (
+            <li
+              key={opt}
+              role="option"
+              aria-selected={i === activeIndex}
+              onClick={() => onChange(opt)}
+            >
+              {opt}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ============ Form Accessibility ============
+
+function FormField({ id, label, error, required, children }) {
+  return (
+    <div>
+      <label htmlFor={id}>
+        {label}
+        {required && <span aria-hidden="true"> *</span>}
+      </label>
+      {children}
+      {error && (
+        <p id={`${id}-error`} role="alert" className="text-red-500">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Usage
+<FormField id="email" label="Email" error={errors.email} required>
+  <input
+    id="email"
+    type="email"
+    aria-required="true"
+    aria-invalid={!!errors.email}
+    aria-describedby={errors.email ? 'email-error' : undefined}
+  />
+</FormField>
+```
+
+**a11y Checklist:**
+- [ ] All images have `alt` text (or `alt=""` for decorative)
+- [ ] All interactive elements are keyboard accessible (Tab, Enter, Space, Escape)
+- [ ] Focus is visible and logical
+- [ ] Color is not the only indicator (add icons or text)
+- [ ] Form inputs have associated labels
+- [ ] Error messages are linked with `aria-describedby`
+- [ ] Modals trap focus and can be dismissed with Escape
+- [ ] Live regions announce dynamic content changes
+
+**Performance Patterns (REQUIRED for production quality):**
+
+```jsx
+// 1. Route-based code splitting with React.lazy
+import { lazy, Suspense } from 'react';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Settings = lazy(() => import('./pages/Settings'));
+
+function App() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/settings" element={<Settings />} />
+      </Routes>
+    </Suspense>
+  );
+}
+
+// 2. Memoize expensive computations
+const filteredIssues = useMemo(() => 
+  issues.filter(i => i.status === filter),
+  [issues, filter]
+);
+
+// 3. Memoize callbacks passed to children
+const handleSelect = useCallback((id) => {
+  setSelected(id);
+}, []);
+
+// 4. Debounce search input
+const debouncedSearch = useMemo(
+  () => debounce((q) => onSearch(q), 300),
+  [onSearch]
+);
+
+// 5. Lazy load images
+<img src={url} alt={alt} loading="lazy" decoding="async" />
+```
+
+**Performance Checklist:**
+- [ ] Route-based code splitting for pages
+- [ ] useMemo for expensive computations
+- [ ] useCallback for callbacks passed to children
+- [ ] Debounce search/filter inputs (300ms)
+- [ ] Lazy load images below fold
+- [ ] Tree-shake imports (import debounce from 'lodash/debounce')
+</FRONTEND_QUALITY_REQUIREMENTS>

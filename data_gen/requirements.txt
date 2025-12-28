@@ -1,0 +1,16 @@
+# Core dependencies for data generation
+torch>=2.0.0
+diffusers>=0.21.0
+transformers>=4.30.0
+accelerate>=0.20.0
+
+# Web scraping dependencies
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+
+# Image processing
+Pillow>=10.0.0
+
+# HuggingFace datasets
+datasets>=2.14.0
+pandas>=2.0.0

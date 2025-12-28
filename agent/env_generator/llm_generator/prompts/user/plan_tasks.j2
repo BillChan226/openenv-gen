@@ -1,0 +1,108 @@
+## Task: Plan Project Tasks
+
+You need to break down the following goal into specific, ordered tasks.
+
+### Goal
+
+{{ goal }}
+
+### Requirements
+
+{{ requirements }}
+
+{% if reference_images %}
+### Reference Images (Selected for this project)
+
+The following reference images have been selected as design guides:
+
+{% for img in reference_images %}
+- **{{ img.path }}** - {{ img.purpose }}
+{% endfor %}
+
+When planning frontend/design tasks, include these reference images in the task.
+The Code Agent will use `view_image` and `analyze_image` tools to study these references.
+{% endif %}
+
+### Phases
+
+The project must be built in this order:
+1. **design** - Create design documents (spec.json, API contracts, component inventory)
+2. **database** - Create database schema and seed data
+3. **backend** - Create Express.js backend API
+4. **frontend** - Create React frontend application
+5. **env** - Create OpenEnv adapter
+6. **docker** - Create Docker configuration
+
+### Directory Structure (Reference)
+
+Each phase has a target directory. The Code Agent will decide what specific files to create.
+
+- `design/` - Design documents defining requirements
+- `app/database/` - PostgreSQL schema and seed data
+- `app/backend/` - Express.js API server
+- `app/frontend/` - React application with components and pages
+- `env/` - OpenEnv adapter for agent interaction
+- `docker/` - Docker compose configuration
+
+### Instructions
+
+For each phase, create a task with:
+- **description**: What functionality this phase should provide
+- **requirements**: Specific features and capabilities needed
+- **target_directory**: Where files should be created
+- **acceptance_criteria**: How to verify the phase is complete
+
+**Note: The Code Agent will decide what specific files to create for each phase. Do NOT list individual files - only describe the functionality needed.**
+
+### Response Format
+
+Respond with JSON:
+
+```json
+{
+  "tasks": [
+    {
+      "id": "design",
+      "type": "design",
+      "description": "Create design documents that define the project specification, API contracts, and component inventory",
+      "requirements": [
+        "Define all features based on reference screenshots",
+        "Document all API endpoints with request/response formats",
+        "List all UI components with props and responsibilities"
+      ],
+      "target_directory": "design/",
+      "reference_images": [
+        {"path": "screenshots/example.png", "purpose": "Main layout reference"}
+      ],
+      "acceptance_criteria": [
+        "Project specification is complete and valid JSON",
+        "All API endpoints are documented",
+        "All components are listed with their interfaces"
+      ]
+    },
+    {
+      "id": "frontend",
+      "type": "frontend",
+      "description": "Create React frontend matching the reference designs",
+      "requirements": [
+        "Match layout from reference images",
+        "Use similar color scheme and styling",
+        "Implement all visible UI components"
+      ],
+      "target_directory": "app/frontend/",
+      "reference_images": [
+        {"path": "screenshots/main.png", "purpose": "Main page design"},
+        {"path": "screenshots/component.png", "purpose": "Component reference"}
+      ],
+      "acceptance_criteria": [
+        "UI matches reference screenshots",
+        "All components are functional",
+        "No console errors"
+      ]
+    }
+  ]
+}
+```
+
+**Important**: For design and frontend tasks, include the `reference_images` array with relevant images from the selected references above.
+

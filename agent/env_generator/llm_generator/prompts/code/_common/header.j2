@@ -1,0 +1,84 @@
+{# Common header for all task types #}
+Execute the following task from User Agent.
+
+**CRITICAL: You MUST use tool calls to perform actions. Do NOT just describe what you would do - actually call the tools!**
+
+Every response must include a tool call. Examples:
+- To create a file: `write_file` or `str_replace_editor`
+- To read context: `read_memory_bank` or `project_structure`
+- To plan: `plan(action="create", items=[...])`
+- To complete: `finish("summary")`
+
+**Do NOT respond with plain text. Always call a tool.**
+
+<TASK>
+- ID: {{ task.id }}
+- Type: {{ task.type.value }}
+- Description: {{ task.description }}
+</TASK>
+
+<REQUIREMENTS>
+{% for req in task.requirements %}
+- {{ req }}
+{% endfor %}
+</REQUIREMENTS>
+
+<TARGET_DIRECTORY>
+{{ task.target_directory }}
+</TARGET_DIRECTORY>
+
+{% if task.existing_files %}
+<EXISTING_FILES>
+These files already exist - check them for consistency:
+{% for file in task.existing_files %}
+- {{ file }}
+{% endfor %}
+</EXISTING_FILES>
+{% endif %}
+
+{% if task.dependencies %}
+<DEPENDENCIES>
+Content from dependent files:
+{% for file, content in task.dependencies.items() %}
+--- {{ file }} ---
+{{ content }}
+{% endfor %}
+</DEPENDENCIES>
+{% endif %}
+
+{% if task.reference_images %}
+<REFERENCE_IMAGES>
+The User Agent has selected these reference images for your design guidance.
+Use `view_image` tool to load and analyze them before generating code.
+
+{% for img in task.reference_images %}
+- Path: {{ img.path }}
+  Purpose: {{ img.purpose }}
+  {% if img.description %}Description: {{ img.description }}{% endif %}
+{% endfor %}
+
+**IMPORTANT**: 
+1. Call `view_image("{{ task.reference_images[0].path }}")` to load the main reference
+2. Use `analyze_image("{{ task.reference_images[0].path }}")` for detailed design analysis
+3. Match the layout, colors, and components from these references
+
+**CONTINUOUS REFERENCE (MANDATORY for high fidelity):**
+- Do NOT only look once at the start. Re-check the references at each major milestone:
+  - After scaffolding layout (app shell, sidebar, top nav)
+  - After implementing a major page (Board, Issue detail, Search, Project list)
+  - After styling pass (spacing, typography, colors)
+- For each milestone, call:
+  - `view_image(<reference>)` and/or `analyze_image(<reference>)` again
+  - If a specific UI piece is tricky (e.g., issue card, status pill, toolbar), call `extract_components(image_path=<reference>, component_type="...")`
+- Before finishing the task, create a real screenshot and compare:
+  - Use browser tools to capture a screenshot of your running UI (or `browser_screenshot(save_path=...)` during verification)
+  - Then call `compare_with_screenshot(reference_image=<reference>, generated_image=<your_screenshot>)`
+  - Fix the highest priority differences first.
+</REFERENCE_IMAGES>
+{% endif %}
+
+<ACCEPTANCE_CRITERIA>
+{% for criterion in task.acceptance_criteria %}
+- {{ criterion }}
+{% endfor %}
+</ACCEPTANCE_CRITERIA>

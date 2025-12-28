@@ -1,0 +1,15 @@
+<BACKEND_PORT_GUIDANCE>
+CRITICAL: Do NOT hardcode a single backend port (port conflicts are common).
+
+- The Code Agent SHOULD choose an available host port for the backend (e.g. 8000-8999).
+- Use find_free_port() to pick a free port, preferring 8000-8099 if possible:
+  - find_free_port(preferred=[8000,8001,8002,8003,8004], range_start=8000, range_end=8999)
+- Once a port is chosen, you MUST keep it consistent everywhere:
+  - `docker/docker-compose.yml` (environment PORT and published port mapping)
+  - any frontend dev proxy / runtime config (e.g. `vite.config.js` proxy target)
+  - verification expectations (User Agent should read compose and derive base URL)
+  - any docs/env files that mention the backend URL
+
+Rule of thumb:
+- Prefer 8000 if it is free; otherwise pick any free port and propagate it.
+</BACKEND_PORT_GUIDANCE>

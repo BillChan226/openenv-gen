@@ -1,0 +1,61 @@
+Generate a coverage-focused verification plan for this task.
+
+Return ONLY valid JSON.
+
+<CONTEXT>
+- Task ID: {{ task.id }}
+- Task Type: {{ task.type.value }}
+- Description: {{ task.description }}
+- Target Directory: {{ task.target_directory }}
+- Acceptance Criteria:
+{% for criterion in task.acceptance_criteria %}
+  - {{ criterion }}
+{% endfor %}
+</CONTEXT>
+
+<FILES_CREATED_SUMMARY>
+Count: {{ (result.files_created | length) if result.files_created else 0 }}
+</FILES_CREATED_SUMMARY>
+
+{% if task.type.value == 'frontend' or task.type.value == 'verification' %}
+For FRONTEND verification, you MUST plan to test:
+
+1. **Element Discovery** - Use browser_a11y_tree to find ALL interactive elements
+2. **Navigation** - Every nav link, menu item, breadcrumb
+3. **Buttons** - Every button on every page
+4. **Inputs** - Every input field, textarea, select
+5. **Forms** - Every form submission
+6. **CRUD** - Create, Read, Update, Delete for each entity
+7. **Search** - If search exists
+8. **Modals/Dialogs** - Open/close, form submission inside
+9. **Error States** - Invalid inputs, API errors
+
+Generate tests that ensure FULL COVERAGE of all interactive elements.
+{% endif %}
+
+JSON schema:
+{
+  "plan_title": "string",
+  "expected_coverage": {
+    "pages": ["list of pages to visit"],
+    "features": ["list of features to test"],
+    "interactions": ["buttons", "inputs", "navigation", "forms", "modals"]
+  },
+  "tests": [
+    {
+      "id": "TEST-001",
+      "category": "Navigation/Buttons/Inputs/Forms/CRUD/Search/Modal",
+      "title": "short description",
+      "priority": "P0/P1/P2",
+      "elements_to_test": ["list of element types or selectors"],
+      "actions": ["action1", "action2"],
+      "expected": "what should happen"
+    }
+  ]
+}
+
+Requirements:
+- P0 tests: MUST pass for verification to succeed
+- Cover ALL categories: Navigation, Buttons, Inputs, Forms
+- Include at least one test per major feature mentioned in task description
+- Total 10-20 tests covering all interaction types

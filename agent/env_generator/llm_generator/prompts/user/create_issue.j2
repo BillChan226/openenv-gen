@@ -1,0 +1,63 @@
+Create an issue for the Code Agent to fix.
+
+<VERIFICATION_RESULT>
+- Task: {{ task_id }}
+- Passed: {{ 'YES' if passed else 'NO' }}
+</VERIFICATION_RESULT>
+
+<FAILED_CHECKS>
+{% for check in failed_checks %}
+- {{ check }}
+{% endfor %}
+</FAILED_CHECKS>
+
+<PROBLEMS_FOUND>
+{% for problem in problems %}
+- {{ problem }}
+{% endfor %}
+</PROBLEMS_FOUND>
+
+{% if error_logs %}
+<ERROR_LOGS>
+{{ error_logs }}
+</ERROR_LOGS>
+{% endif %}
+
+{% if related_files %}
+<RELATED_FILES>
+{% for file in related_files %}
+- {{ file }}
+{% endfor %}
+</RELATED_FILES>
+{% endif %}
+
+<INSTRUCTIONS>
+Create a clear, actionable issue that the Code Agent can fix.
+Include:
+1. A concise title
+2. Detailed description of what's wrong
+3. The specific error message (if any)
+4. Which file(s) need to be fixed
+5. Suggested fix approach
+6. How to verify the fix worked
+</INSTRUCTIONS>
+
+Respond in JSON:
+```json
+{
+  "id": "issue_001",
+  "task_id": "{{ task_id }}",
+  "severity": "error|warning|suggestion",
+  "title": "Brief issue title",
+  "description": "Detailed description of the problem",
+  "error_message": "Actual error message if any",
+  "file_path": "path/to/problem/file",
+  "line_number": null,
+  "code_snippet": "relevant code if applicable",
+  "suggested_fix": "How to fix this issue",
+  "related_files": ["other", "files", "to", "check"],
+  "verification_command": "command to verify fix",
+  "expected_result": "what success looks like"
+}
+```
+
