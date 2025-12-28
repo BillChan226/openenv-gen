@@ -32,11 +32,14 @@ class Episode:
         request_len: Fixed length for request (prompt) tensors
         response_len: Fixed length for response tensors
         task_id: Identifier for the web task this episode belongs to
+        traj_uid: Unique identifier for the trajectory this step belongs to
+        uid: Group identifier for GRPO grouping (same task, different rollouts)
         step_in_task: Step number within the task (0-indexed)
         completion: Model completion containing generated tokens
+        old_logprobs: Log probabilities from policy at generation time
         ref_logprobs: Log probabilities from reference model
-        reward: Shaped reward value
-        advantage: Group-relative advantage
+        reward: Shaped reward value (final trajectory outcome)
+        advantage: Group-relative advantage (computed per trajectory, broadcast to steps)
     """
 
     episode_id: str
@@ -44,8 +47,11 @@ class Episode:
     request_len: int
     response_len: int
     task_id: str
+    traj_uid: str  # Unique per trajectory (for grouping steps)
+    uid: str  # Unique per group (for GRPO advantage computation)
     step_in_task: int
     completion: Completion | None = None
+    old_logprobs: torch.Tensor | None = None  # Log probs from policy at rollout time
     ref_logprobs: torch.Tensor | None = None
     reward: float | None = None
     advantage: float | None = None
@@ -97,11 +103,44 @@ class Episode:
             tensor = tensor[:self.response_len]
         return tensor
 
+    @property
+    def old_logprobs_tensor(self) -> torch.Tensor:
+        """
+        Get padded old log probabilities tensor.
+
+        Right-pads to response_len with zeros (log prob of 1.0).
+
+        Returns:
+            Tensor of shape (response_len,)
+        """
+        if self.old_logprobs is None:
+            # Return zeros if not available (fallback)
+            return torch.zeros(self.response_len, dtype=torch.float32)
+
+        tensor = self.old_logprobs
+        if not isinstance(tensor, torch.Tensor):
+            tensor = torch.tensor(tensor, dtype=torch.float32)
+        else:
+            tensor = tensor.float()
+
+        # Flatten if needed (in case it's multi-dimensional)
+        if tensor.dim() > 1:
+            tensor = tensor.flatten()
+
+        if tensor.shape[0] < self.response_len:
+            diff = self.response_len - tensor.shape[0]
+            tensor = F.pad(tensor, (0, diff), value=0.0)
+        elif tensor.shape[0] > self.response_len:
+            tensor = tensor[:self.response_len]
+        return tensor
+
     def to_dict(self) -> dict:
         """Convert episode to dictionary for logging."""
         return {
             "episode_id": self.episode_id,
             "task_id": self.task_id,
+            "traj_uid": self.traj_uid,
+            "uid": self.uid,
             "step_in_task": self.step_in_task,
             "reward": self.reward,
             "advantage": self.advantage,
@@ -127,7 +166,7 @@ def collate(batches: list[Group]) -> tuple[list[dict[str, Any]], list[dict[str, 
     Returns:
         Tuple of (inputs, targets) where:
         - inputs: List of dicts with "tokens" key (concatenated request+response)
-        - targets: List of dicts with response, ref_logprobs, advantages, padding_mask
+        - targets: List of dicts with response, old_logprobs, ref_logprobs, advantages, padding_mask
     """
     inputs = []
     targets = []
@@ -136,7 +175,11 @@ def collate(batches: list[Group]) -> tuple[list[dict[str, Any]], list[dict[str, 
         # Stack tensors from all episodes in batch
         request = torch.stack([e.request_tensor for e in batch])
         response = torch.stack([e.response_tensor for e in batch])
-        ref_logprobs = torch.stack([e.ref_logprobs for e in batch]).squeeze()
+        old_logprobs = torch.stack([e.old_logprobs_tensor for e in batch])
+        # Stack ref_logprobs and squeeze only trailing dims, not batch dim
+        ref_logprobs = torch.stack([e.ref_logprobs for e in batch])
+        while ref_logprobs.dim() > 2:
+            ref_logprobs = ref_logprobs.squeeze(-1)
         advantages = torch.tensor([e.advantage for e in batch]).unsqueeze(-1)
 
         # Create padding mask (True for non-pad tokens)
@@ -148,6 +191,7 @@ def collate(batches: list[Group]) -> tuple[list[dict[str, Any]], list[dict[str, 
 
         target_dict = {
             "response": response,
+            "old_logprobs": old_logprobs,
             "ref_logprobs": ref_logprobs,
             "advantages": advantages,
             "padding_mask": mask,
@@ -165,8 +209,11 @@ def create_episode(
     request_len: int,
     response_len: int,
     task_id: str,
+    traj_uid: str,
+    uid: str,
     step_in_task: int,
     completion: Completion,
+    old_logprobs: torch.Tensor | None = None,
 ) -> Episode:
     """
     Factory function to create an Episode instance.
@@ -177,8 +224,11 @@ def create_episode(
         request_len: Fixed request length
         response_len: Fixed response length
         task_id: Task identifier
+        traj_uid: Trajectory unique identifier
+        uid: Group identifier for GRPO
         step_in_task: Step number
         completion: Model completion
+        old_logprobs: Log probabilities from policy at generation time
 
     Returns:
         New Episode instance
@@ -189,6 +239,9 @@ def create_episode(
         request_len=request_len,
         response_len=response_len,
         task_id=task_id,
+        traj_uid=traj_uid,
+        uid=uid,
         step_in_task=step_in_task,
         completion=completion,
+        old_logprobs=old_logprobs,
     )

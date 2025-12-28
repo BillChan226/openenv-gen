@@ -31,7 +31,8 @@ from forge.types import LauncherConfig, ProvisionerConfig
 from .data import Episode, collate
 from .loss import simple_grpo_loss
 from .actors import WebReward, ComputeAdvantages, WebEnvActor
-from .rollout import play_web_task, setup_task_logger
+from .rollout import play_web_task, play_web_task_parallel, setup_task_logger
+from .env_pool import EnvironmentPool, create_pool_from_config
 from .tasks import get_tasks_by_category, MINIWOB_ALL_TASKS_UNIQUE
 
 
@@ -73,16 +74,18 @@ class GRPOWebTrainer:
         await trainer.shutdown()
     """
 
-    def __init__(self, services: Dict[str, Any], cfg: DictConfig):
+    def __init__(self, services: Dict[str, Any], cfg: DictConfig, env_pool: EnvironmentPool):
         """
         Initialize trainer with Forge services.
 
         Args:
             services: Dict of initialized Forge services/actors
             cfg: Training configuration
+            env_pool: Shared environment pool for all server connections
         """
         self._services = services
         self._cfg = cfg
+        self._env_pool = env_pool
         self._shutdown_event = asyncio.Event()
         self._training_step = 0
         self._rollout_count = 0
@@ -140,10 +143,13 @@ class GRPOWebTrainer:
         max_res_tokens = self._cfg.max_res_tokens
 
         web_env_cfg = self._cfg.get("web_env", {})
-        server_url = web_env_cfg.get("server_url", "http://localhost:8005")
         benchmark = web_env_cfg.get("benchmark", "miniwob")
         default_task_name = web_env_cfg.get("task_name", "click-test")
         max_steps = web_env_cfg.get("max_steps", 15)
+
+        # Use the shared environment pool
+        env_pool = self._env_pool
+        print(f"Environment pool: {env_pool.capacity} server(s) available")
 
         # Build task pool for random sampling during training
         task_pool_cfg = web_env_cfg.get("task_pool", None)
@@ -151,8 +157,19 @@ class GRPOWebTrainer:
             # No task pool specified, use single task
             task_pool = [default_task_name]
         elif isinstance(task_pool_cfg, str):
-            # String like "easy", "medium", "hard", "all"
-            task_pool = get_tasks_by_category(task_pool_cfg)
+            # String like "easy", "medium", "hard", "all", or combined like "easy+medium"
+            if "+" in task_pool_cfg:
+                # Combined categories: "easy+medium" -> easy tasks + medium tasks
+                task_pool = []
+                for category in task_pool_cfg.split("+"):
+                    category = category.strip()
+                    tasks = get_tasks_by_category(category)
+                    if tasks:
+                        task_pool.extend(tasks)
+                # Deduplicate while preserving order
+                task_pool = list(dict.fromkeys(task_pool))
+            else:
+                task_pool = get_tasks_by_category(task_pool_cfg)
             if not task_pool:
                 print(f"Warning: Unknown task_pool '{task_pool_cfg}', using default task")
                 task_pool = [default_task_name]
@@ -181,29 +198,30 @@ class GRPOWebTrainer:
         async def continuous_rollouts():
             """Rollout loop: play tasks and collect episodes."""
             while not self._shutdown_event.is_set():
-                all_step_results = []
+                # GRPO: Sample ONE task and run group_size rollouts on it
+                current_task = random.choice(task_pool)
+                # Create list with same task repeated for all rollouts in the group
+                rollout_tasks = [current_task] * group_size
 
-                # Play a group of tasks (randomly sample from task pool)
-                for task_idx in range(group_size):
-                    task_id = str(uuid.uuid4())[:8]
-                    # Randomly sample a task from the pool
-                    current_task = random.choice(task_pool)
-                    step_results = await play_web_task(
-                        task_idx=task_idx,
-                        task_id=task_id,
-                        server_url=server_url,
-                        policy=policy,
-                        tokenizer=tokenizer,
-                        task_log=task_log,
-                        rollout_count=self._rollout_count,
-                        max_steps=max_steps,
-                        benchmark=benchmark,
-                        task_name=current_task,
-                    )
-                    all_step_results.extend(step_results)
+                # The pool automatically limits concurrency to available servers
+                all_step_results = await play_web_task_parallel(
+                    num_tasks=group_size,
+                    env_pool=env_pool,
+                    policy=policy,
+                    tokenizer=tokenizer,
+                    task_log=task_log,
+                    task_names=rollout_tasks,
+                    rollout_count=self._rollout_count,
+                    max_steps=max_steps,
+                    benchmark=benchmark,
+                )
 
                 # Create episodes from step results
-                print(f"[TRAINER DEBUG] Creating {len(all_step_results)} episodes...")
+                # Generate a unique group ID (uid) for this rollout batch
+                # All episodes in this batch share the same uid for GRPO grouping
+                group_uid = str(uuid.uuid4())
+
+                # print(f"[TRAINER DEBUG] Creating {len(all_step_results)} episodes...")
                 episodes = []
                 input_ids = torch.ones(
                     (len(all_step_results), max_req_tokens + max_res_tokens),
@@ -211,14 +229,21 @@ class GRPOWebTrainer:
                 )
 
                 for i, step_result in enumerate(all_step_results):
+                    # Extract old_logprobs from completion (log probs at generation time)
+                    completion = step_result["response"]
+                    old_logprobs = completion.logprobs if completion.logprobs is not None else None
+
                     episode = Episode(
                         episode_id=str(uuid.uuid4()),
                         pad_id=pad_id,
                         request_len=max_req_tokens,
                         response_len=max_res_tokens,
                         task_id=step_result["task_id"],
+                        traj_uid=step_result["traj_uid"],  # Trajectory ID (shared by all steps in same trajectory)
+                        uid=group_uid,  # Group ID (shared by all episodes in this GRPO batch)
                         step_in_task=step_result["step_num"],
-                        completion=step_result["response"],
+                        completion=completion,
+                        old_logprobs=old_logprobs,  # Log probs from policy at rollout time
                     )
 
                     # Compute shaped reward
@@ -249,22 +274,36 @@ class GRPOWebTrainer:
                 # Compute group-relative advantages
                 print(f"[TRAINER DEBUG] Computing advantages...")
                 advantages = await compute_advantages.compute.call_one(episodes)
-                print(f"[TRAINER DEBUG] Adding episodes to replay buffer...")
+
+                # CRITICAL FIX: Skip groups with zero variance (no learning signal)
+                if advantages is None:
+                    print(f"[TRAINER] Skipping rollout {self._rollout_count + 1}: zero-variance group")
+                    self._rollout_count += 1
+                    continue
+
+                # print(f"[TRAINER DEBUG] Adding episodes to replay buffer...")
                 for episode, advantage in zip(episodes, advantages):
                     episode.advantage = advantage
                     await replay_buffer.add.call_one(episode)
-                print(f"[TRAINER DEBUG] Episodes added to replay buffer")
+                # print(f"[TRAINER DEBUG] Episodes added to replay buffer")
 
                 self._rollout_count += 1
 
-                # Log rollout stats
-                successes = sum(1 for e in episodes if e.reward > 0)
-                success_rate = successes / len(episodes) if episodes else 0
-                avg_reward = sum(e.reward for e in episodes) / len(episodes) if episodes else 0
+                # Log rollout stats at TRAJECTORY level (not episode/step level)
+                # This avoids biasing metrics toward longer trajectories
+                traj_rewards = {}
+                for e in episodes:
+                    if e.traj_uid not in traj_rewards:
+                        traj_rewards[e.traj_uid] = e.reward
+
+                num_trajectories = len(traj_rewards)
+                successes = sum(1 for r in traj_rewards.values() if r > 0)
+                success_rate = successes / num_trajectories if num_trajectories else 0
+                avg_reward = sum(traj_rewards.values()) / num_trajectories if num_trajectories else 0
 
                 print(
                     f"Rollout {self._rollout_count}: "
-                    f"{len(episodes)} episodes, "
+                    f"{num_trajectories} trajectories ({len(episodes)} episodes), "
                     f"success rate: {success_rate:.1%}, "
                     f"avg reward: {avg_reward:.2f}"
                 )
@@ -273,6 +312,23 @@ class GRPOWebTrainer:
                 record_metric("train/success_rate", success_rate, Reduce.MEAN)
                 record_metric("train/avg_reward", avg_reward, Reduce.MEAN)
                 record_metric("train/episodes_per_rollout", len(episodes), Reduce.MEAN)
+                record_metric("train/trajectories_per_rollout", num_trajectories, Reduce.MEAN)
+
+        # Get evaluation config
+        eval_cfg = self._cfg.get("evaluation", {})
+        eval_interval = eval_cfg.get("eval_interval", 0)  # 0 means no eval
+        eval_tasks = eval_cfg.get("eval_tasks", 64)
+        eval_quiet = eval_cfg.get("quiet", True)
+
+        if eval_interval > 0:
+            print(f"Evaluation: every {eval_interval} steps, {eval_tasks} tasks")
+            # Run initial evaluation before training starts
+            print(f"\n[Step 0] Running initial evaluation (before training)...")
+            await self.evaluate(
+                num_tasks=eval_tasks,
+                quiet=eval_quiet,
+                log_to_wandb=True,
+            )
 
         async def continuous_training():
             """Training loop: sample and update policy."""
@@ -305,6 +361,15 @@ class GRPOWebTrainer:
                 if self._training_step % log_interval == 0:
                     print(f"Training step {self._training_step}/{steps}")
 
+                # Periodic evaluation
+                if eval_interval > 0 and self._training_step % eval_interval == 0:
+                    print(f"\n[Step {self._training_step}] Running evaluation...")
+                    await self.evaluate(
+                        num_tasks=eval_tasks,
+                        quiet=eval_quiet,
+                        log_to_wandb=True,
+                    )
+
             print(f"\nTraining complete! {steps} steps finished.")
 
         # Run both loops concurrently
@@ -324,66 +389,146 @@ class GRPOWebTrainer:
 
     async def evaluate(
         self,
-        num_tasks: int = 50,
+        num_tasks: int = 64,
         task_name: Optional[str] = None,
+        use_task_pool: bool = True,
+        quiet: bool = False,
+        log_to_wandb: bool = True,
     ) -> Dict[str, Any]:
         """
         Evaluate current policy on web tasks.
 
+        This is a held-out evaluation that runs a fixed number of tasks
+        and computes success rate with num_tasks as the denominator.
+
+        Uses the shared environment pool to avoid conflicts with training rollouts.
+
         Args:
-            num_tasks: Number of tasks to evaluate on
-            task_name: Task to evaluate (default: from config)
+            num_tasks: Number of tasks to evaluate on (denominator for success rate)
+            task_name: Specific task to evaluate (if None, samples from task_pool)
+            use_task_pool: If True and task_name is None, sample from task_pool
+            quiet: If True, suppress per-task logging
+            log_to_wandb: If True, record metrics to wandb
 
         Returns:
-            Evaluation metrics
+            Evaluation metrics dict with success_rate, avg_reward, etc.
         """
-        from .rollout import play_web_task
-
         policy = self._services["policy"]
         tokenizer = self._services["tokenizer"]
+        env_pool = self._env_pool
 
         web_env_cfg = self._cfg.get("web_env", {})
-        server_url = web_env_cfg.get("server_url", "http://localhost:8005")
         benchmark = web_env_cfg.get("benchmark", "miniwob")
-        task = task_name or web_env_cfg.get("task_name", "click-test")
         max_steps = web_env_cfg.get("max_steps", 15)
 
-        task_log = lambda msg: print(msg)  # Simple logging for eval
+        # Build task pool for evaluation
+        if task_name:
+            eval_task_pool = [task_name]
+        elif use_task_pool:
+            task_pool_cfg = web_env_cfg.get("task_pool", None)
+            if task_pool_cfg is None:
+                eval_task_pool = [web_env_cfg.get("task_name")]
+            elif isinstance(task_pool_cfg, str):
+                if "+" in task_pool_cfg:
+                    eval_task_pool = []
+                    for category in task_pool_cfg.split("+"):
+                        tasks = get_tasks_by_category(category.strip())
+                        if tasks:
+                            eval_task_pool.extend(tasks)
+                    eval_task_pool = list(dict.fromkeys(eval_task_pool))
+                else:
+                    eval_task_pool = get_tasks_by_category(task_pool_cfg)
+                if not eval_task_pool:
+                    eval_task_pool = [web_env_cfg.get("task_name")]
+            elif hasattr(task_pool_cfg, '__iter__') and not isinstance(task_pool_cfg, str):
+                eval_task_pool = list(task_pool_cfg)
+            else:
+                eval_task_pool = [web_env_cfg.get("task_name")]
+        else:
+            eval_task_pool = [web_env_cfg.get("task_name")]
 
-        successes = 0
-        total_reward = 0
-        total_steps = 0
+        task_log = (lambda msg: None) if quiet else (lambda msg: print(msg))
 
+        print(f"\n{'='*60}")
+        print(f"EVALUATION: {num_tasks} tasks (from {len(eval_task_pool)} task types)")
+        print(f"Using shared pool with {env_pool.capacity} server(s)")
+        print(f"Task pool sample: {eval_task_pool[:5]}..." if len(eval_task_pool) > 5 else f"Task pool: {eval_task_pool}")
+        print(f"{'='*60}")
+
+        # Deterministic task selection: use first N tasks from pool (cycling if needed)
+        # This ensures consistent evaluation across training runs
+        eval_task_names = []
         for i in range(num_tasks):
-            task_id = str(uuid.uuid4())[:8]
-            results = await play_web_task(
-                task_idx=i,
-                task_id=task_id,
-                server_url=server_url,
-                policy=policy,
-                tokenizer=tokenizer,
-                task_log=task_log,
-                max_steps=max_steps,
-                benchmark=benchmark,
-                task_name=task,
-            )
+            eval_task_names.append(eval_task_pool[i % len(eval_task_pool)])
 
-            if results:
-                final_reward = results[0]["final_reward"]
-                step_count = results[0]["step_count"]
+        # Run all evaluation tasks using the shared pool
+        # The pool limits concurrency and prevents conflicts with training
+        all_results = await play_web_task_parallel(
+            num_tasks=num_tasks,
+            env_pool=env_pool,
+            policy=policy,
+            tokenizer=tokenizer,
+            task_log=task_log,
+            rollout_count=-1,  # Mark as evaluation
+            max_steps=max_steps,
+            benchmark=benchmark,
+            task_names=eval_task_names,
+        )
 
-                if final_reward > 0:
-                    successes += 1
-                total_reward += final_reward
-                total_steps += step_count
+        # Process results - group by task_id to get per-task outcomes
+        task_results_map: Dict[str, Dict[str, Any]] = {}
+        for result in all_results:
+            task_id = result["task_id"]
+            if task_id not in task_results_map:
+                task_results_map[task_id] = {
+                    "task": eval_task_names[len(task_results_map) % len(eval_task_names)],
+                    "final_reward": result["final_reward"],
+                    "step_count": result["step_count"],
+                    "success": result["final_reward"] > 0,
+                }
+
+        # Calculate metrics
+        task_results = list(task_results_map.values())
+        successes = sum(1 for r in task_results if r["success"])
+        total_reward = sum(r["final_reward"] for r in task_results)
+        total_steps = sum(r["step_count"] for r in task_results)
+
+        # Handle case where we have fewer results than expected
+        actual_num_tasks = len(task_results)
+        if actual_num_tasks < num_tasks:
+            print(f"  Warning: Only {actual_num_tasks}/{num_tasks} tasks completed")
+
+        success_rate = successes / actual_num_tasks if actual_num_tasks > 0 else 0
+        avg_reward = total_reward / actual_num_tasks if actual_num_tasks > 0 else 0
+        avg_steps = total_steps / actual_num_tasks if actual_num_tasks > 0 else 0
+
+        # Log per-task results if not quiet
+        if not quiet:
+            for i, result in enumerate(task_results):
+                if result["success"]:
+                    print(f"  [EVAL] Task {i} ({result['task']}): SUCCESS in {result['step_count']} steps")
+                else:
+                    print(f"  [EVAL] Task {i} ({result['task']}): FAILED, reward={result['final_reward']}")
+
+        print(f"\n{'='*60}")
+        print(f"EVAL RESULTS: {successes}/{actual_num_tasks} = {success_rate:.1%} success rate")
+        print(f"Avg reward: {avg_reward:.3f}, Avg steps: {avg_steps:.1f}")
+        print(f"{'='*60}\n")
+
+        # Log to wandb
+        if log_to_wandb:
+            record_metric("eval/success_rate", success_rate, Reduce.MEAN)
+            record_metric("eval/avg_reward", avg_reward, Reduce.MEAN)
+            record_metric("eval/successes", successes, Reduce.SUM)
+            record_metric("eval/num_tasks", actual_num_tasks, Reduce.MEAN)
 
         return {
-            "task": task,
-            "num_tasks": num_tasks,
+            "num_tasks": actual_num_tasks,
             "successes": successes,
-            "success_rate": successes / num_tasks,
-            "avg_reward": total_reward / num_tasks,
-            "avg_steps": total_steps / num_tasks,
+            "success_rate": success_rate,
+            "avg_reward": avg_reward,
+            "avg_steps": avg_steps,
+            "task_results": task_results,
         }
 
     async def shutdown(self):
@@ -434,6 +579,10 @@ async def setup_forge_training(config_path: str) -> GRPOWebTrainer:
     # Filter web_env config for WebEnvActor (remove task_pool which is only used in trainer)
     web_env_cfg = dict(cfg.get("web_env", {}))
     web_env_cfg.pop("task_pool", None)  # task_pool is handled in GRPOWebTrainer.run()
+
+    # Create environment pool from config (shared by training and evaluation)
+    env_pool = create_pool_from_config(cfg.get("web_env", {}))
+    print(f"  [OK] Environment pool: {env_pool.capacity} server(s)")
 
     # Start all services concurrently
     (
@@ -495,4 +644,4 @@ async def setup_forge_training(config_path: str) -> GRPOWebTrainer:
         "pad_id": pad_id,
     }
 
-    return GRPOWebTrainer(services, cfg)
+    return GRPOWebTrainer(services, cfg, env_pool)

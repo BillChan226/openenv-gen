@@ -83,7 +83,7 @@ Rules:
 2. Use element IDs (BIDs) from the page content - look for [XX] before element names
 3. Copy element IDs exactly as shown (e.g., if you see [13] button, use click('13'))
 4. If unsure, use noop() to observe
-5. Keep reasoning very brief, then output the action"""
+5. Output the action directly"""
 
     # Extract observation fields
     goal = observation.goal or "(not provided)"
@@ -129,8 +129,9 @@ What action should I take next? Output exactly one BrowserGym action:"""
         {"role": "user", "content": user_content},
     ]
 
+    # Disable Qwen3 thinking mode for direct action output
     return tokenizer.apply_chat_template(
-        chat, tokenize=False, add_generation_prompt=True
+        chat, tokenize=False, add_generation_prompt=True, enable_thinking=False
     )
 
 

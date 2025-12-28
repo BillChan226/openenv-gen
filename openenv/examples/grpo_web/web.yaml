@@ -12,9 +12,9 @@
 
 # Global configuration
 group_size: 8  # Number of parallel tasks per rollout (reduced to avoid OOM with multi-step tasks)
-local_batch_size: 4  # Per-device batch size (smaller due to longer sequences and more steps)
-max_req_tokens: 2048  # Max tokens for prompt 
-max_res_tokens: 1024  # Max tokens for response 
+local_batch_size: 8  # Per-device batch size (smaller due to longer sequences and more steps)
+max_req_tokens: 1024  # Max tokens for prompt 
+max_res_tokens: 256  # Max tokens for response 
 model: "Qwen/Qwen3-1.7B"
 model_local_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
 off_by_n: 1  # Off-policy tolerance
@@ -33,23 +33,31 @@ metric_logging:
 
 # Web environment configuration (BrowserGym)
 web_env:
+  # Single server (current setup - training and eval share this server sequentially)
   server_url: "http://localhost:8005"
+  # Multiple servers for parallel rollouts (uncomment and add more servers as needed)
+  # server_urls:
+  #   - "http://localhost:8005"
+  #   - "http://localhost:8006"
+  #   - "http://localhost:8007"
+  #   - "http://localhost:8008"
   model: ${model}
   benchmark: "miniwob"
-  task_name: "click-test"  # Default task (fallback if task_pool is empty)
+  # task_name: "click-test"  # Default task (fallback if task_pool is empty)
   max_steps: 10  # Max steps per episode
   # Task pool - randomly sample tasks during training for better generalization
   # Options: "easy" (22 tasks), "medium" (50 tasks), "hard" (63 tasks), "all" (~125 tasks)
+  # Combine with "+": "easy+medium" (72 tasks)
   # Or specify a list directly: ["click-test", "click-button", "enter-text"]
   # task_pool: "easy"  # Start with easy tasks for curriculum learning
-  # task_pool: ["click-test"]  # Single task for debugging
-  task_pool: ["enter-text", "click-button-sequence", "click-checkboxes", "choose-list", "focus-text"]
+  task_pool: "medium"  # 72 tasks combined
+  # task_pool: ["click-checkboxes"]  # Single task for debugging - medium difficulty
 
 # Policy configuration
 policy:
   engine_args:  # https://docs.vllm.ai/en/v0.10.0/api/vllm/engine/arg_utils.html
     model: ${model}
-    tensor_parallel_size: 1
+    tensor_parallel_size: 1  # 8B fits on 1x H200 (143GB VRAM)
     pipeline_parallel_size: 1
     enforce_eager: false
   sampling_params:  # https://docs.vllm.ai/en/v0.10.0/api/vllm/sampling_params.html
@@ -66,22 +74,22 @@ trainer:
     hf_assets_path: ${model_local_path}
   optimizer:
     name: AdamW
-    lr: 5e-6  # Lower LR for web tasks (more complex)
+    lr: 1e-5  # Same as blackjack (which works)
     eps: 1e-8
   lr_scheduler:
-    warmup_steps: 10
+    warmup_steps: 1  # Same as blackjack
   training:
     local_batch_size: ${local_batch_size}
     seq_len: 4200  # Longer sequences for web pages (max_req + max_res + buffer)
     max_norm: 1.0
-    steps: 2000  # More steps needed for web navigation
+    steps: 500  # More steps needed for web navigation
     dtype: bfloat16
     gc_freq: 1
   compile:
     enable: false
   parallelism:
     data_parallel_replicate_degree: 1
-    data_parallel_shard_degree: 1
+    data_parallel_shard_degree: 1  # 1.7B model fits on single GPU
     tensor_parallel_degree: 1
     pipeline_parallel_degree: 1
     context_parallel_degree: 1
@@ -98,11 +106,17 @@ trainer:
     mode: selective
     selective_ac_option: op
 
+# Evaluation configuration
+evaluation:
+  eval_interval: 5      # Run evaluation every N training steps
+  eval_tasks: 32        # Number of tasks for evaluation (denominator for success rate)
+  quiet: false          # Show per-task logging during eval for debugging
+
 # Replay buffer configuration
 replay_buffer:
   batch_size: ${local_batch_size}
   max_policy_age: ${off_by_n}
-  dp_size: ${trainer.parallelism.data_parallel_shard_degree}
+  dp_size: 1  # Must match trainer's data_parallel_shard_degree
 
 # Reference model configuration
 ref_model:
@@ -136,7 +150,7 @@ services:
     mesh_name: policy
     with_gpus: true
   ref_model:
-    procs: 2  # Match tensor_parallel_degree (policy=1 + trainer=1 + ref_model=2 = 4 total GPUs)
+    procs: 2  # policy=1 + trainer=2 + ref_model=2 = 5 total GPUs
     num_replicas: 1
     mesh_name: ref_model
     with_gpus: true
@@ -152,7 +166,7 @@ actors:
     with_gpus: false
     mesh_name: web_env
   trainer:
-    procs: 1
+    procs: 1  # 1.7B model fits on single GPU
     with_gpus: true
     mesh_name: trainer
   replay_buffer:

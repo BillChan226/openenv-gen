@@ -24,17 +24,22 @@ class WebReward(ForgeActor):
     """
     Reward actor for evaluating web navigation outcomes.
 
-    Computes shaped rewards that encourage:
-    - Task completion
-    - Efficient completion (fewer steps)
-    - Valid actions (penalize errors)
+    Computes shaped rewards based on TRAJECTORY OUTCOME ONLY.
+
+    IMPORTANT: All steps in a trajectory MUST receive the same reward
+    for GRPO advantage computation to work correctly. This means:
+    - NO per-step penalties (errors, noop)
+    - Only final outcome (success/failure) + efficiency bonus
+
+    The efficiency bonus is based on total trajectory length, so all
+    steps in the same trajectory get the identical reward.
     """
 
     # Reward shaping parameters
     success_reward: float = 2.0
     failure_reward: float = -0.5
     efficiency_bonus_scale: float = 0.5
-    error_penalty: float = 0.1
+    # NOTE: error_penalty removed - was causing reward inconsistency within trajectories
 
     @endpoint
     async def evaluate_response(
@@ -44,26 +49,29 @@ class WebReward(ForgeActor):
         task_reward: float,
         step_count: int,
         max_steps: int,
-        had_error: bool = False,
+        had_error: bool = False,  # Kept for API compatibility but NOT used
     ) -> float:
         """
-        Evaluate episode reward with shaping for web tasks.
+        Evaluate trajectory reward (same for ALL steps in trajectory).
 
-        Reward shaping strategy:
-        1. Base reward from task outcome (success/failure)
-        2. Efficiency bonus for completing faster
-        3. Penalty for action errors
+        Reward is computed based on:
+        1. Task outcome (success/failure)
+        2. Efficiency bonus (for success only)
+
+        CRITICAL: This returns the SAME reward for all steps in a trajectory.
+        The had_error and response parameters are kept for API compatibility
+        but are NOT used in reward computation to ensure consistency.
 
         Args:
-            prompt: Page state prompt (unused, for logging)
-            response: Model's action string
+            prompt: Page state prompt (unused)
+            response: Model's action string (unused for reward)
             task_reward: Raw task outcome (1.0 for success, 0.0 for failure)
-            step_count: Steps taken to complete
+            step_count: Total steps taken in trajectory
             max_steps: Maximum allowed steps
-            had_error: Whether the action caused an error
+            had_error: Whether action caused error (unused - for API compat)
 
         Returns:
-            Shaped reward value
+            Shaped reward value (identical for all steps in same trajectory)
         """
         # Base reward from task outcome
         if task_reward > 0:
@@ -71,12 +79,14 @@ class WebReward(ForgeActor):
             efficiency = 1.0 - (step_count / max_steps)
             reward = self.success_reward + (self.efficiency_bonus_scale * efficiency)
         else:
-            # Failure
+            # Failure: flat penalty (no per-step penalties!)
             reward = self.failure_reward
 
-        # Penalty for action errors
-        if had_error or response == "noop()":
-            reward -= self.error_penalty
+        # NOTE: We intentionally do NOT penalize per-step errors or noops here.
+        # Doing so would create inconsistent rewards within a trajectory,
+        # which breaks the GRPO advantage computation.
+        # The model learns to avoid errors through the relative advantage:
+        # trajectories with fewer errors are more likely to succeed.
 
         # Record metrics for monitoring
         record_metric("reward/avg_reward", reward, Reduce.MEAN)
@@ -116,18 +126,16 @@ class WebReward(ForgeActor):
 @dataclass
 class WebRewardWithFormatPenalty(ForgeActor):
     """
-    Extended reward actor that also penalizes malformed actions.
+    Extended reward actor - DEPRECATED, use WebReward instead.
 
-    This variant adds penalties for:
-    - Invalid action syntax
-    - Referencing non-existent elements
-    - Repetitive actions
+    WARNING: Per-step penalties break GRPO advantage computation.
+    This class is kept for backwards compatibility but should NOT be used.
+    All steps in a trajectory MUST have the same reward.
     """
 
     success_reward: float = 2.0
     failure_reward: float = -0.5
-    format_penalty: float = 0.2
-    repetition_penalty: float = 0.1
+    efficiency_bonus_scale: float = 0.5
 
     @endpoint
     async def evaluate_response(
@@ -141,33 +149,20 @@ class WebRewardWithFormatPenalty(ForgeActor):
         valid_bids: Optional[List[str]] = None,
     ) -> float:
         """
-        Evaluate with format and repetition penalties.
+        Evaluate trajectory reward (same for ALL steps).
+
+        NOTE: action_history and valid_bids are kept for API compatibility
+        but are NOT used. Per-step penalties break GRPO.
         """
-        # Base reward
+        # Base reward from task outcome ONLY
         if task_reward > 0:
             efficiency = 1.0 - (step_count / max_steps)
-            reward = self.success_reward + (0.5 * efficiency)
+            reward = self.success_reward + (self.efficiency_bonus_scale * efficiency)
         else:
             reward = self.failure_reward
 
-        # Format penalty for noop (often means parsing failed)
-        if response == "noop()":
-            reward -= self.format_penalty
-
-        # Repetition penalty
-        if action_history and len(action_history) >= 2:
-            if response == action_history[-1]:
-                reward -= self.repetition_penalty
-
-        # Invalid BID penalty
-        if valid_bids and "click(" in response:
-            # Extract BID from action
-            import re
-            match = re.search(r"click\(['\"]?(\d+)['\"]?\)", response)
-            if match:
-                bid = match.group(1)
-                if bid not in valid_bids:
-                    reward -= self.format_penalty
+        # NOTE: All per-step penalties removed to ensure consistent
+        # rewards within a trajectory for GRPO
 
         record_metric("reward/avg_reward", reward, Reduce.MEAN)
         return reward
@@ -176,36 +171,99 @@ class WebRewardWithFormatPenalty(ForgeActor):
 @dataclass
 class ComputeAdvantages(ForgeActor):
     """
-    Actor for computing group-relative advantages.
+    Actor for computing group-relative advantages at the TRAJECTORY level.
 
     GRPO uses group-relative normalization instead of absolute baselines.
-    For each group of episodes, we normalize rewards by the group's
-    mean and standard deviation.
+
+    IMPORTANT: This computes advantages per TRAJECTORY (not per step).
+    - Episodes are grouped by their `traj_uid` (trajectory identifier)
+    - One reward per trajectory is used for normalization
+    - The resulting advantage is broadcast to ALL steps in that trajectory
+
+    This is the correct implementation matching verl-agent's approach,
+    avoiding the bias toward longer trajectories that occurs when
+    treating steps as independent samples.
+
+    CRITICAL FIX: Returns None when all trajectories have the same reward
+    (zero variance), as there's no learning signal in this case.
     """
 
     eps: float = 1e-4  # Numerical stability constant
+    min_std_threshold: float = 1e-6  # Minimum std to consider group valid
 
     @endpoint
-    async def compute(self, group: Group) -> List[float]:
+    async def compute(self, group: Group) -> Optional[List[float]]:
         """
-        Compute advantages normalized by group statistics.
+        Compute trajectory-level advantages and broadcast to steps.
 
-        Formula: advantage_i = (reward_i - mean) / (std + eps)
+        Algorithm:
+        1. Group episodes by traj_uid (trajectory identifier)
+        2. Get ONE reward per trajectory (all steps have same final reward)
+        3. Compute mean and std over trajectories (not steps)
+        4. If std < threshold, return None (skip this batch - no learning signal)
+        5. Compute advantage per trajectory
+        6. Broadcast each trajectory's advantage to all its steps
+
+        Formula (per trajectory): advantage_traj = (reward_traj - mean) / (std + eps)
 
         Args:
-            group: List of episodes from same rollout group
+            group: List of episodes from same rollout group (may contain
+                   multiple steps from multiple trajectories)
 
         Returns:
-            List of advantage values (same order as input)
+            List of advantage values (same order as input episodes),
+            or None if group should be skipped (zero variance)
         """
-        rewards = torch.tensor([[e.reward for e in group]])
+        from collections import defaultdict
 
-        mean = rewards.mean(1, keepdim=True)
-        std = rewards.std(1, keepdim=True)
+        # Step 1: Group episodes by trajectory
+        traj_to_episodes: dict[str, List[Episode]] = defaultdict(list)
+        for ep in group:
+            traj_to_episodes[ep.traj_uid].append(ep)
 
-        advantages = (rewards - mean) / (std + self.eps)
+        # Step 2: Get ONE reward per trajectory
+        # All steps in a trajectory have the same reward (final outcome)
+        traj_rewards: dict[str, float] = {}
+        for traj_uid, episodes in traj_to_episodes.items():
+            # Use the first episode's reward (should all be the same)
+            traj_rewards[traj_uid] = episodes[0].reward
 
-        return advantages.squeeze(0).tolist()
+        # Step 3: Compute mean and std over TRAJECTORIES
+        reward_values = list(traj_rewards.values())
+        rewards_tensor = torch.tensor(reward_values, dtype=torch.float32)
+
+        mean = rewards_tensor.mean()
+
+        # Handle edge cases:
+        # - Single trajectory: no relative signal, skip
+        # - All same rewards (std ~= 0): no relative signal, skip
+        if len(reward_values) <= 1:
+            print(f"[ADVANTAGES] Skipping group with only {len(reward_values)} trajectory(ies)")
+            return None
+
+        std = rewards_tensor.std()
+
+        # CRITICAL FIX: Skip groups with zero/near-zero variance
+        # When all trajectories have the same reward, there's no learning signal
+        if std < self.min_std_threshold:
+            print(f"[ADVANTAGES] Skipping zero-variance group: all rewards = {reward_values[0]:.3f}")
+            return None
+
+        # Step 4: Compute advantage per trajectory
+        traj_advantages: dict[str, float] = {}
+        for traj_uid, reward in traj_rewards.items():
+            traj_advantages[traj_uid] = ((reward - mean) / (std + self.eps)).item()
+
+        # Step 5: Broadcast to all episodes (steps)
+        advantages = [traj_advantages[ep.traj_uid] for ep in group]
+
+        # DEBUG: Print statistics
+        print(f"[ADVANTAGES] num_trajectories={len(traj_rewards)}, num_episodes={len(group)}")
+        print(f"[ADVANTAGES] traj_rewards: {[round(r, 2) for r in reward_values]}")
+        print(f"[ADVANTAGES] mean={mean.item():.3f}, std={std.item():.3f}")
+        print(f"[ADVANTAGES] traj_advantages: {[round(a, 2) for a in traj_advantages.values()]}")
+
+        return advantages
 
     @endpoint
     async def compute_batch(self, groups: List[Group]) -> List[List[float]]:

@@ -2,12 +2,17 @@
 Rollout Logic for BrowserGym Tasks
 """
 
+from __future__ import annotations
+
 import random
 import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+
+if TYPE_CHECKING:
+    from .env_pool import EnvironmentPool
 
 # Add openenv root to path for envs imports
 _openenv_root = Path(__file__).parent.parent.parent.parent
@@ -95,9 +100,9 @@ async def play_web_task(
         - max_steps: Maximum steps allowed
         - had_error: Whether action caused an error
     """
-    print(f"  [DEBUG] Creating BrowserGymEnv client for {server_url}...")
+    # print(f"  [DEBUG] Creating BrowserGymEnv client for {server_url}...")
     env = BrowserGymEnv(base_url=server_url, message_timeout_s=120.0)
-    print(f"  [DEBUG] BrowserGymEnv client created")
+    # print(f"  [DEBUG] BrowserGymEnv client created")
 
     task_log("")
     task_log("=" * 80)
@@ -107,14 +112,14 @@ async def play_web_task(
 
     try:
         # Connect to WebSocket
-        print(f"  [DEBUG] Connecting to WebSocket...")
+        # print(f"  [DEBUG] Connecting to WebSocket...")
         env.connect()
-        print(f"  [DEBUG] WebSocket connected successfully")
+        # print(f"  [DEBUG] WebSocket connected successfully")
 
         # Reset environment with specific task
-        print(f"  [DEBUG] Calling env.reset(task_name={task_name})...")
+        # print(f"  [DEBUG] Calling env.reset(task_name={task_name})...")
         result = env.reset(task_name=task_name)
-        print(f"  [DEBUG] env.reset() completed")
+        # print(f"  [DEBUG] env.reset() completed")
         obs = result.observation
         done = False
         step_num = 0
@@ -123,10 +128,10 @@ async def play_web_task(
 
         task_log(f"\nGOAL: {obs.goal}")
         task_log(f"Initial URL: {obs.url}")
-        print(f"  [DEBUG] Got observation - Goal: {obs.goal[:50] if obs.goal else 'None'}...")
+        # print(f"  [DEBUG] Got observation - Goal: {obs.goal[:50] if obs.goal else 'None'}...")
 
         while not done and step_num < max_steps:
-            print(f"  [DEBUG] Step {step_num + 1} - formatting prompt...")
+            # print(f"  [DEBUG] Step {step_num + 1} - formatting prompt...")
             # Format prompt for model
             prompt = format_web_prompt(
                 step_num=step_num,
@@ -135,28 +140,28 @@ async def play_web_task(
                 tokenizer=tokenizer,
                 max_text_chars=max_text_chars,
             )
-            print(f"  [DEBUG] Step {step_num + 1} - prompt formatted, length={len(prompt)}")
+            # print(f"  [DEBUG] Step {step_num + 1} - prompt formatted, length={len(prompt)}")
 
-            task_log(f"\n--- Step {step_num + 1} ---")
-            task_log(f"URL: {obs.url}")
+            # task_log(f"\n--- Step {step_num + 1} ---")
+            # task_log(f"URL: {obs.url}")
 
             # Generate action using policy
-            print(f"  [DEBUG] Step {step_num + 1} - calling policy.generate.route()...")
+            # print(f"  [DEBUG] Step {step_num + 1} - calling policy.generate.route()...")
             responses = await policy.generate.route(prompt)
-            print(f"  [DEBUG] Step {step_num + 1} - policy.generate.route() completed")
+            # print(f"  [DEBUG] Step {step_num + 1} - policy.generate.route() completed")
             response = responses[0]
 
             # Log model output (show full output for debugging)
-            task_log(f"Model output: '{response.text}'")
+            # task_log(f"Model output: '{response.text}'")
 
             # Parse action from model output
             action_str = parse_web_action(response.text)
             action_history.append(action_str)
 
-            task_log(f"Parsed action: {action_str}")
+            # task_log(f"Parsed action: {action_str}")
             # Debug: if noop was parsed, show the full response
-            if action_str == "noop()" and len(response.text) > 200:
-                print(f"  [DEBUG] Full response (noop parsed): {response.text[-300:]}")
+            # if action_str == "noop()" and len(response.text) > 200:
+            #     print(f"  [DEBUG] Full response (noop parsed): {response.text[-300:]}")
 
             # Store step data
             task_steps.append({
@@ -194,10 +199,13 @@ async def play_web_task(
         task_log(f"Actions: {' -> '.join(action_history)}")
 
         # Prepare return data with final reward assigned to all steps
+        # traj_uid is shared by all steps in this trajectory (for GRPO advantage computation)
+        traj_uid = str(uuid.uuid4())
         all_step_results = []
         for step_data in task_steps:
             all_step_results.append({
                 "task_id": task_id,
+                "traj_uid": traj_uid,  # All steps in this trajectory share this ID
                 "final_reward": final_reward,
                 "step_count": len(task_steps),
                 "max_steps": max_steps,
@@ -218,7 +226,74 @@ async def play_web_task(
 
 async def play_web_task_parallel(
     num_tasks: int,
-    server_urls: List[str],
+    env_pool: "EnvironmentPool",
+    policy,
+    tokenizer,
+    task_log: Callable[[str], None],
+    task_names: List[str],
+    rollout_count: int = 0,
+    max_steps: int = 15,
+    benchmark: str = "miniwob",
+) -> List[Dict[str, Any]]:
+    """
+    Play multiple web tasks in parallel, respecting server capacity.
+
+    Tasks are processed concurrently but the pool limits simultaneous
+    connections to the number of available servers. This prevents
+    "Server at capacity" errors.
+
+    Args:
+        num_tasks: Number of tasks to play
+        env_pool: EnvironmentPool instance for managing server connections
+        policy: Policy model for action selection
+        tokenizer: Tokenizer for prompts
+        task_log: Logging function
+        task_names: List of task names (one per task, will cycle if shorter than num_tasks)
+        rollout_count: Current rollout iteration
+        max_steps: Max steps per task
+        benchmark: BrowserGym benchmark
+
+    Returns:
+        Combined list of step results from all tasks
+    """
+    import asyncio
+
+    async def run_task_with_pool(task_idx: int) -> List[Dict[str, Any]]:
+        """Run a single task, acquiring a server from the pool."""
+        task_id = str(uuid.uuid4())[:8]
+        task_name = task_names[task_idx % len(task_names)]
+
+        async with env_pool.acquire() as server_url:
+            return await play_web_task(
+                task_idx=task_idx,
+                task_id=task_id,
+                server_url=server_url,
+                policy=policy,
+                tokenizer=tokenizer,
+                task_log=task_log,
+                rollout_count=rollout_count,
+                max_steps=max_steps,
+                benchmark=benchmark,
+                task_name=task_name,
+            )
+
+    # Create all tasks - the pool's semaphore limits concurrency
+    tasks = [run_task_with_pool(task_idx) for task_idx in range(num_tasks)]
+
+    # Run all tasks - pool automatically limits to available servers
+    results = await asyncio.gather(*tasks)
+
+    # Flatten results
+    all_steps = []
+    for task_results in results:
+        all_steps.extend(task_results)
+
+    return all_steps
+
+
+async def play_web_task_with_pool(
+    task_idx: int,
+    env_pool: "EnvironmentPool",
     policy,
     tokenizer,
     task_log: Callable[[str], None],
@@ -226,32 +301,35 @@ async def play_web_task_parallel(
     max_steps: int = 15,
     benchmark: str = "miniwob",
     task_name: str = "click-test",
+    max_text_chars: int = 4000,
 ) -> List[Dict[str, Any]]:
     """
-    Play multiple web tasks in parallel across multiple servers.
+    Play a single web task using a server from the pool.
+
+    This is a convenience wrapper that acquires a server from the pool,
+    runs the task, and releases the server automatically.
 
     Args:
-        num_tasks: Number of tasks to play
-        server_urls: List of BrowserGym server URLs
+        task_idx: Index of this task in the rollout batch
+        env_pool: EnvironmentPool instance
         policy: Policy model for action selection
-        tokenizer: Tokenizer for prompts
+        tokenizer: Tokenizer for prompt formatting
         task_log: Logging function
-        rollout_count: Current rollout iteration
-        max_steps: Max steps per task
+        rollout_count: Current rollout iteration number
+        max_steps: Maximum steps allowed per task
         benchmark: BrowserGym benchmark
-        task_name: Task name
+        task_name: Specific task within the benchmark
+        max_text_chars: Max chars for observation text
 
     Returns:
-        Combined list of step results from all tasks
+        List of step result dicts
     """
-    import asyncio
+    from .env_pool import EnvironmentPool
 
-    tasks = []
-    for task_idx in range(num_tasks):
-        server_url = server_urls[task_idx % len(server_urls)]
-        task_id = str(uuid.uuid4())[:8]
+    task_id = str(uuid.uuid4())[:8]
 
-        task = play_web_task(
+    async with env_pool.acquire() as server_url:
+        return await play_web_task(
             task_idx=task_idx,
             task_id=task_id,
             server_url=server_url,
@@ -262,17 +340,8 @@ async def play_web_task_parallel(
             max_steps=max_steps,
             benchmark=benchmark,
             task_name=task_name,
+            max_text_chars=max_text_chars,
         )
-        tasks.append(task)
-
-    results = await asyncio.gather(*tasks)
-
-    # Flatten results
-    all_steps = []
-    for task_results in results:
-        all_steps.extend(task_results)
-
-    return all_steps
 
 
 def show_web_observation(observation) -> None:

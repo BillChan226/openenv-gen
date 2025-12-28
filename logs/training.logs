@@ -1,0 +1,33 @@
+Warning: setting HYPERACTOR_CODEC_MAX_FRAME_LENGTH since this needs to be set to enable large RPC calls via Monarch
+INFO 12-28 12:51:33 [__init__.py:235] Automatically detected platform cuda.
+/scratch/czr/env-gen/openenv/examples/grpo_web/utils/trainer.py:25: FutureWarning: RLTrainer is deprecated and will be removed in a future version. Please use TitanTrainer instead.
+  from forge.actors.trainer import RLTrainer
+
+============================================================
+GRPO WEB AGENT TRAINING
+============================================================
+Initializing Forge infrastructure...
+
+Launcher not provided, remote allocations will not work.
+wandb: Currently logged in as: billchenzr226 to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.23.1
+wandb: Run data is saved locally in /scratch/czr/env-gen/openenv/wandb/run-20251228_125136-q9keuhxb
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run miniwob-medium-5tasks
+wandb: ⭐️ View project at https://wandb.ai/billchenzr226/grpo-web
+wandb: 🚀 View run at https://wandb.ai/billchenzr226/grpo-web/runs/q9keuhxb
+wandb: Detected [openai] in use.
+wandb: Use W&B Weave for improved LLM call tracing. Install Weave with `pip install weave` then add `import weave` to the top of your script.
+wandb: For more information, check out the docs at: https://weave-docs.wandb.ai/
+  [OK] Provisioner
+  [OK] Metric Logger
+
+  Initializing services...
+  [OK] Environment pool: 1 server(s)
+Spawning actor WebEnvActor
+Spawning service Generator
+Spawning actor TitanTrainer
+Spawning actor ReplayBuffer
+Spawning actor ComputeAdvantages
+Spawning service ReferenceModel
+Spawning service WebReward
