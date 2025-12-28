@@ -1,11 +1,3 @@
-"""
-Prompt Formatting and Action Parsing for Web Navigation
-
-This module handles the conversion between web page observations and
-text prompts for the language model, as well as parsing model outputs
-back into BrowserGym actions.
-"""
-
 import re
 from typing import List, Optional
 

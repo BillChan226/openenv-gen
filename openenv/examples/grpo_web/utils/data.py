@@ -1,10 +1,3 @@
-"""
-Data structures for GRPO web agent training.
-
-This module defines the Episode dataclass and collation functions
-for batching episodes during training.
-"""
-
 from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 

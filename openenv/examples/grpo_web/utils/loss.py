@@ -1,15 +1,3 @@
-"""
-GRPO Loss Functions
-
-This module implements the Group Relative Policy Optimization (GRPO) loss
-function used for training web navigation agents.
-
-GRPO is more efficient than PPO as it only requires 2 models (policy + reference)
-instead of 3 (policy + reference + value function).
-
-Reference: https://arxiv.org/abs/2402.03300
-"""
-
 import torch
 from forge.util.ops import compute_logprobs
 

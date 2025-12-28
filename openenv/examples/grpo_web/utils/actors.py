@@ -1,12 +1,3 @@
-"""
-Forge Actors for Web Agent Training
-
-This module defines the Forge actors used in GRPO training:
-- WebReward: Computes shaped rewards for web navigation tasks
-- ComputeAdvantages: Calculates group-relative advantages
-- WebEnvActor: Manages environment connections and tokenizer
-"""
-
 from dataclasses import dataclass
 from typing import List, Optional
 

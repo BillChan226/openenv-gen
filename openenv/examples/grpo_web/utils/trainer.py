@@ -1,10 +1,3 @@
-"""
-GRPO Training Infrastructure for BrowserGym Agents
-
-This module provides the high-level training interface that wraps
-all Forge infrastructure and exposes a simple API for training.
-"""
-
 import asyncio
 import random
 import time
@@ -289,8 +282,6 @@ class GRPOWebTrainer:
 
                 self._rollout_count += 1
 
-                # Log rollout stats at TRAJECTORY level (not episode/step level)
-                # This avoids biasing metrics toward longer trajectories
                 traj_rewards = {}
                 for e in episodes:
                     if e.traj_uid not in traj_rewards:

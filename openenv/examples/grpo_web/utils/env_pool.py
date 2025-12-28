@@ -1,13 +1,3 @@
-"""
-Environment Pool for Managing Multiple BrowserGym Servers
-
-This module provides a centralized pool for managing environment server
-connections, ensuring no conflicts between training rollouts and evaluation.
-
-The pool uses a semaphore-based approach to limit concurrent connections
-to the number of available servers, preventing "Server at capacity" errors.
-"""
-
 import asyncio
 from contextlib import asynccontextmanager
 from typing import List, Optional

@@ -1,12 +1,3 @@
-"""
-MiniWoB++ Task Definitions and Curriculum Learning
-
-This module provides the complete task lists for MiniWoB++ benchmark,
-organized by category and difficulty for curriculum learning strategies.
-
-Total tasks: ~125 tasks across multiple categories
-"""
-
 from typing import Dict, List, Optional, Tuple
 
 

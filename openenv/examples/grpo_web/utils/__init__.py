@@ -1,19 +1,3 @@
-"""
-GRPO Web Agent Training Utilities
-
-This submodule provides core components for training web navigation agents using
-GRPO (Group Relative Policy Optimization) with OpenEnv's BrowserGym integration.
-
-Components:
-- data: Episode data structures and collation functions
-- loss: GRPO loss implementation
-- prompts: Prompt formatting and action parsing for web navigation
-- actors: Forge actors for reward computation, environment management
-- rollout: Web task playing logic and episode collection
-- trainer: High-level training interface
-- tasks: MiniWoB++ task definitions and curriculum
-"""
-
 import sys
 from pathlib import Path
 
