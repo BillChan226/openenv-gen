@@ -23,6 +23,7 @@ class TaskType(Enum):
     BACKEND = "backend"         # Generate backend code
     FRONTEND = "frontend"       # Generate frontend code
     DATABASE = "database"       # Generate database schema
+    DATA_ENGINE = "data_engine" # Discover and load HuggingFace datasets
     ENV = "env"                 # Generate OpenEnv adapter
     DOCKER = "docker"           # Generate Docker config
     FIX = "fix"                 # Fix an issue

@@ -1,0 +1,74 @@
+name: ebay-web-dev
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ebayweb
+    volumes:
+      - ebayweb_pgdata:/var/lib/postgresql/data
+      - ../app/database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ebayweb"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  backend:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ../app/backend:/app
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/ebayweb
+      JWT_SECRET: dev-secret-change-me
+      CORS_ORIGINS: http://localhost:3002
+    command: sh -lc "npm ci && npx nodemon src/server.js"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8002:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend.dev
+    volumes:
+      - ../app/frontend:/app
+    environment:
+      # Ensure Vite uses the correct backend when proxying from container
+      VITE_API_URL: /api
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3002:5173"
+
+  env:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.env
+    environment:
+      BACKEND_BASE_URL: http://backend:3000
+      FRONTEND_BASE_URL: http://frontend:5173
+      PORT: 9100
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    ports:
+      - "9101:9100"
+
+volumes:
+  ebayweb_pgdata:

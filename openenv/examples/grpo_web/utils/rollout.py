@@ -160,13 +160,35 @@ async def play_web_task(
                 print(f"  [NOOP DEBUG] Response length: {len(response.text)}")
                 print(f"  [NOOP DEBUG] Response (last 500 chars): {response.text[-500:]}")
 
-            # Store step data
+            # Determine action validity with format compliance checks
+            # Following verl-agent's approach: stricter validity checking creates more variance
+            is_action_valid = True
+            response_text = response.text
+
+            # Check 1: noop() means parsing failed or model explicitly chose to do nothing
+            if action_str == "noop()":
+                is_action_valid = False
+
+            # Check 2: Proper <think>...</think> format (when thinking mode is enabled)
+            # This ensures the model is actually reasoning, not just outputting collapsed text
+            has_think_open = "<think>" in response_text.lower()
+            has_think_close = "</think>" in response_text.lower()
+            if not (has_think_open and has_think_close):
+                # Missing proper thinking tags - mark as invalid
+                is_action_valid = False
+
+            # Check 3: Response too short (collapsed output)
+            # A proper response with thinking should be at least ~50 chars
+            MIN_RESPONSE_LENGTH = 50
+            if len(response_text.strip()) < MIN_RESPONSE_LENGTH:
+                is_action_valid = False
             task_steps.append({
                 "step_num": step_num,
                 "prompt": prompt,
                 "response": response,
                 "action": action_str,
                 "had_error": False,  # Updated after step
+                "is_action_valid": is_action_valid,  # For invalid action penalty
             })
 
             # Execute action in environment
@@ -177,6 +199,7 @@ async def play_web_task(
             # Check for action errors
             if obs.last_action_error:
                 task_steps[-1]["had_error"] = True
+                task_steps[-1]["is_action_valid"] = False  # Action that causes error is invalid
                 error_msg = obs.error if hasattr(obs, 'error') else "Unknown error"
                 task_log(f"Action error: {error_msg}")
 
@@ -214,6 +237,11 @@ async def play_web_task(
         record_metric("task/avg_length", len(task_steps), Reduce.MEAN)
         record_metric("task/success_rate", 1.0 if final_reward > 0 else 0.0, Reduce.MEAN)
         record_metric("task/avg_reward", final_reward, Reduce.MEAN)
+
+        # Track valid action ratio for invalid action penalty monitoring
+        valid_actions = sum(1 for s in task_steps if s.get("is_action_valid", True))
+        valid_action_ratio = valid_actions / len(task_steps) if task_steps else 1.0
+        record_metric("task/valid_action_ratio", valid_action_ratio, Reduce.MEAN)
 
         return all_step_results
 

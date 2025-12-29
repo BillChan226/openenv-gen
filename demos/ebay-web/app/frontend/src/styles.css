@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Helvetica Neue, Arial, sans-serif;
+  color: #333;
+  background: #fff;
+}
+
+a {
+  color: #0b66c3;
+}
+
+.container-page {
+  @apply mx-auto w-full max-w-6xl px-4;
+}
+
+.focus-ring {
+  @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2;
+}
+
+.link-muted {
+  @apply text-gray-600 hover:text-brand-blue;
+}

@@ -33,6 +33,8 @@ class Episode:
         ref_logprobs: Log probabilities from reference model
         reward: Shaped reward value (final trajectory outcome)
         advantage: Group-relative advantage (computed per trajectory, broadcast to steps)
+        is_action_valid: Whether this step's action was valid (for invalid action penalty)
+        step_reward: Per-step reward after applying invalid action penalty
     """
 
     episode_id: str
@@ -46,8 +48,10 @@ class Episode:
     completion: Completion | None = None
     old_logprobs: torch.Tensor | None = None  # Log probs from policy at rollout time
     ref_logprobs: torch.Tensor | None = None
-    reward: float | None = None
+    reward: float | None = None  # Base trajectory reward (before step penalties)
     advantage: float | None = None
+    is_action_valid: bool = True  # Whether this step's action was valid
+    step_reward: float | None = None  # Per-step reward (after invalid action penalty)
 
     @property
     def policy_version(self) -> int | None:
@@ -136,6 +140,8 @@ class Episode:
             "uid": self.uid,
             "step_in_task": self.step_in_task,
             "reward": self.reward,
+            "step_reward": self.step_reward,
+            "is_action_valid": self.is_action_valid,
             "advantage": self.advantage,
             "policy_version": self.policy_version,
         }
@@ -207,6 +213,7 @@ def create_episode(
     step_in_task: int,
     completion: Completion,
     old_logprobs: torch.Tensor | None = None,
+    is_action_valid: bool = True,
 ) -> Episode:
     """
     Factory function to create an Episode instance.
@@ -222,6 +229,7 @@ def create_episode(
         step_in_task: Step number
         completion: Model completion
         old_logprobs: Log probabilities from policy at generation time
+        is_action_valid: Whether this step's action was valid
 
     Returns:
         New Episode instance
@@ -237,4 +245,5 @@ def create_episode(
         step_in_task=step_in_task,
         completion=completion,
         old_logprobs=old_logprobs,
+        is_action_valid=is_action_valid,
     )

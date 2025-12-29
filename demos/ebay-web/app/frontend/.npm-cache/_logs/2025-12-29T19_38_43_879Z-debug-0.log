@@ -1,0 +1,13 @@
+0 verbose cli /usr/bin/node /usr/bin/npm
+1 info using npm@10.8.2
+2 info using node@v20.19.4
+3 silly config load:file:/usr/lib/node_modules/npm/npmrc
+4 silly config load:file:/scratch/czr/env-gen/demos/ebay-web/app/frontend/.npmrc
+5 silly config load:file:/root/.npmrc
+6 silly config load:file:/usr/etc/npmrc
+7 verbose title npm run dev --port 5174
+8 verbose argv "run" "dev" "--" "--port" "5174"
+9 verbose logfile logs-max:10 dir:/scratch/czr/env-gen/demos/ebay-web/app/frontend/.npm-cache/_logs/2025-12-29T19_38_43_879Z-
+10 verbose logfile /scratch/czr/env-gen/demos/ebay-web/app/frontend/.npm-cache/_logs/2025-12-29T19_38_43_879Z-debug-0.log
+11 silly logfile start cleaning logs, removing 1 files
+12 silly logfile done cleaning log files

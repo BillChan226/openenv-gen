@@ -1,0 +1,95 @@
+name: ebay-web-dev
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ebayweb
+    volumes:
+      - ebayweb_pgdata:/var/lib/postgresql/data
+      - ../app/database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ebayweb"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    # Optional host publishing for local tools (psql, GUI clients).
+    # Set POSTGRES_HOST_PORT to override if the default is already taken.
+    ports:
+      - "${POSTGRES_HOST_PORT:-55432}:5432"
+
+
+  backend:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ../app/backend:/app
+      # Prevent bind-mount from overwriting container-installed deps
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/ebayweb
+      JWT_SECRET: dev-secret-change-me
+      # Frontend is published on host at FRONTEND_PORT (default 5173)
+      CORS_ORIGINS: http://localhost:${FRONTEND_PORT:-5173}
+    command: sh -lc "npm ci && npm run dev"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT:-8002}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend.dev
+    working_dir: /app
+    volumes:
+      - ../app/frontend:/app
+      # Prevent bind-mount from overwriting container-installed deps
+      - /app/node_modules
+    environment:
+      # Vite proxy target inside the docker network
+      VITE_PROXY_TARGET: http://backend:3000
+      VITE_PORT: 5173
+      # Ensure HMR works reliably when Vite runs inside Docker but browser is on host
+      VITE_HMR_HOST: localhost
+      VITE_HMR_CLIENT_PORT: ${FRONTEND_PORT:-5173}
+    command: sh -lc "npm ci && npm run dev -- --host 0.0.0.0 --port 5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5173/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  env:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.env
+    environment:
+      BACKEND_BASE_URL: http://backend:3000
+      FRONTEND_BASE_URL: http://frontend:5173
+      PORT: 9100
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    ports:
+      - "${ENV_PORT:-9101}:9100"
+
+volumes:
+  ebayweb_pgdata:

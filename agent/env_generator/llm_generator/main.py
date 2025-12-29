@@ -3,10 +3,18 @@
 LLM Generator - Main Entry Point
 
 Usage:
-    python -m llm_generator.main --name calendar --description "A calendar app"
-    
-    # Or with environment variable
-    OPENAI_API_KEY=sk-... python -m llm_generator.main --name shop --domain ecommerce
+    # With inline prompt
+    python -m llm_generator.main --name calendar --prompt "A calendar app"
+
+    # With prompt file
+    python -m llm_generator.main --name shop --prompt ./prompt.md
+
+    # With environment variable
+    OPENAI_API_KEY=sk-... python -m llm_generator.main --name shop --prompt ./prompt.md
+
+Note: Reference images should be placed in the screenshot library at:
+    llm_generator/screenshot/<project_name>/
+The agent will automatically discover and use them during generation.
 """
 
 import argparse
@@ -74,9 +82,9 @@ async def main():
         help="Environment name (e.g., 'calendar', 'shop')",
     )
     parser.add_argument(
-        "--description",
+        "--prompt",
         default="",
-        help="Environment description",
+        help="Environment description: either inline text or path to a .md/.txt file",
     )
     parser.add_argument(
         "--output",
@@ -106,11 +114,22 @@ async def main():
     )
     
     args = parser.parse_args()
-    
+
     # Setup logging
     setup_logging(args.verbose)
     logger = logging.getLogger("main")
-    
+
+    # Parse prompt: could be inline text or a file path
+    description = args.prompt
+    if args.prompt:
+        prompt_path = Path(args.prompt)
+        # Check if it's a file path (exists and has .md or .txt extension)
+        if prompt_path.exists() and prompt_path.suffix in (".md", ".txt"):
+            description = prompt_path.read_text(encoding="utf-8").strip()
+            logger.info(f"Loaded prompt from file: {args.prompt}")
+        else:
+            logger.info("Using inline prompt")
+
     # Determine provider and API key
     provider_map = {
         "openai": (LLMProvider.OPENAI, "OPENAI_API_KEY"),
@@ -159,12 +178,12 @@ async def main():
     
     # Build requirements list
     requirements = []
-    if args.description:
-        requirements.append(args.description)
-    
+    if description:
+        requirements.append(description)
+
     # Run generation
     result = await coordinator.run(
-        goal=args.description or f"Build a {args.name} web application",
+        goal=description or f"Build a {args.name} web application",
         requirements=requirements,
         resume=args.resume,
     )

@@ -121,9 +121,10 @@ What action should I take next? Output exactly one BrowserGym action:"""
         {"role": "user", "content": user_content},
     ]
 
-    # Disable Qwen3 thinking mode for direct action output
+    # Enable Qwen3 thinking mode for chain-of-thought reasoning
+    # This helps the model reason through actions and provides structured output
     return tokenizer.apply_chat_template(
-        chat, tokenize=False, add_generation_prompt=True, enable_thinking=False
+        chat, tokenize=False, add_generation_prompt=True, enable_thinking=True
     )
 
 

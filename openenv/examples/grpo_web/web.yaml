@@ -13,10 +13,10 @@
 # Global configuration
 group_size: 8  # Number of parallel tasks per rollout (reduced to avoid OOM with multi-step tasks)
 local_batch_size: 8  # Per-device batch size (smaller due to longer sequences and more steps)
-max_req_tokens: 1024  # Max tokens for prompt 
-max_res_tokens: 256  # Max tokens for response 
-model: "Qwen/Qwen3-1.7B"
-model_local_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
+max_req_tokens: 1024  # Max tokens for prompt
+max_res_tokens: 1024  # Max tokens for response (increased for thinking mode - model needs room to reason) 
+model: "Qwen/Qwen3-8B"
+model_local_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-8B/snapshots/b968826d9c46dd6066d109eabc6255188de91218
 off_by_n: 1  # Off-policy tolerance
 
 # Main loop configuration
@@ -28,7 +28,7 @@ metric_logging:
     logging_mode: global_reduce
   wandb:
     project: "grpo-web"
-    name: "miniwob-medium-5tasks"
+    name: "miniwob-medium-qwen3-8B"
     logging_mode: global_reduce
 
 # Web environment configuration (BrowserGym)
@@ -60,6 +60,7 @@ policy:
     tensor_parallel_size: 1  # 8B fits on 1x H200 (143GB VRAM)
     pipeline_parallel_size: 1
     enforce_eager: false
+    max_model_len: 4500  # Match trainer seq_len for 8B model
   sampling_params:  # https://docs.vllm.ai/en/v0.10.0/api/vllm/sampling_params.html
     n: 1  # Generate 1 response per observation
     max_tokens: ${max_res_tokens}
@@ -70,7 +71,7 @@ policy:
 trainer:
   model:
     name: qwen3
-    flavor: 1.7B
+    flavor: 8B
     hf_assets_path: ${model_local_path}
   optimizer:
     name: AdamW
@@ -80,7 +81,7 @@ trainer:
     warmup_steps: 1  # Same as blackjack
   training:
     local_batch_size: ${local_batch_size}
-    seq_len: 4200  # Longer sequences for web pages (max_req + max_res + buffer)
+    seq_len: 4500  # Longer sequences for web pages (max_req + max_res + buffer = 1024+1024+buffer)
     max_norm: 1.0
     steps: 500  # More steps needed for web navigation
     dtype: bfloat16
@@ -89,7 +90,7 @@ trainer:
     enable: false
   parallelism:
     data_parallel_replicate_degree: 1
-    data_parallel_shard_degree: 1  # 1.7B model fits on single GPU
+    data_parallel_shard_degree: 1  # 8B model fits on single H200 (143GB VRAM)
     tensor_parallel_degree: 1
     pipeline_parallel_degree: 1
     context_parallel_degree: 1
@@ -122,7 +123,7 @@ replay_buffer:
 ref_model:
   model:
     name: qwen3
-    flavor: 1.7B
+    flavor: 8B
     hf_assets_path: ${model_local_path}
   training:
     seq_len: ${trainer.training.seq_len}
@@ -166,7 +167,7 @@ actors:
     with_gpus: false
     mesh_name: web_env
   trainer:
-    procs: 1  # 1.7B model fits on single GPU
+    procs: 1  # 8B model fits on single H200
     with_gpus: true
     mesh_name: trainer
   replay_buffer:

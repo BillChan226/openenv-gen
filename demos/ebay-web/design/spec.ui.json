@@ -1,0 +1,441 @@
+{
+  "design_tokens": {
+    "color": {
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "border": "#E6E6E6",
+      "text": "#333333",
+      "muted_text": "#666666",
+      "link": "#1E73BE",
+      "primary": "#1E73BE",
+      "primary_hover": "#155A93",
+      "primary_text": "#FFFFFF",
+      "rating_filled": "#FF6600",
+      "rating_empty": "#CFCFCF",
+      "danger": "#C62828",
+      "success": "#2E7D32",
+      "focus_ring": "rgba(30,115,190,0.35)",
+      "ebay_logo": {
+        "red": "#E53238",
+        "blue": "#0064D2",
+        "yellow": "#F5AF02",
+        "green": "#86B817"
+      }
+    },
+    "typography": {
+      "font_family": "Helvetica Neue, Arial, sans-serif",
+      "font_size": {
+        "xs": 12,
+        "sm": 13,
+        "md": 14,
+        "lg": 16,
+        "xl": 18,
+        "h1": 32
+      },
+      "font_weight": {
+        "regular": 400,
+        "medium": 500,
+        "bold": 700
+      },
+      "line_height": {
+        "tight": 1.2,
+        "normal": 1.4,
+        "relaxed": 1.6
+      }
+    },
+    "spacing": {
+      "0": 0,
+      "1": 4,
+      "2": 8,
+      "3": 12,
+      "4": 16,
+      "5": 20,
+      "6": 24,
+      "8": 32,
+      "10": 40,
+      "12": 48
+    },
+    "radius": {
+      "sm": 3,
+      "md": 6
+    },
+    "shadow": {
+      "none": "none",
+      "focus": "0 0 0 3px rgba(30,115,190,0.35)"
+    },
+    "layout": {
+      "container_max_width": 1200,
+      "header_height_main": 72,
+      "header_height_utility": 28,
+      "category_nav_height": 44
+    }
+  },
+  "responsive_behavior": {
+    "breakpoints": {
+      "mobile": 0,
+      "tablet": 768,
+      "desktop": 1024,
+      "wide": 1280
+    },
+    "container": {
+      "padding_mobile": 12,
+      "padding_desktop": 16
+    },
+    "header": {
+      "desktop": {
+        "layout": "logo | search | cart",
+        "category_nav": "horizontal with hover mega-menu",
+        "utility_bar": "right aligned links"
+      },
+      "mobile": {
+        "layout": "logo row + search row",
+        "category_nav": "horizontal scroll or hamburger to drawer",
+        "utility_bar": "collapsed into menu; show sign-in/account as icons or a single menu link"
+      }
+    },
+    "grids": {
+      "product_grid_columns": {
+        "mobile": 2,
+        "tablet": 3,
+        "desktop": 5
+      },
+      "account_layout": {
+        "desktop": "2-column (sidebar 260px + content)",
+        "mobile": "stacked (sidebar becomes top accordion/select)"
+      },
+      "category_layout": {
+        "desktop": "filters rail left (260px) + results",
+        "mobile": "filters collapse into button + drawer/accordion"
+      },
+      "search_results_layout": {
+        "desktop": "filters rail left (260px) + results",
+        "mobile": "filters collapse into button + drawer/accordion; sort bar stays above results"
+      }
+    }
+  },
+  "routes": {
+    "/": {
+      "page": "HomePage",
+      "title": "Home",
+      "requires_auth": false,
+      "data_requirements": ["GET /categories", "GET /products?limit=12"],
+      "ux_states": {
+        "loading": "Skeleton grid (12 placeholders)",
+        "empty": "Show 'No products found' with link to categories",
+        "error": "Inline error + retry button",
+        "signed_out": "Normal; wishlist buttons prompt login",
+        "signed_in": "Normal; wishlist toggles immediately"
+      },
+      "components_used": {
+        "layout": ["AppShell", "Header", "Footer"],
+        "content": ["ProductCard"],
+        "controls": []
+      }
+    },
+    "/search": {
+      "page": "SearchResultsPage",
+      "title": "Search Results",
+      "requires_auth": false,
+      "purpose": "Show product results for querystring q; allow filtering/sorting/pagination.",
+      "primary_actions": [
+        "Submit search from Header SearchBar (navigates to /search?q=...)",
+        "Refine results with price filters",
+        "Change sort",
+        "Paginate results",
+        "Add to cart",
+        "Toggle wishlist (signed-in only)"
+      ],
+      "data_requirements": ["GET /products?q=<q>&limit=24&page=<n>&sort=<sort>&minPrice=<n>&maxPrice=<n>"],
+      "ux_states": {
+        "loading": "Skeleton filters + grid; keep query visible in heading",
+        "empty": "No results for '<q>'. Show tips + link back to categories/home.",
+        "error": "Inline error banner with retry; keep last query and controls enabled",
+        "signed_out": "Wishlist toggles prompt login/redirect; cart works",
+        "signed_in": "Wishlist toggles immediately",
+        "responsive": {
+          "mobile": "Filters hidden behind 'Filter' button; opens drawer. Sort is a select above grid. Pagination moves to bottom.",
+          "tablet": "Optional collapsible filters rail; 3-column grid",
+          "desktop": "Two-column layout: FiltersRail left + results right; SortBar above grid"
+        }
+      },
+      "components_used": {
+        "layout": ["AppShell", "Header", "Footer"],
+        "content": ["ProductCard"],
+        "controls": ["FiltersRail", "SortBar", "Pagination"],
+        "notes": [
+          "FiltersRail uses price buckets; if backend doesn't return counts, compute client-side from current result set.",
+          "Pagination is shown when total > pageSize; otherwise hidden."
+        ]
+      }
+    },
+    "/advanced-search": {
+      "page": "AdvancedSearchPage",
+      "title": "Advanced Search",
+      "requires_auth": false,
+      "data_requirements": ["POST /search/advanced"],
+      "ux_states": {
+        "loading": "Disable Search button; show spinner in results area",
+        "empty": "No results found message",
+        "error": "Inline error + keep form values",
+        "responsive": "Two-column form on desktop, stacked on mobile"
+      },
+      "components_used": {
+        "layout": ["AppShell", "Header", "Footer"],
+        "content": ["ProductCard"],
+        "controls": []
+      }
+    },
+    "/login": {
+      "page": "LoginPage",
+      "title": "Customer Login",
+      "requires_auth": false,
+      "data_requirements": ["POST /auth/login"],
+      "ux_states": {
+        "loading": "Disable Sign In; show button spinner",
+        "error": "Inline validation and auth error",
+        "signed_in": "Redirect to next or /account"
+      },
+      "components_used": {
+        "layout": ["AppShell", "Header", "Footer"],
+        "content": ["LoginForm"],
+        "controls": []
+      }
+    },
+    "/account": {
+      "page": "AccountOverviewPage",
+      "title": "My Account",
+      "requires_auth": true,
+      "data_requirements": ["GET /auth/me", "GET /account/summary"],
+      "ux_states": {
+        "loading": "Account layout skeleton (sidebar + content cards)",
+        "error": "Inline error + retry; if 401 redirect to /login",
+        "empty": "If no orders: show empty orders message"
+      },
+      "components_used": {
+        "layout": ["AppShell", "Header", "Footer"],
+        "content": ["AccountLayout", "OrdersTable"],
+        "controls": ["AccountSidebarNav"]
+      }
+    },
+    "/account/wishlist": {
+      "page": "WishlistPage",
+      "title": "My Wish List",
+      "requires_auth": true,
+      "data_requirements": ["GET /wishlist", "GET /products?ids=... (or fetch by id list)"],
+      "ux_states": {
+        "loading": "Skeleton wishlist grid",
+        "empty": "You have no items in your wish list.",
+        "error": "Inline error + retry"
+      },
+      "components_used": {
+        "layout": ["AppShell", "Header", "Footer"],
+        "content": ["WishlistGrid"],
+        "controls": []
+      }
+    },
+    "/category/:slug": {
+      "page": "CategoryPage",
+      "title": "Category",
+      "requires_auth": false,
+      "data_requirements": ["GET /categories/:slug", "GET /products?category=:slug"],
+      "ux_states": {
+        "loading": "Skeleton filters + grid",
+        "empty": "No results found (for filters)",
+        "error": "Inline error + retry",
+        "responsive": "Filters rail collapses into drawer on mobile"
+      },
+      "components_used": {
+        "layout": ["AppShell", "Header", "Footer"],
+        "content": ["ProductCard"],
+        "controls": ["FiltersRail", "SortBar", "Pagination"]
+      }
+    },
+    "/cart": {
+      "page": "CartPage",
+      "title": "Shopping Cart",
+      "requires_auth": false,
+      "data_requirements": ["GET /cart", "PATCH /cart/items/:productId", "DELETE /cart/items/:productId"],
+      "ux_states": {
+        "loading": "Skeleton cart table",
+        "empty": "Your cart is empty. Continue shopping link",
+        "error": "Inline error + retry"
+      },
+      "components_used": {
+        "layout": ["AppShell", "Header", "Footer"],
+        "content": ["CartLineItem", "CartSummary"],
+        "controls": ["Pagination"]
+      }
+    }
+  },
+  "components": {
+    "AppShell": {
+      "type": "layout",
+      "responsibilities": ["Global header/footer", "Route outlet", "Toasts"],
+      "props": { "children": "ReactNode" },
+      "state_owner": ["session", "cart", "wishlist", "categories cache"]
+    },
+    "Header": {
+      "type": "layout",
+      "responsibilities": [
+        "Sticky header with utility bar",
+        "Logo link to /",
+        "SearchBar",
+        "CartButton badge",
+        "Advanced Search link",
+        "CategoryNav with MegaMenu"
+      ],
+      "props": {
+        "user": "User|null",
+        "cartItemCount": "number",
+        "categories": "CategoryNode[]",
+        "onSearchSubmit": "(q:string)=>void",
+        "onSignOut": "()=>void"
+      },
+      "states": ["signed_out", "signed_in", "mobile_compact"]
+    },
+    "Footer": {
+      "type": "layout",
+      "responsibilities": ["Footer links", "Newsletter subscribe (demo)"]
+    },
+    "MegaMenu": {
+      "type": "feature",
+      "responsibilities": [
+        "Hover/focus open dropdown",
+        "Left column lists level-2 subcategories",
+        "Right column lists level-3 subcategories for hovered level-2",
+        "Keyboard navigation (arrow keys, escape closes)",
+        "Click navigates to /category/:slug"
+      ],
+      "props": {
+        "rootCategory": "CategoryNode",
+        "open": "boolean",
+        "onOpenChange": "(open:boolean)=>void",
+        "onNavigate": "(slug:string)=>void"
+      },
+      "states": ["closed", "open", "keyboard_focus"]
+    },
+    "SearchBar": {
+      "type": "feature",
+      "responsibilities": ["Input with placeholder", "Submit on Enter/button", "Clear button when non-empty"],
+      "props": {
+        "value": "string",
+        "onChange": "(v:string)=>void",
+        "onSubmit": "()=>void",
+        "placeholder": "string"
+      },
+      "states": ["idle", "typing"]
+    },
+    "ProductCard": {
+      "type": "feature",
+      "responsibilities": ["Render image/title/rating/reviews/price", "Add to Cart", "Wishlist toggle"],
+      "props": {
+        "product": "Product",
+        "inWishlist": "boolean",
+        "onToggleWishlist": "(productId:string)=>void",
+        "onAddToCart": "(productId:string)=>void",
+        "disabled": "boolean"
+      },
+      "events": ["ADD_TO_CART", "TOGGLE_WISHLIST"]
+    },
+    "RatingStars": {
+      "type": "ui",
+      "props": { "value": "number", "max": "number", "showCount": "boolean", "count": "number" }
+    },
+    "Breadcrumbs": {
+      "type": "ui",
+      "props": { "items": "{label:string,href:string}[]" }
+    },
+    "FiltersRail": {
+      "type": "feature",
+      "responsibilities": ["Price range filter list with counts", "Mobile collapsible"],
+      "props": {
+        "priceBuckets": "{label:string,min:number|null,max:number|null,count:number}[]",
+        "selected": "{min:number|null,max:number|null}",
+        "onSelect": "(bucket)=>void",
+        "mobileOpen": "boolean",
+        "onMobileOpenChange": "(open:boolean)=>void"
+      }
+    },
+    "SortBar": {
+      "type": "feature",
+      "props": {
+        "total": "number",
+        "rangeLabel": "string",
+        "sort": "'position'|'price_asc'|'price_desc'|'rating_desc'",
+        "onSortChange": "(sort)=>void"
+      }
+    },
+    "Pagination": {
+      "type": "ui",
+      "props": {
+        "page": "number",
+        "pageSize": "number",
+        "total": "number",
+        "onPageChange": "(page:number)=>void"
+      }
+    },
+    "CartSummary": {
+      "type": "feature",
+      "props": { "cart": "Cart", "productsById": "Record<string,Product>", "onCheckout": "()=>void" },
+      "states": ["empty", "has_items"]
+    },
+    "CartLineItem": {
+      "type": "feature",
+      "props": {
+        "product": "Product",
+        "quantity": "number",
+        "onQuantityChange": "(qty:number)=>void",
+        "onRemove": "()=>void"
+      }
+    },
+    "WishlistGrid": {
+      "type": "feature",
+      "props": {
+        "products": "Product[]",
+        "onRemove": "(productId:string)=>void",
+        "onAddToCart": "(productId:string)=>void"
+      }
+    },
+    "OrdersTable": {
+      "type": "feature",
+      "props": {
+        "orders": "Order[]",
+        "onViewOrder": "(orderId:string)=>void",
+        "onReorder": "(orderId:string)=>void"
+      }
+    },
+    "AccountLayout": {
+      "type": "layout",
+      "responsibilities": ["Left nav + content area", "Responsive stacked layout"],
+      "props": { "active": "string", "children": "ReactNode" }
+    },
+    "AccountSidebarNav": {
+      "type": "feature",
+      "props": {
+        "items": "{label:string,href:string,stub?:boolean}[]",
+        "activeHref": "string",
+        "onNavigate": "(href:string)=>void"
+      }
+    },
+    "LoginForm": {
+      "type": "feature",
+      "responsibilities": [
+        "Collect email + password",
+        "Client-side validation",
+        "Submit to POST /auth/login",
+        "Show inline errors and loading state"
+      ],
+      "props": {
+        "onSubmit": "(email:string,password:string)=>Promise<void>",
+        "initialEmail": "string|undefined",
+        "loading": "boolean",
+        "error": "{code:string,message:string}|null"
+      },
+      "state": {
+        "email": "string",
+        "password": "string",
+        "touched": "{email:boolean,password:boolean}"
+      }
+    }
+  }
+}

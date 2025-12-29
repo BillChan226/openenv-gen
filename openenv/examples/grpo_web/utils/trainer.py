@@ -237,9 +237,10 @@ class GRPOWebTrainer:
                         step_in_task=step_result["step_num"],
                         completion=completion,
                         old_logprobs=old_logprobs,  # Log probs from policy at rollout time
+                        is_action_valid=step_result.get("is_action_valid", True),  # For invalid action penalty
                     )
 
-                    # Compute shaped reward
+                    # Compute shaped reward (base trajectory reward)
                     print(f"[TRAINER DEBUG] Computing reward for episode {i+1}/{len(all_step_results)}...")
                     episode.reward = await reward_actor.evaluate_response.route(
                         prompt=step_result["prompt"],
@@ -249,7 +250,7 @@ class GRPOWebTrainer:
                         max_steps=step_result["max_steps"],
                         had_error=step_result.get("had_error", False),
                     )
-                    print(f"[TRAINER DEBUG] Episode {i+1} reward: {episode.reward}")
+                    print(f"[TRAINER DEBUG] Episode {i+1} reward: {episode.reward}, valid: {episode.is_action_valid}")
 
                     episodes.append(episode)
                     input_ids[i, :max_req_tokens] = episode.request_tensor
@@ -264,7 +265,18 @@ class GRPOWebTrainer:
                 for i, episode in enumerate(episodes):
                     episode.ref_logprobs = ref_logprobs[i]
 
-                # Compute group-relative advantages
+                # Apply invalid action penalty to create step-level reward variance
+                # This is critical for GRPO to learn even when all trajectories succeed/fail
+                from .actors import apply_invalid_action_penalty
+                invalid_penalty_coef = self._cfg.get("invalid_action_penalty_coef", 0.1)
+                episodes, penalty_metrics = apply_invalid_action_penalty(
+                    episodes, invalid_action_penalty_coef=invalid_penalty_coef
+                )
+                print(f"[TRAINER DEBUG] Applied invalid action penalty (coef={invalid_penalty_coef})")
+                print(f"[TRAINER DEBUG] Valid action ratio: {penalty_metrics['episode/valid_action_ratio']:.2%}")
+                record_metric("train/valid_action_ratio", penalty_metrics['episode/valid_action_ratio'], Reduce.MEAN)
+
+                # Compute group-relative advantages (now using step_rewards with penalty)
                 print(f"[TRAINER DEBUG] Computing advantages...")
                 advantages = await compute_advantages.compute.call_one(episodes)
 

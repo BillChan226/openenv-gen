@@ -1,0 +1,112 @@
+name: ebay-web
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ebay-web-db
+    environment:
+      POSTGRES_DB: ebay
+      POSTGRES_USER: ebay
+      POSTGRES_PASSWORD: ebay
+    ports:
+      - "55432:5432"
+    volumes:
+      # Persist database data between restarts
+      - db_data:/var/lib/postgresql/data
+      # Run init scripts on first startup (schema + seed)
+      - ./app/database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./app/backend:/app
+    command: sh -c "npm ci && npm run dev"
+    container_name: ebay-web-backend
+    environment:
+      NODE_ENV: development
+      # Backend listens on 3000 across all compose configs in this repo.
+      PORT: 3000
+      DATABASE_URL: postgres://ebay:ebay@db:5432/ebay
+      SESSION_SECRET: dev-secret
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # Host port for API
+      - "18000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./app/frontend:/app
+    command: sh -c "npm ci && npm run dev:3000"
+    container_name: ebay-web-frontend
+    environment:
+      NODE_ENV: development
+      # Inside the docker network, use the backend service DNS name.
+      # (Do not use localhost here; it would point at the frontend container itself.)
+      VITE_API_BASE_URL: http://backend:3000
+    depends_on:
+      - backend
+    ports:
+      - "13000:3000"
+
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.57.0-jammy
+    working_dir: /app
+    volumes:
+      - ./app/frontend:/app
+    environment:
+      # Use docker network service name for the browser.
+      PLAYWRIGHT_BASE_URL: http://frontend:3000
+      CI: "1"
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    command: >
+      sh -c "
+        npm install --no-audit --no-fund &&
+        node ./scripts/smoke-http.mjs &&
+        npx playwright test
+      "
+
+  openenv:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: sh -c "pip install -r env/requirements.txt && uvicorn env.server.main:app --host 0.0.0.0 --port 9100"
+    container_name: ebay-web-openenv
+    environment:
+      OPENENV_PORT: 9100
+      BACKEND_BASE_URL: http://backend:3000
+      FRONTEND_BASE_URL: http://frontend:3000
+    extra_hosts:
+      # Allows using host.docker.internal on Linux as well (maps to host-gateway).
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "9100:9100"
+
+volumes:
+  db_data:

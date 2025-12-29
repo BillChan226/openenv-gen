@@ -159,24 +159,73 @@ class WebRewardWithFormatPenalty(ForgeActor):
         return reward
 
 
+def apply_invalid_action_penalty(
+    episodes: List["Episode"],
+    invalid_action_penalty_coef: float = 0.1,
+) -> tuple[List["Episode"], dict]:
+    """
+    Apply invalid action penalty to step rewards.
+
+    This function modifies episode step_rewards based on action validity,
+    creating variance even when all trajectories have the same outcome.
+
+    Following verl-agent's approach:
+    - Each step's reward = base_reward - penalty_coef * (1 if invalid else 0)
+    - Invalid actions include: noop(), actions that cause errors
+
+    Args:
+        episodes: List of Episode objects with is_action_valid set
+        invalid_action_penalty_coef: Penalty coefficient (default 0.1)
+
+    Returns:
+        Tuple of (modified episodes, metrics dict)
+    """
+    total_valid = 0
+    total_invalid = 0
+
+    for ep in episodes:
+        # Start with base trajectory reward
+        base_reward = ep.reward if ep.reward is not None else 0.0
+
+        # Apply penalty for invalid actions
+        if ep.is_action_valid:
+            ep.step_reward = base_reward
+            total_valid += 1
+        else:
+            ep.step_reward = base_reward - invalid_action_penalty_coef
+            total_invalid += 1
+
+    # Compute metrics
+    total = total_valid + total_invalid
+    valid_ratio = total_valid / total if total > 0 else 1.0
+
+    metrics = {
+        "episode/valid_action_ratio": valid_ratio,
+        "episode/invalid_action_count": total_invalid,
+        "episode/penalty_coef": invalid_action_penalty_coef,
+    }
+
+    return episodes, metrics
+
+
 @dataclass
 class ComputeAdvantages(ForgeActor):
     """
-    Actor for computing group-relative advantages at the TRAJECTORY level.
+    Actor for computing group-relative advantages following verl-agent's approach.
 
     GRPO uses group-relative normalization instead of absolute baselines.
 
-    IMPORTANT: This computes advantages per TRAJECTORY (not per step).
-    - Episodes are grouped by their `traj_uid` (trajectory identifier)
-    - One reward per trajectory is used for normalization
-    - The resulting advantage is broadcast to ALL steps in that trajectory
+    **verl-agent's approach (what we implement):**
+    1. Sum step_rewards within each trajectory to get a trajectory score
+    2. Compute mean/std over TRAJECTORIES in the group
+    3. Normalize each trajectory's score
+    4. Broadcast the same advantage to ALL steps in that trajectory
 
-    This is the correct implementation matching verl-agent's approach,
-    avoiding the bias toward longer trajectories that occurs when
-    treating steps as independent samples.
+    The invalid action penalty modifies step_rewards, which affects the
+    trajectory's total score, creating variance even when base rewards
+    are identical across trajectories.
 
-    CRITICAL FIX: Returns None when all trajectories have the same reward
-    (zero variance), as there's no learning signal in this case.
+    This matches verl-agent's `compute_grpo_outcome_advantage` function.
     """
 
     eps: float = 1e-4  # Numerical stability constant
@@ -185,21 +234,22 @@ class ComputeAdvantages(ForgeActor):
     @endpoint
     async def compute(self, group: Group) -> Optional[List[float]]:
         """
-        Compute trajectory-level advantages and broadcast to steps.
+        Compute TRAJECTORY-LEVEL advantages following verl-agent's approach.
 
-        Algorithm:
-        1. Group episodes by traj_uid (trajectory identifier)
-        2. Get ONE reward per trajectory (all steps have same final reward)
-        3. Compute mean and std over trajectories (not steps)
-        4. If std < threshold, return None (skip this batch - no learning signal)
-        5. Compute advantage per trajectory
-        6. Broadcast each trajectory's advantage to all its steps
+        Algorithm (matching verl-agent's compute_grpo_outcome_advantage):
+        1. Group episodes by traj_uid
+        2. Sum step_rewards within each trajectory to get trajectory score
+        3. Compute mean and std over TRAJECTORIES (not steps)
+        4. Normalize each trajectory's score: (score - mean) / (std + eps)
+        5. Broadcast trajectory advantage to ALL steps in that trajectory
 
-        Formula (per trajectory): advantage_traj = (reward_traj - mean) / (std + eps)
+        The invalid action penalty creates variance by modifying step_rewards:
+        - Valid step: step_reward = base_reward
+        - Invalid step: step_reward = base_reward - penalty
+        - Trajectory score = sum(step_rewards) differs based on invalid action count
 
         Args:
-            group: List of episodes from same rollout group (may contain
-                   multiple steps from multiple trajectories)
+            group: List of episodes from same rollout group
 
         Returns:
             List of advantage values (same order as input episodes),
@@ -212,47 +262,48 @@ class ComputeAdvantages(ForgeActor):
         for ep in group:
             traj_to_episodes[ep.traj_uid].append(ep)
 
-        # Step 2: Get ONE reward per trajectory
-        # All steps in a trajectory have the same reward (final outcome)
-        traj_rewards: dict[str, float] = {}
+        # Step 2: Compute trajectory scores by SUMMING step_rewards
+        # This matches verl-agent: scores = token_level_rewards.sum(dim=-1)
+        traj_scores: dict[str, float] = {}
         for traj_uid, episodes in traj_to_episodes.items():
-            # Use the first episode's reward (should all be the same)
-            traj_rewards[traj_uid] = episodes[0].reward
+            # Check if step_rewards are available (invalid action penalty applied)
+            if all(ep.step_reward is not None for ep in episodes):
+                # Sum step_rewards to get trajectory score
+                traj_scores[traj_uid] = sum(ep.step_reward for ep in episodes)
+            else:
+                # Fallback: use base reward (same for all steps in trajectory)
+                traj_scores[traj_uid] = episodes[0].reward if episodes[0].reward is not None else 0.0
 
         # Step 3: Compute mean and std over TRAJECTORIES
-        reward_values = list(traj_rewards.values())
-        rewards_tensor = torch.tensor(reward_values, dtype=torch.float32)
+        score_values = list(traj_scores.values())
+        scores_tensor = torch.tensor(score_values, dtype=torch.float32)
 
-        mean = rewards_tensor.mean()
-
-        # Handle edge cases:
-        # - Single trajectory: no relative signal, skip
-        # - All same rewards (std ~= 0): no relative signal, skip
-        if len(reward_values) <= 1:
-            print(f"[ADVANTAGES] Skipping group with only {len(reward_values)} trajectory(ies)")
+        if len(score_values) <= 1:
+            print(f"[ADVANTAGES] Skipping group with only {len(score_values)} trajectory(ies)")
             return None
 
-        std = rewards_tensor.std()
+        mean = scores_tensor.mean()
+        std = scores_tensor.std()
 
-        # CRITICAL FIX: Skip groups with zero/near-zero variance
-        # When all trajectories have the same reward, there's no learning signal
+        # Check for zero variance
         if std < self.min_std_threshold:
-            print(f"[ADVANTAGES] Skipping zero-variance group: all rewards = {reward_values[0]:.3f}")
+            print(f"[ADVANTAGES] Skipping zero-variance group: std={std.item():.6f}")
+            print(f"[ADVANTAGES] Trajectory scores: {[round(s, 3) for s in score_values]}")
             return None
 
-        # Step 4: Compute advantage per trajectory
+        # Step 4: Compute normalized advantage per trajectory
         traj_advantages: dict[str, float] = {}
-        for traj_uid, reward in traj_rewards.items():
-            traj_advantages[traj_uid] = ((reward - mean) / (std + self.eps)).item()
+        for traj_uid, score in traj_scores.items():
+            traj_advantages[traj_uid] = ((score - mean) / (std + self.eps)).item()
 
-        # Step 5: Broadcast to all episodes (steps)
+        # Step 5: Broadcast to ALL episodes (steps) in each trajectory
         advantages = [traj_advantages[ep.traj_uid] for ep in group]
 
         # DEBUG: Print statistics
-        print(f"[ADVANTAGES] num_trajectories={len(traj_rewards)}, num_episodes={len(group)}")
-        print(f"[ADVANTAGES] traj_rewards: {[round(r, 2) for r in reward_values]}")
+        print(f"[ADVANTAGES] Traj-level (verl-agent style): num_trajs={len(traj_scores)}, num_steps={len(group)}")
+        print(f"[ADVANTAGES] Trajectory scores: {[round(s, 3) for s in score_values]}")
         print(f"[ADVANTAGES] mean={mean.item():.3f}, std={std.item():.3f}")
-        print(f"[ADVANTAGES] traj_advantages: {[round(a, 2) for a in traj_advantages.values()]}")
+        print(f"[ADVANTAGES] Trajectory advantages: {[round(a, 3) for a in traj_advantages.values()]}")
 
         return advantages
 

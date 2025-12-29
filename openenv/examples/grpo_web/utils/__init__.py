@@ -35,6 +35,7 @@ from .actors import (
     ComputeAdvantages,
     WebEnvActor,
     CurriculumManager,
+    apply_invalid_action_penalty,
 )
 from .rollout import (
     play_web_task,
@@ -83,6 +84,7 @@ __all__ = [
     "ComputeAdvantages",
     "WebEnvActor",
     "CurriculumManager",
+    "apply_invalid_action_penalty",
     # Rollout
     "play_web_task",
     "play_web_task_parallel",
