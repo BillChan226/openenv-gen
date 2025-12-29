@@ -253,7 +253,7 @@ from .data_engine_tools import (
 
 # Data Engine (LLM-powered core)
 from .data_engine import (
-    DataEngine as LLMDataEngine,  # Alias for backward compatibility
+    DataEngine,
     create_data_engine,
     DomainInferenceResult,
     FieldMappingResult,
@@ -536,9 +536,9 @@ __all__ = [
     "FieldMappingTool",
     "DATA_ENGINE_AVAILABLE",
 
-    # LLM Data Engine
-    "LLMDataEngine",
-    "create_llm_data_engine",
+    # Data Engine (LLM-powered core)
+    "DataEngine",
+    "create_data_engine",
     "DomainInferenceResult",
     "FieldMappingResult",
     "DatasetEvaluationResult",

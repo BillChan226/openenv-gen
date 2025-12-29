@@ -295,6 +295,6 @@ class DataEngine:
             )
 
 
-def create_llm_data_engine(llm: LLM) -> LLMDataEngine:
-    """Factory function to create LLM data engine."""
-    return LLMDataEngine(llm)
+def create_data_engine(llm: LLM) -> DataEngine:
+    """Factory function to create data engine."""
+    return DataEngine(llm)

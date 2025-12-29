@@ -72,7 +72,7 @@ Example:
     def _get_llm_engine(self):
         """Lazy load LLM engine."""
         if self._llm_engine is None and self.llm_client is not None:
-            from tools.llm_data_engine import LLMDataEngine
+            from tools.data_engine import DataEngine as LLMDataEngine
             self._llm_engine = LLMDataEngine(self.llm_client)
         return self._llm_engine
 
@@ -635,7 +635,7 @@ Returns detailed mappings with transforms.
     def _get_llm_engine(self):
         """Lazy load LLM engine."""
         if self._llm_engine is None and self.llm_client is not None:
-            from tools.llm_data_engine import LLMDataEngine
+            from tools.data_engine import DataEngine as LLMDataEngine
             self._llm_engine = LLMDataEngine(self.llm_client)
         return self._llm_engine
 
