@@ -1,0 +1,362 @@
+# Domain configurations for data engine
+# Maps domains to HuggingFace search queries, required fields, and recommended datasets
+
+e-commerce:
+  description: "E-commerce and product catalog applications"
+  keywords:
+    - product
+    - shopping
+    - store
+    - catalog
+    - cart
+    - checkout
+    - ebay
+    - amazon
+    - shop
+    - buy
+    - sell
+    - price
+    - inventory
+    - marketplace
+    - retail
+
+  search_queries:
+    - "amazon products"
+    - "e-commerce products dataset"
+    - "retail products"
+    - "shopping dataset"
+    - "product catalog"
+
+  entities:
+    Product:
+      required_fields:
+        - name
+        - price
+      preferred_fields:
+        - description
+        - image
+        - rating
+        - category
+        - sku
+
+    Category:
+      required_fields:
+        - name
+        - slug
+
+    User:
+      required_fields:
+        - email
+      preferred_fields:
+        - name
+        - username
+
+  recommended_datasets:
+    - id: "milistu/AMAZON-Products-2023"
+      description: "Amazon product catalog with images, prices, ratings"
+      size: "~117K products"
+      quality: "high"
+
+    - id: "McAuley-Lab/Amazon-Reviews-2023"
+      description: "Amazon reviews with product metadata"
+      size: "~570M reviews"
+      quality: "high"
+
+  category_mapping:
+    meta_Beauty_and_Personal_Care:
+      slug: "beauty-personal-care"
+      name: "Beauty & Personal Care"
+
+    meta_Sports_and_Outdoors:
+      slug: "sports-outdoors"
+      name: "Sports & Outdoors"
+
+    meta_Clothing_Shoes_and_Jewelry:
+      slug: "clothing-shoes-jewelry"
+      name: "Clothing, Shoes & Jewelry"
+
+    meta_Home_and_Kitchen:
+      slug: "home-kitchen"
+      name: "Home & Kitchen"
+
+    meta_Office_Products:
+      slug: "office-products"
+      name: "Office Products"
+
+    meta_Tools_and_Home_Improvement:
+      slug: "tools-home-improvement"
+      name: "Tools & Home Improvement"
+
+    meta_Health_and_Household:
+      slug: "health-household"
+      name: "Health & Household"
+
+    meta_Health_and_Personal_Care:
+      slug: "health-household"
+      name: "Health & Household"
+
+    meta_Patio_Lawn_and_Garden:
+      slug: "patio-lawn-garden"
+      name: "Patio, Lawn & Garden"
+
+    meta_Electronics:
+      slug: "electronics"
+      name: "Electronics"
+
+    meta_Cell_Phones_and_Accessories:
+      slug: "cell-phones-accessories"
+      name: "Cell Phones & Accessories"
+
+    meta_Video_Games:
+      slug: "video-games"
+      name: "Video Games"
+
+    meta_Grocery_and_Gourmet_Food:
+      slug: "grocery-gourmet-food"
+      name: "Grocery & Gourmet Food"
+
+    meta_Digital_Music:
+      slug: "electronics"
+      name: "Electronics"
+
+    meta_CDs_and_Vinyl:
+      slug: "electronics"
+      name: "Electronics"
+
+    meta_Automotive:
+      slug: "tools-home-improvement"
+      name: "Tools & Home Improvement"
+
+    meta_Arts_Crafts_and_Sewing:
+      slug: "office-products"
+      name: "Office Products"
+
+    meta_Pet_Supplies:
+      slug: "health-household"
+      name: "Health & Household"
+
+    meta_Toys_and_Games:
+      slug: "video-games"
+      name: "Video Games"
+
+    meta_Industrial_and_Scientific:
+      slug: "tools-home-improvement"
+      name: "Tools & Home Improvement"
+
+    meta_Musical_Instruments:
+      slug: "electronics"
+      name: "Electronics"
+
+    meta_Appliances:
+      slug: "home-kitchen"
+      name: "Home & Kitchen"
+
+    meta_Baby_Products:
+      slug: "health-household"
+      name: "Health & Household"
+
+    meta_Amazon_Fashion:
+      slug: "clothing-shoes-jewelry"
+      name: "Clothing, Shoes & Jewelry"
+
+  field_mappings:
+    # HuggingFace field -> Database column
+    parent_asin: sku
+    title: name
+    average_rating: rating
+    rating_number: review_count
+    main_category: category_slug
+
+  filters:
+    price:
+      min: 0.01
+      max: 50000
+    rating:
+      min: 0
+    image:
+      not_empty: true
+    title:
+      min_length: 5
+
+
+social-media:
+  description: "Social media and content platforms"
+  keywords:
+    - post
+    - feed
+    - social
+    - twitter
+    - reddit
+    - comment
+    - like
+    - share
+    - follow
+    - user
+    - profile
+    - timeline
+
+  search_queries:
+    - "twitter dataset"
+    - "reddit posts"
+    - "social media dataset"
+    - "user comments"
+
+  entities:
+    Post:
+      required_fields:
+        - content
+        - author
+      preferred_fields:
+        - timestamp
+        - likes
+        - shares
+
+    User:
+      required_fields:
+        - username
+      preferred_fields:
+        - name
+        - avatar
+        - bio
+
+    Comment:
+      required_fields:
+        - text
+        - author
+
+  recommended_datasets:
+    - id: "sentiment140"
+      description: "Twitter sentiment analysis dataset"
+      size: "~1.6M tweets"
+
+    - id: "tweet_eval"
+      description: "Twitter evaluation benchmark"
+      size: "~60K tweets"
+
+
+news:
+  description: "News and journalism applications"
+  keywords:
+    - article
+    - news
+    - blog
+    - headline
+    - journalist
+    - publish
+    - media
+    - press
+    - story
+    - reporter
+
+  search_queries:
+    - "news articles dataset"
+    - "news headlines"
+    - "journalism dataset"
+
+  entities:
+    Article:
+      required_fields:
+        - title
+        - content
+      preferred_fields:
+        - author
+        - date
+        - category
+
+    Author:
+      required_fields:
+        - name
+
+    Category:
+      required_fields:
+        - name
+        - slug
+
+  recommended_datasets:
+    - id: "cnn_dailymail"
+      description: "CNN/Daily Mail news summarization"
+      size: "~300K articles"
+
+    - id: "multi_news"
+      description: "Multi-document news summarization"
+      size: "~56K articles"
+
+
+real-estate:
+  description: "Real estate and property applications"
+  keywords:
+    - property
+    - house
+    - apartment
+    - listing
+    - rent
+    - real estate
+    - home
+    - housing
+    - realtor
+    - mortgage
+
+  search_queries:
+    - "real estate listings"
+    - "housing dataset"
+    - "property listings"
+
+  entities:
+    Property:
+      required_fields:
+        - address
+        - price
+      preferred_fields:
+        - bedrooms
+        - bathrooms
+        - sqft
+        - image
+
+    Agent:
+      required_fields:
+        - name
+        - email
+
+
+restaurant:
+  description: "Restaurant and food applications"
+  keywords:
+    - restaurant
+    - food
+    - menu
+    - order
+    - delivery
+    - cuisine
+    - dining
+    - recipe
+    - meal
+    - dish
+
+  search_queries:
+    - "restaurant dataset"
+    - "food reviews"
+    - "menu dataset"
+    - "yelp dataset"
+
+  entities:
+    Restaurant:
+      required_fields:
+        - name
+        - address
+      preferred_fields:
+        - cuisine
+        - rating
+        - price_range
+
+    MenuItem:
+      required_fields:
+        - name
+        - price
+      preferred_fields:
+        - description
+        - category
+
+  recommended_datasets:
+    - id: "yelp_review_full"
+      description: "Yelp reviews for restaurants and businesses"
+      size: "~700K reviews"

@@ -1,0 +1,155 @@
+{#
+  Dataset Evaluation Prompt
+
+  Evaluates if a HuggingFace dataset matches project requirements.
+  Provides scoring, recommendations, and field coverage analysis.
+#}
+
+<TASK>
+Evaluate if this HuggingFace dataset fits the project requirements.
+</TASK>
+
+<SCORING_GUIDE>
+- 90-100: Highly recommended - excellent match, comprehensive data
+- 70-89: Recommended - good match with minor gaps
+- 50-69: Acceptable - usable but has limitations
+- 30-49: Not recommended - significant gaps or quality issues
+- 0-29: Unsuitable - does not match requirements
+</SCORING_GUIDE>
+
+<EVALUATION_CRITERIA>
+1. Field Coverage: Does the dataset have the required fields?
+2. Data Quality: Is the data well-structured and clean?
+3. Scale: Is the dataset large enough for realistic testing?
+4. Popularity: High download count indicates reliability
+5. Domain Match: Does it match the target domain?
+</EVALUATION_CRITERIA>
+
+<EXAMPLES>
+Example 1 - Good Match:
+Requirement: E-commerce product catalog with prices, images, and reviews
+Dataset: McAuley-Lab/Amazon-Reviews-2023
+Fields: parent_asin, title, price, description, images, average_rating, rating_number, main_category
+Sample: {"title": "Wireless Mouse", "price": 19.99, "average_rating": 4.2, "images": [...]}
+Downloads: 42,000
+
+Response:
+```json
+{
+  "score": 95,
+  "recommendation": "highly_recommended",
+  "strengths": [
+    "Complete product data with prices, images, ratings",
+    "Large scale with multiple categories",
+    "High download count indicates reliability",
+    "Well-structured with clear field names"
+  ],
+  "weaknesses": [
+    "May need filtering for valid prices (some nulls)",
+    "Images are in nested array format, need extraction"
+  ],
+  "field_coverage": {
+    "required": ["name", "price", "image", "category"],
+    "covered": ["name", "price", "image", "rating", "description", "category"],
+    "missing": []
+  },
+  "reasoning": "Excellent match for e-commerce. Amazon data is well-structured with all required fields."
+}
+```
+
+Example 2 - Partial Match:
+Requirement: Social media posts with user profiles and engagement
+Dataset: tweet_samples_2023
+Fields: text, created_at, user_id
+Sample: {"text": "Hello world", "created_at": "2023-01-01", "user_id": "123"}
+Downloads: 2,500
+
+Response:
+```json
+{
+  "score": 55,
+  "recommendation": "acceptable",
+  "strengths": [
+    "Has basic post content",
+    "Includes timestamps",
+    "Moderate download count"
+  ],
+  "weaknesses": [
+    "Missing user profile details (name, avatar)",
+    "No engagement metrics (likes, retweets)",
+    "Limited fields for full social media features"
+  ],
+  "field_coverage": {
+    "required": ["content", "author", "likes", "timestamp"],
+    "covered": ["content", "timestamp"],
+    "missing": ["author", "likes"]
+  },
+  "reasoning": "Partial match. Has basic tweet data but missing user details and engagement metrics."
+}
+```
+
+Example 3 - Poor Match:
+Requirement: Restaurant menus with dishes and prices
+Dataset: random_text_corpus
+Fields: text, source
+Sample: {"text": "Lorem ipsum...", "source": "wikipedia"}
+Downloads: 150
+
+Response:
+```json
+{
+  "score": 10,
+  "recommendation": "unsuitable",
+  "strengths": [
+    "Has text content"
+  ],
+  "weaknesses": [
+    "Not restaurant/food related",
+    "No structured menu data",
+    "No prices or dish information",
+    "Very low download count",
+    "Wrong domain entirely"
+  ],
+  "field_coverage": {
+    "required": ["restaurant_name", "dish_name", "price", "category"],
+    "covered": [],
+    "missing": ["restaurant_name", "dish_name", "price", "category"]
+  },
+  "reasoning": "Completely wrong domain. This is generic text data, not restaurant/menu data."
+}
+```
+</EXAMPLES>
+
+<REQUIREMENT>
+{{ requirement }}
+</REQUIREMENT>
+
+<DATASET_INFO>
+Dataset ID: {{ dataset_id }}
+Description: {{ description }}
+Downloads: {{ downloads }}
+</DATASET_INFO>
+
+<DATASET_FIELDS>
+{{ fields }}
+</DATASET_FIELDS>
+
+<SAMPLE_DATA>
+{{ sample }}
+</SAMPLE_DATA>
+
+<OUTPUT_FORMAT>
+Respond with ONLY valid JSON (no markdown code blocks):
+{
+  "score": 0-100,
+  "recommendation": "highly_recommended|recommended|acceptable|not_recommended|unsuitable",
+  "strengths": ["strength1", "strength2", ...],
+  "weaknesses": ["weakness1", "weakness2", ...],
+  "field_coverage": {
+    "required": ["field1", "field2", ...],
+    "covered": ["field1", ...],
+    "missing": ["field2", ...]
+  },
+  "reasoning": "Brief explanation of the evaluation"
+}
+</OUTPUT_FORMAT>

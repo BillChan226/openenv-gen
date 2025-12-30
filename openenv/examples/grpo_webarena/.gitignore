@@ -1,0 +1,10 @@
+# HPC-specific scripts (site-dependent)
+tillicum/
+
+# Python
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+wandb/

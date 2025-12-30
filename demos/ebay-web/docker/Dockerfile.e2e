@@ -1,0 +1,16 @@
+FROM mcr.microsoft.com/playwright:v1.49.1-jammy
+
+WORKDIR /e2e
+
+# Install deps first for better caching
+COPY app/e2e/package.json ./package.json
+RUN npm install
+# Ensure browsers are installed in the image (some base tags may not include them)
+RUN npx playwright install --with-deps chromium
+
+COPY app/e2e ./
+
+ENV CI=true
+
+# Run tests by default
+CMD ["npm", "run", "test:ci"]

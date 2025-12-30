@@ -12,7 +12,8 @@ FROM ${OPENSPIEL_BASE_IMAGE}
 
 # Copy OpenEnv core (base image already set WORKDIR=/app)
 WORKDIR /app
-COPY src/core/ /app/src/core/
+COPY src/openenv/core/ /app/src/openenv/core/
+COPY src/openenv/__init__.py /app/src/openenv/__init__.py
 
 # Copy OpenSpiel environment
 COPY envs/openspiel_env/ /app/envs/openspiel_env/
@@ -21,8 +22,8 @@ COPY envs/openspiel_env/ /app/envs/openspiel_env/
 COPY envs/openspiel_env/README.md /app/README.md
 
 # Extend Python path for OpenEnv (base image set PYTHONPATH=/app/src)
-# We prepend OpenSpiel paths
-ENV PYTHONPATH=/repo:/repo/build/python:/app/src
+# We prepend OpenSpiel paths; note openenv is under src/openenv
+ENV PYTHONPATH=/repo:/repo/build/python:/app/src:/app
 
 # OpenSpiel-specific environment variables (can be overridden at runtime)
 ENV OPENSPIEL_GAME=catch

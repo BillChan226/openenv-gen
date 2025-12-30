@@ -1,0 +1,133 @@
+# WebArena GRPO Training Configuration
+# Usage: python webarena_main.py --config webarena.yaml --steps 100
+
+group_size: 4
+local_batch_size: 8
+max_req_tokens: 2048
+max_res_tokens: 128
+model: "meta-llama/Llama-3.1-8B-Instruct"
+model_path: "/scratch/models/meta-llama/Llama-3.1-8B-Instruct"
+off_by_n: 1
+
+metric_logging:
+  console:
+    logging_mode: global_reduce
+
+webarena_env:
+  server_url: "http://localhost:8005"
+  model: ${model_path}
+
+policy:
+  engine_args:
+    model: ${model_path}
+    tensor_parallel_size: 1
+    pipeline_parallel_size: 1
+    enforce_eager: false
+    max_model_len: 4096
+  sampling_params:
+    n: 1
+    max_tokens: ${max_res_tokens}
+    temperature: 0.7
+    top_p: 0.95
+
+trainer:
+  model:
+    name: llama3
+    flavor: 8B
+    hf_assets_path: ${model_path}
+  optimizer:
+    name: AdamW
+    lr: 1e-6
+    eps: 1e-8
+  lr_scheduler:
+    warmup_steps: 10
+  training:
+    local_batch_size: ${local_batch_size}
+    seq_len: 4096
+    max_norm: 1.0
+    steps: 100
+    dtype: bfloat16
+    gc_freq: 1
+  compile:
+    enable: false
+  parallelism:
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: 1
+    tensor_parallel_degree: 1
+    pipeline_parallel_degree: 1
+    context_parallel_degree: 1
+    expert_parallel_degree: 1
+    disable_loss_parallel: true
+  checkpoint:
+    enable: true
+    initial_load_path: ${model_path}
+    initial_load_in_hf: true
+    last_save_in_hf: true
+    interval: 100
+    async_mode: "disabled"
+  activation_checkpoint:
+    mode: selective
+    selective_ac_option: op
+
+replay_buffer:
+  batch_size: ${local_batch_size}
+  max_policy_age: ${off_by_n}
+  dp_size: 1
+
+ref_model:
+  model:
+    name: llama3
+    flavor: 8B
+    hf_assets_path: ${model_path}
+  training:
+    seq_len: ${trainer.training.seq_len}
+    dtype: bfloat16
+    gc_freq: 1
+  compile:
+    enable: false
+  parallelism:
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: 1
+    tensor_parallel_degree: 1
+    pipeline_parallel_degree: 1
+    context_parallel_degree: 1
+    expert_parallel_degree: 1
+  checkpoint:
+    enable: true
+    initial_load_path: ${model_path}
+    initial_load_in_hf: true
+
+services:
+  policy:
+    procs: 1
+    num_replicas: 1
+    mesh_name: policy
+    with_gpus: true
+  ref_model:
+    procs: 1
+    num_replicas: 1
+    mesh_name: ref_model
+    with_gpus: true
+  reward_actor:
+    procs: 1
+    num_replicas: 1
+    mesh_name: reward_actor
+    with_gpus: false
+
+actors:
+  webarena_env:
+    procs: 1
+    with_gpus: false
+    mesh_name: webarena_env
+  trainer:
+    procs: 1
+    with_gpus: true
+    mesh_name: trainer
+  replay_buffer:
+    procs: 1
+    with_gpus: false
+    mesh_name: replay_buffer
+  compute_advantages:
+    procs: 1
+    with_gpus: false
+    mesh_name: compute_advantages

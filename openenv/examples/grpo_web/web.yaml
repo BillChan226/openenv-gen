@@ -1,0 +1,180 @@
+# Web Agent GRPO Training Configuration
+# >>> python -m examples.grpo_web.train --config examples/grpo_web/web.yaml
+#
+# Prerequisites:
+# 1. Build and start BrowserGym Docker container:
+#    cd openenv/envs/browsergym_env/server
+#    docker build -t browsergym-env:latest .
+#    docker run -p 8005:8000 -e BROWSERGYM_BENCHMARK=miniwob -e BROWSERGYM_TASK_NAME=click-test browsergym-env:latest
+#
+# 2. Run training:
+#    python -m examples.grpo_web.train --config examples/grpo_web/web.yaml
+
+# Global configuration
+group_size: 8  # Number of parallel tasks per rollout (reduced to avoid OOM with multi-step tasks)
+local_batch_size: 8  # Per-device batch size (smaller due to longer sequences and more steps)
+max_req_tokens: 1024  # Max tokens for prompt
+max_res_tokens: 1024  # Max tokens for response (increased for thinking mode - model needs room to reason) 
+model: "Qwen/Qwen3-8B"
+model_local_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-8B/snapshots/b968826d9c46dd6066d109eabc6255188de91218
+off_by_n: 1  # Off-policy tolerance
+
+# Main loop configuration
+rollout_threads: 1  # Number of parallel rollout threads
+
+# Observability configuration
+metric_logging:
+  console:
+    logging_mode: global_reduce
+  wandb:
+    project: "grpo-web"
+    name: "miniwob-medium-qwen3-8B"
+    logging_mode: global_reduce
+
+# Web environment configuration (BrowserGym)
+web_env:
+  # Single server (current setup - training and eval share this server sequentially)
+  server_url: "http://localhost:8005"
+  # Multiple servers for parallel rollouts (uncomment and add more servers as needed)
+  # server_urls:
+  #   - "http://localhost:8005"
+  #   - "http://localhost:8006"
+  #   - "http://localhost:8007"
+  #   - "http://localhost:8008"
+  model: ${model}
+  benchmark: "miniwob"
+  # task_name: "click-test"  # Default task (fallback if task_pool is empty)
+  max_steps: 10  # Max steps per episode
+  # Task pool - randomly sample tasks during training for better generalization
+  # Options: "easy" (22 tasks), "medium" (50 tasks), "hard" (63 tasks), "all" (~125 tasks)
+  # Combine with "+": "easy+medium" (72 tasks)
+  # Or specify a list directly: ["click-test", "click-button", "enter-text"]
+  # task_pool: "easy"  # Start with easy tasks for curriculum learning
+  task_pool: "medium"  # 72 tasks combined
+  # task_pool: ["click-checkboxes"]  # Single task for debugging - medium difficulty
+
+# Policy configuration
+policy:
+  engine_args:  # https://docs.vllm.ai/en/v0.10.0/api/vllm/engine/arg_utils.html
+    model: ${model}
+    tensor_parallel_size: 1  # 8B fits on 1x H200 (143GB VRAM)
+    pipeline_parallel_size: 1
+    enforce_eager: false
+    max_model_len: 4500  # Match trainer seq_len for 8B model
+  sampling_params:  # https://docs.vllm.ai/en/v0.10.0/api/vllm/sampling_params.html
+    n: 1  # Generate 1 response per observation
+    max_tokens: ${max_res_tokens}
+    temperature: 0.7  # Lower temperature for more focused actions
+    top_p: 0.95
+
+# Trainer configuration
+trainer:
+  model:
+    name: qwen3
+    flavor: 8B
+    hf_assets_path: ${model_local_path}
+  optimizer:
+    name: AdamW
+    lr: 1e-5  # Same as blackjack (which works)
+    eps: 1e-8
+  lr_scheduler:
+    warmup_steps: 1  # Same as blackjack
+  training:
+    local_batch_size: ${local_batch_size}
+    seq_len: 4500  # Longer sequences for web pages (max_req + max_res + buffer = 1024+1024+buffer)
+    max_norm: 1.0
+    steps: 500  # More steps needed for web navigation
+    dtype: bfloat16
+    gc_freq: 1
+  compile:
+    enable: false
+  parallelism:
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: 1  # 8B model fits on single H200 (143GB VRAM)
+    tensor_parallel_degree: 1
+    pipeline_parallel_degree: 1
+    context_parallel_degree: 1
+    expert_parallel_degree: 1
+    disable_loss_parallel: true
+  checkpoint:
+    enable: true
+    initial_load_path: ${model_local_path}
+    initial_load_in_hf: true
+    last_save_in_hf: true
+    interval: 500
+    async_mode: "disabled"
+  activation_checkpoint:
+    mode: selective
+    selective_ac_option: op
+
+# Evaluation configuration
+evaluation:
+  eval_interval: 5      # Run evaluation every N training steps
+  eval_tasks: 32        # Number of tasks for evaluation (denominator for success rate)
+  quiet: false          # Show per-task logging during eval for debugging
+
+# Replay buffer configuration
+replay_buffer:
+  batch_size: ${local_batch_size}
+  max_policy_age: ${off_by_n}
+  dp_size: 1  # Must match trainer's data_parallel_shard_degree
+
+# Reference model configuration
+ref_model:
+  model:
+    name: qwen3
+    flavor: 8B
+    hf_assets_path: ${model_local_path}
+  training:
+    seq_len: ${trainer.training.seq_len}
+    dtype: bfloat16
+    gc_freq: 1
+  compile:
+    enable: false
+  parallelism:
+    data_parallel_replicate_degree: 1
+    data_parallel_shard_degree: 1
+    tensor_parallel_degree: 2  # Use 2 GPUs (policy=1 + trainer=1 + ref_model=2 = 4 total)
+    pipeline_parallel_degree: 1
+    context_parallel_degree: 1
+    expert_parallel_degree: 1
+  checkpoint:
+    enable: true
+    initial_load_path: ${model_local_path}
+    initial_load_in_hf: true
+
+# All resource allocations
+services:
+  policy:
+    procs: ${policy.engine_args.tensor_parallel_size}
+    num_replicas: 1
+    mesh_name: policy
+    with_gpus: true
+  ref_model:
+    procs: 2  # policy=1 + trainer=2 + ref_model=2 = 5 total GPUs
+    num_replicas: 1
+    mesh_name: ref_model
+    with_gpus: true
+  reward_actor:
+    procs: 1
+    num_replicas: 1
+    mesh_name: reward_actor
+    with_gpus: false
+
+actors:
+  web_env:
+    procs: 1
+    with_gpus: false
+    mesh_name: web_env
+  trainer:
+    procs: 1  # 8B model fits on single H200
+    with_gpus: true
+    mesh_name: trainer
+  replay_buffer:
+    procs: 1
+    with_gpus: false
+    mesh_name: replay_buffer
+  compute_advantages:
+    procs: 1
+    with_gpus: false
+    mesh_name: compute_advantages

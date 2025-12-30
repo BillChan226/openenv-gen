@@ -8,6 +8,7 @@ with OpenEnv's Environment ABC. BrowserGym includes multiple benchmarks:
 - WorkArena: Enterprise task automation
 """
 
+import asyncio
 import importlib
 import logging
 from typing import Any, Dict, Optional
@@ -100,6 +101,7 @@ class BrowserGymEnvironment(Environment):
         viewport_width: int = 1280,
         viewport_height: int = 720,
         timeout: float = 10000.0,
+        use_screenshot: bool = False,
         **gym_kwargs: Any,
     ):
         """Initialize the BrowserGym environment.
@@ -112,6 +114,8 @@ class BrowserGymEnvironment(Environment):
             viewport_width: Browser viewport width
             viewport_height: Browser viewport height
             timeout: Action timeout in milliseconds
+            use_screenshot: Whether to include screenshots in observations (default False).
+                           Set to False for text-only LLMs like Llama to reduce message size.
             **gym_kwargs: Additional arguments passed to gym.make()
         """
         super().__init__()
@@ -122,6 +126,7 @@ class BrowserGymEnvironment(Environment):
         self.viewport_width = viewport_width
         self.viewport_height = viewport_height
         self.timeout = timeout
+        self.use_screenshot = use_screenshot
         self.gym_kwargs = dict(gym_kwargs)
 
         # Build environment ID
@@ -152,23 +157,10 @@ class BrowserGymEnvironment(Environment):
             )
             raise ValueError(message) from import_error
 
-        # Create the BrowserGym environment
-        try:
-            self.gym_env = gym.make(
-                self.env_id,
-                headless=headless,
-                viewport={"width": viewport_width, "height": viewport_height},
-                timeout=timeout,
-                **self.gym_kwargs,
-            )
-        except Exception as e:  # noqa: BLE001 - gym.make
-            message = (
-                "Failed to create BrowserGym environment "
-                f"'{self.env_id}': {e}\n"
-                "Make sure the benchmark package is installed "
-                f"(e.g., pip install browsergym-{benchmark})."
-            )
-            raise ValueError(message) from e
+        # NOTE: gym_env is created lazily in reset() to ensure Playwright
+        # is initialized in the same thread where it will be used.
+        # This avoids threading issues when reset/step run in an executor.
+        self.gym_env = None
 
         # State tracking
         self._state = BrowserGymState(
@@ -181,6 +173,35 @@ class BrowserGymEnvironment(Environment):
         self._last_obs: Optional[Dict[str, Any]] = None
         self._last_info: Optional[Dict[str, Any]] = None
 
+    def _ensure_gym_env(self) -> None:
+        """Lazily create the gym environment.
+
+        This ensures Playwright is initialized in the same thread where
+        reset/step will be called (the executor thread), avoiding threading issues.
+        """
+        if self.gym_env is not None:
+            return
+
+        try:
+            # Note: BrowserGym always captures screenshots internally.
+            # We control whether to include them in responses via self.use_screenshot
+            # (checked in _create_observation), not via gym.make()
+            self.gym_env = gym.make(
+                self.env_id,
+                headless=self.headless,
+                viewport={"width": self.viewport_width, "height": self.viewport_height},
+                timeout=self.timeout,
+                **self.gym_kwargs,
+            )
+        except Exception as e:  # noqa: BLE001 - gym.make
+            message = (
+                "Failed to create BrowserGym environment "
+                f"'{self.env_id}': {e}\n"
+                "Make sure the benchmark package is installed "
+                f"(e.g., pip install browsergym-{self.benchmark})."
+            )
+            raise ValueError(message) from e
+
     def reset(
         self,
         seed: Optional[int] = None,
@@ -190,17 +211,39 @@ class BrowserGymEnvironment(Environment):
 
         Args:
             seed: Random seed for reproducibility
-            task_name: Override task name for this episode
+            task_name: Override task name for this episode. If different from
+                      current task, will recreate the gym environment.
 
         Returns:
             Initial observation for the task
         """
+        # Check if we need to switch tasks (requires recreating gym environment)
+        new_task = task_name or self.task_name
+        current_task = self._state.task_name if hasattr(self, '_state') else None
+
+        # If task changed, close existing gym_env and update config
+        if new_task and new_task != current_task:
+            if self.gym_env is not None:
+                # Task changed - close old environment
+                logger.info(f"Switching task from '{current_task}' to '{new_task}'")
+                try:
+                    self.gym_env.close()
+                except Exception as e:
+                    logger.warning(f"Error closing gym_env during task switch: {e}")
+                self.gym_env = None
+            # Update task config BEFORE creating gym_env
+            self.task_name = new_task
+            self.env_id = f"browsergym/{self.benchmark}.{new_task}"
+
+        # Lazily create gym_env in the current thread (executor thread)
+        self._ensure_gym_env()
+
         # Generate new episode ID
         self._state = BrowserGymState(
             episode_id=str(uuid4()),
             step_count=0,
             benchmark=self.benchmark,
-            task_name=task_name or self.task_name or "",
+            task_name=new_task or "",
         )
 
         # Reset options
@@ -331,8 +374,10 @@ class BrowserGymEnvironment(Environment):
         self._state.current_url = url
         self._state.goal = goal
 
-        # Extract additional observation modalities
-        screenshot = obs.get("screenshot") if isinstance(obs, dict) else None
+        # Extract additional observation modalities (only if enabled)
+        screenshot = None
+        if self.use_screenshot and isinstance(obs, dict):
+            screenshot = obs.get("screenshot")
 
         # Extract last_action_error from obs (BrowserGym includes this)
         last_action_error = False
@@ -371,5 +416,19 @@ class BrowserGymEnvironment(Environment):
 
     def close(self) -> None:
         """Clean up environment resources."""
-        if hasattr(self, "gym_env"):
-            self.gym_env.close()
+        if hasattr(self, "gym_env") and self.gym_env is not None:
+            try:
+                self.gym_env.close()
+            except Exception as e:
+                logger.warning(f"Error closing gym_env: {e}")
+                # If close fails, try to reset the global Playwright state
+                # to prevent corruption affecting future sessions
+                try:
+                    import browsergym.core
+                    if hasattr(browsergym.core, '_set_global_playwright'):
+                        browsergym.core._set_global_playwright(None)
+                        logger.info("Reset global Playwright state after close error")
+                except Exception as reset_error:
+                    logger.warning(f"Failed to reset global Playwright: {reset_error}")
+            finally:
+                self.gym_env = None

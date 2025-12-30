@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+wandb/
+web_task_logs/
+game_logs/
+checkpoint/
+.github/
+forge_dcp_tmp/
 # C extensions
 *.so
 

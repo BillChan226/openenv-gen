@@ -1,0 +1,694 @@
+{
+  "conventions": {
+    "base_url": "/api",
+    "auth": {
+      "type": "jwt",
+      "header": "Authorization",
+      "scheme": "Bearer",
+      "token_ttl_minutes": 1440,
+      "refresh": "none (demo)"
+    },
+    "content_type": "application/json",
+    "error_format": {
+      "type": "object",
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "object",
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "type": "string" },
+            "message": { "type": "string" },
+            "details": { "type": ["object", "array", "string", "null"] },
+            "requestId": { "type": "string" }
+          }
+        }
+      }
+    },
+    "pagination": {
+      "style": "offset_limit",
+      "query": {
+        "limit": { "type": "integer", "minimum": 1, "maximum": 100, "default": 24 },
+        "offset": { "type": "integer", "minimum": 0, "default": 0 }
+      },
+      "response": {
+        "meta": {
+          "type": "object",
+          "required": ["limit", "offset", "total"],
+          "properties": {
+            "limit": { "type": "integer" },
+            "offset": { "type": "integer" },
+            "total": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "sorting": {
+      "query": {
+        "sort": {
+          "type": "string",
+          "description": "Comma-separated fields. Prefix with '-' for desc. Example: sort=price,-rating"
+        }
+      }
+    }
+  },
+  "relationship_notes": {
+    "user_orders": {
+      "summary": "Orders are owned by a user. Relationship is modeled as Order.userId (required). User may embed lightweight orderSummaries for convenience, but canonical order retrieval is via GET /api/account/orders.",
+      "canonical_linkage": "Order.userId",
+      "recommended_fetch": "GET /api/account/orders",
+      "why": "Avoid huge User payloads while still satisfying requirement 'User includes ... orders'."
+    }
+  },
+  "schemas": {
+    "Money": {
+      "$id": "Money",
+      "type": "object",
+      "required": ["currency", "amount"],
+      "properties": {
+        "currency": { "type": "string", "enum": ["USD"] },
+        "amount": { "type": "number", "minimum": 0 }
+      }
+    },
+    "Image": {
+      "$id": "Image",
+      "type": "object",
+      "required": ["url"],
+      "properties": {
+        "url": { "type": "string" },
+        "alt": { "type": "string" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "CategoryNode": {
+      "$id": "CategoryNode",
+      "type": "object",
+      "required": ["id", "slug", "name", "level"],
+      "properties": {
+        "id": { "type": "string" },
+        "slug": { "type": "string" },
+        "name": { "type": "string" },
+        "level": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "parentId": { "type": ["string", "null"] },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["slug", "name"],
+            "properties": {
+              "slug": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          }
+        },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "CategoryNode" }
+        }
+      }
+    },
+    "Product": {
+      "$id": "Product",
+      "type": "object",
+      "required": [
+        "id",
+        "sku",
+        "name",
+        "price",
+        "rating",
+        "reviewCount",
+        "images",
+        "primaryImage",
+        "categoryPath",
+        "shortDescription",
+        "description",
+        "inventoryStatus"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "sku": { "type": "string" },
+        "name": { "type": "string" },
+        "price": { "$ref": "Money" },
+        "rating": { "type": "number", "minimum": 0, "maximum": 5 },
+        "reviewCount": { "type": "integer", "minimum": 0 },
+        "images": { "type": "array", "minItems": 1, "items": { "$ref": "Image" } },
+        "primaryImage": { "$ref": "Image" },
+        "categoryPath": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["slug", "name"],
+            "properties": {
+              "slug": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          }
+        },
+        "shortDescription": { "type": "string" },
+        "description": { "type": "string" },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "number", "boolean"] }
+        },
+        "inventoryStatus": { "type": "string", "enum": ["in_stock", "low_stock", "out_of_stock"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Address": {
+      "$id": "Address",
+      "type": "object",
+      "required": ["id", "fullName", "line1", "city", "state", "postalCode", "country"],
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "company": { "type": ["string", "null"] },
+        "line1": { "type": "string" },
+        "line2": { "type": ["string", "null"] },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "postalCode": { "type": "string" },
+        "country": { "type": "string", "enum": ["US"] },
+        "phone": { "type": ["string", "null"] }
+      }
+    },
+    "OrderItem": {
+      "$id": "OrderItem",
+      "type": "object",
+      "required": ["productId", "sku", "name", "unitPrice", "quantity", "lineTotal"],
+      "properties": {
+        "productId": { "type": "string" },
+        "sku": { "type": "string" },
+        "name": { "type": "string" },
+        "unitPrice": { "$ref": "Money" },
+        "quantity": { "type": "integer", "minimum": 1 },
+        "lineTotal": { "$ref": "Money" }
+      }
+    },
+    "OrderSummary": {
+      "$id": "OrderSummary",
+      "type": "object",
+      "required": ["id", "orderNumber", "createdAt", "total", "status"],
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "total": { "$ref": "Money" },
+        "status": { "type": "string", "enum": ["processing", "shipped", "delivered", "cancelled"] }
+      }
+    },
+    "Order": {
+      "$id": "Order",
+      "type": "object",
+      "required": ["id", "orderNumber", "userId", "createdAt", "shipToName", "total", "status", "items"],
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "userId": { "type": "string", "description": "Owning user id (foreign key to User.id)." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "shipToName": { "type": "string" },
+        "total": { "$ref": "Money" },
+        "status": { "type": "string", "enum": ["processing", "shipped", "delivered", "cancelled"] },
+        "items": { "type": "array", "minItems": 1, "items": { "$ref": "OrderItem" } }
+      }
+    },
+    "User": {
+      "$id": "User",
+      "type": "object",
+      "required": ["id", "firstName", "lastName", "email", "createdAt"],
+      "properties": {
+        "id": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "newsletterSubscribed": { "type": "boolean" },
+        "defaultBillingAddressId": { "type": ["string", "null"] },
+        "defaultShippingAddressId": { "type": ["string", "null"] },
+        "addresses": { "type": "array", "items": { "$ref": "Address" } },
+        "wishlistProductIds": { "type": "array", "items": { "type": "string" } },
+        "orderSummaries": {
+          "type": "array",
+          "description": "Optional lightweight summaries of user's orders. Canonical list is via GET /api/account/orders.",
+          "items": { "$ref": "OrderSummary" }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Session": {
+      "$id": "Session",
+      "type": "object",
+      "required": ["token", "user"],
+      "properties": {
+        "token": { "type": "string" },
+        "user": { "$ref": "User" }
+      }
+    },
+    "CartItem": {
+      "$id": "CartItem",
+      "type": "object",
+      "required": ["productId", "quantity"],
+      "properties": {
+        "productId": { "type": "string" },
+        "quantity": { "type": "integer", "minimum": 1 },
+        "addedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Cart": {
+      "$id": "Cart",
+      "type": "object",
+      "required": ["id", "items", "currency", "subtotal", "itemCount"],
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": ["string", "null"] },
+        "items": { "type": "array", "items": { "$ref": "CartItem" } },
+        "currency": { "type": "string", "enum": ["USD"] },
+        "subtotal": { "$ref": "Money" },
+        "itemCount": { "type": "integer", "minimum": 0 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ProductListResponse": {
+      "$id": "ProductListResponse",
+      "type": "object",
+      "required": ["data", "meta"],
+      "properties": {
+        "data": { "type": "array", "items": { "$ref": "Product" } },
+        "meta": { "$ref": "PaginationMeta" }
+      }
+    },
+    "PaginationMeta": {
+      "$id": "PaginationMeta",
+      "type": "object",
+      "required": ["limit", "offset", "total"],
+      "properties": {
+        "limit": { "type": "integer" },
+        "offset": { "type": "integer" },
+        "total": { "type": "integer" }
+      }
+    },
+    "CategoryListResponse": {
+      "$id": "CategoryListResponse",
+      "type": "object",
+      "required": ["data"],
+      "properties": {
+        "data": { "type": "array", "items": { "$ref": "CategoryNode" } }
+      }
+    },
+    "CartResponse": {
+      "$id": "CartResponse",
+      "type": "object",
+      "required": ["data"],
+      "properties": {
+        "data": { "$ref": "Cart" }
+      }
+    },
+    "WishlistResponse": {
+      "$id": "WishlistResponse",
+      "type": "object",
+      "required": ["data"],
+      "properties": {
+        "data": {
+          "type": "object",
+          "required": ["productIds"],
+          "properties": {
+            "productIds": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "AccountSummary": {
+      "$id": "AccountSummary",
+      "type": "object",
+      "required": ["user", "defaultBillingAddress", "defaultShippingAddress", "recentOrders"],
+      "properties": {
+        "user": { "$ref": "User" },
+        "defaultBillingAddress": { "$ref": "Address" },
+        "defaultShippingAddress": { "$ref": "Address" },
+        "recentOrders": { "type": "array", "items": { "$ref": "Order" } }
+      }
+    }
+  },
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/health",
+      "summary": "Health check",
+      "auth_required": false,
+      "request": { "query": null, "body": null },
+      "responses": {
+        "200": {
+          "description": "Service healthy",
+          "schema": {
+            "type": "object",
+            "required": ["status"],
+            "properties": { "status": { "type": "string", "enum": ["ok"] } }
+          },
+          "example": { "status": "ok" }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/register",
+      "summary": "Register a new user (mock)",
+      "auth_required": false,
+      "request": {
+        "query": null,
+        "body": {
+          "type": "object",
+          "required": ["email", "password", "firstName", "lastName"],
+          "properties": {
+            "email": { "type": "string", "format": "email" },
+            "password": { "type": "string", "minLength": 1 },
+            "firstName": { "type": "string" },
+            "lastName": { "type": "string" },
+            "newsletterSubscribed": { "type": "boolean" }
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Created session",
+          "schema": { "$ref": "Session" },
+          "example": {
+            "token": "jwt.mock.token",
+            "user": {
+              "id": "u_1",
+              "firstName": "Alex",
+              "lastName": "Shopper",
+              "email": "alex@example.com",
+              "newsletterSubscribed": true,
+              "defaultBillingAddressId": null,
+              "defaultShippingAddressId": null,
+              "addresses": [],
+              "wishlistProductIds": [],
+              "orderSummaries": [],
+              "createdAt": "2025-01-01T00:00:00.000Z"
+            }
+          }
+        },
+        "400": {
+          "description": "Validation error",
+          "schema": { "$ref": "Error" },
+          "example": { "error": { "code": "VALIDATION_ERROR", "message": "email is required" } }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "summary": "Login (mock; accepts any non-empty credentials)",
+      "auth_required": false,
+      "request": {
+        "query": null,
+        "body": {
+          "type": "object",
+          "required": ["email", "password"],
+          "properties": {
+            "email": { "type": "string" },
+            "password": { "type": "string", "minLength": 1 }
+          }
+        }
+      },
+      "responses": {
+        "200": { "description": "Session", "schema": { "$ref": "Session" } },
+        "401": {
+          "description": "Invalid credentials (only if empty)",
+          "schema": { "$ref": "Error" },
+          "example": { "error": { "code": "AUTH_INVALID", "message": "Email and password are required" } }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/me",
+      "summary": "Get current user",
+      "auth_required": true,
+      "request": { "query": null, "body": null },
+      "responses": {
+        "200": { "description": "User", "schema": { "$ref": "User" } },
+        "401": { "description": "Not authenticated", "schema": { "$ref": "Error" } }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/logout",
+      "summary": "Logout (mock)",
+      "auth_required": true,
+      "request": { "query": null, "body": null },
+      "responses": {
+        "204": { "description": "Logged out", "schema": null },
+        "401": { "description": "Not authenticated", "schema": { "$ref": "Error" } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/categories",
+      "summary": "Get full category tree (3 levels)",
+      "auth_required": false,
+      "request": {
+        "query": {
+          "type": "object",
+          "properties": {
+            "depth": { "type": "integer", "minimum": 1, "maximum": 3, "default": 3 }
+          }
+        },
+        "body": null
+      },
+      "responses": {
+        "200": { "description": "Category tree", "schema": { "$ref": "CategoryListResponse" } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/categories/:slug",
+      "summary": "Get category node by slug (includes path and children)",
+      "auth_required": false,
+      "request": { "query": null, "body": null },
+      "responses": {
+        "200": { "description": "Category node", "schema": { "$ref": "CategoryNode" } },
+        "404": {
+          "description": "Not found",
+          "schema": { "$ref": "Error" },
+          "example": { "error": { "code": "NOT_FOUND", "message": "Category not found" } }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/products",
+      "summary": "List products (supports category filter, pagination, sorting)",
+      "auth_required": false,
+      "request": {
+        "query": {
+          "type": "object",
+          "properties": {
+            "category": { "type": "string", "description": "Category slug (level 1/2/3)." },
+            "q": { "type": "string", "description": "Basic keyword search (name/shortDescription)." },
+            "minPrice": { "type": "number", "minimum": 0 },
+            "maxPrice": { "type": "number", "minimum": 0 },
+            "sort": { "type": "string" },
+            "limit": { "type": "integer" },
+            "offset": { "type": "integer" }
+          }
+        },
+        "body": null
+      },
+      "responses": {
+        "200": {
+          "description": "Product list",
+          "schema": {
+            "type": "object",
+            "required": ["data", "meta"],
+            "properties": {
+              "data": { "type": "array", "items": { "$ref": "Product" } },
+              "meta": { "$ref": "PaginationMeta" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/products/:id",
+      "summary": "Get product detail",
+      "auth_required": false,
+      "request": { "query": null, "body": null },
+      "responses": {
+        "200": { "description": "Product", "schema": { "$ref": "Product" } },
+        "404": { "description": "Not found", "schema": { "$ref": "Error" } }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/search/advanced",
+      "summary": "Advanced search",
+      "auth_required": false,
+      "request": {
+        "query": null,
+        "body": {
+          "type": "object",
+          "required": ["q"],
+          "properties": {
+            "q": { "type": "string" },
+            "category": { "type": ["string", "null"] },
+            "minPrice": { "type": ["number", "null"], "minimum": 0 },
+            "maxPrice": { "type": ["number", "null"], "minimum": 0 },
+            "sort": { "type": ["string", "null"] }
+          }
+        }
+      },
+      "responses": {
+        "200": { "description": "Product list", "schema": { "$ref": "ProductListResponse" } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/cart",
+      "summary": "Get current cart (anonymous or user)",
+      "auth_required": false,
+      "request": {
+        "query": {
+          "type": "object",
+          "properties": {
+            "cartId": { "type": "string", "description": "Anonymous cart id (if no auth)." }
+          }
+        },
+        "body": null
+      },
+      "responses": {
+        "200": { "description": "Cart", "schema": { "$ref": "CartResponse" } }
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/cart/items/:productId",
+      "summary": "Update quantity",
+      "auth_required": false,
+      "request": {
+        "query": {
+          "type": "object",
+          "properties": {
+            "cartId": { "type": "string", "description": "Anonymous cart id (if no auth)." }
+          }
+        },
+        "body": {
+          "type": "object",
+          "required": ["quantity"],
+          "properties": {
+            "quantity": { "type": "integer", "minimum": 1 }
+          }
+        }
+      },
+      "responses": {
+        "200": { "description": "Cart", "schema": { "$ref": "CartResponse" } },
+        "404": { "description": "Product not found", "schema": { "$ref": "Error" } }
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/cart/items/:productId",
+      "summary": "Remove item",
+      "auth_required": false,
+      "request": {
+        "query": {
+          "type": "object",
+          "properties": {
+            "cartId": { "type": "string", "description": "Anonymous cart id (if no auth)." }
+          }
+        },
+        "body": null
+      },
+      "responses": {
+        "200": { "description": "Cart", "schema": { "$ref": "CartResponse" } },
+        "404": { "description": "Not found", "schema": { "$ref": "Error" } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/wishlist",
+      "summary": "Get wishlist",
+      "auth_required": true,
+      "request": { "query": null, "body": null },
+      "responses": {
+        "200": { "description": "Wishlist", "schema": { "$ref": "WishlistResponse" } },
+        "401": { "description": "Not authenticated", "schema": { "$ref": "Error" } }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/wishlist/items",
+      "summary": "Add product to wishlist",
+      "auth_required": true,
+      "request": {
+        "query": null,
+        "body": {
+          "type": "object",
+          "required": ["productId"],
+          "properties": {
+            "productId": { "type": "string" }
+          }
+        }
+      },
+      "responses": {
+        "200": { "description": "Wishlist", "schema": { "$ref": "WishlistResponse" } },
+        "404": { "description": "Product not found", "schema": { "$ref": "Error" } }
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/wishlist/items/:productId",
+      "summary": "Remove product from wishlist",
+      "auth_required": true,
+      "request": { "query": null, "body": null },
+      "responses": {
+        "200": { "description": "Wishlist", "schema": { "$ref": "WishlistResponse" } },
+        "404": { "description": "Not found", "schema": { "$ref": "Error" } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/account/summary",
+      "summary": "Get account summary (user, addresses, recent orders)",
+      "auth_required": true,
+      "request": { "query": null, "body": null },
+      "responses": {
+        "200": { "description": "Account summary", "schema": { "$ref": "AccountSummary" } },
+        "401": { "description": "Not authenticated", "schema": { "$ref": "Error" } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/account/orders",
+      "summary": "List orders for current user",
+      "auth_required": true,
+      "request": {
+        "query": {
+          "type": "object",
+          "properties": {
+            "limit": { "type": "integer" },
+            "offset": { "type": "integer" }
+          }
+        },
+        "body": null
+      },
+      "responses": {
+        "200": {
+          "description": "Orders",
+          "schema": {
+            "type": "object",
+            "required": ["data", "meta"],
+            "properties": {
+              "data": { "type": "array", "items": { "$ref": "Order" } },
+              "meta": { "$ref": "PaginationMeta" }
+            }
+          }
+        },
+        "401": { "description": "Not authenticated", "schema": { "$ref": "Error" } }
+      }
+    }
+  ]
+}

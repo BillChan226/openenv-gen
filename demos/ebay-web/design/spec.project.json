@@ -1,0 +1,316 @@
+{
+  "project": {
+    "name": "ebay-web",
+    "description": "Mock eBay-style storefront demo with browse/search/cart/wishlist/account flows.",
+    "seed": {
+      "products_min": 60,
+      "categories": {
+        "level1": 12,
+        "level2_per_level1": 4,
+        "level3_per_level2": 4,
+        "total_level3_estimate": 192
+      },
+      "users_min": 1,
+      "orders_per_user_min": 3,
+      "wishlist_items_per_user_min": 6
+    },
+    "persistence": {
+      "client": {
+        "storage": "localStorage",
+        "keys": {
+          "session": "ebay.session",
+          "cart": "ebay.cart",
+          "wishlist": "ebay.wishlist",
+          "recentSearch": "ebay.search.recent",
+          "ui": "ebay.ui"
+        },
+        "rules": [
+          "Session token and user profile are persisted in localStorage (ebay.session).",
+          "Anonymous cart is persisted in localStorage (ebay.cart).",
+          "Wishlist is persisted only for signed-in users (ebay.wishlist mirrors server for demo; cleared on logout).",
+          "On login: if localStorage cart exists, it is merged into server cart; duplicates sum quantities.",
+          "On logout: session cleared; wishlist cleared; cart remains as anonymous cart unless user opts to clear.",
+          "If API is unavailable, UI falls back to localStorage seed data and in-memory operations."
+        ]
+      },
+      "server": {
+        "mode": "mock in-memory",
+        "rules": [
+          "All entities are seeded at boot and stored in memory; optional file-based persistence is out of scope.",
+          "JWT tokens are unsigned mock strings but treated as Bearer tokens by middleware.",
+          "Per-user carts and wishlists are stored in memory keyed by userId; anonymous cart keyed by a client-provided cartId."
+        ]
+      }
+    }
+  },
+  "user_roles_and_personas": [
+    {
+      "role": "guest",
+      "persona": "Anonymous shopper",
+      "capabilities": [
+        "Browse categories",
+        "Search products",
+        "View product cards and details",
+        "Add/remove/update items in cart (anonymous)",
+        "View cart",
+        "Attempt to access account routes redirects to /login"
+      ]
+    },
+    {
+      "role": "customer",
+      "persona": "Signed-in shopper",
+      "capabilities": [
+        "All guest capabilities",
+        "Maintain wishlist",
+        "Access account dashboard and orders",
+        "Persist cart across sessions",
+        "See welcome message in header"
+      ]
+    },
+    {
+      "role": "admin (seed-only)",
+      "persona": "Demo operator",
+      "capabilities": [
+        "Not exposed in UI",
+        "May be used to regenerate seed data"
+      ]
+    }
+  ],
+  "permissions_matrix": {
+    "entities": ["product", "category", "cart", "wishlist", "order", "account"],
+    "roles": {
+      "guest": {
+        "product": ["read"],
+        "category": ["read"],
+        "cart": ["read", "write"],
+        "wishlist": [],
+        "order": [],
+        "account": []
+      },
+      "customer": {
+        "product": ["read"],
+        "category": ["read"],
+        "cart": ["read", "write"],
+        "wishlist": ["read", "write"],
+        "order": ["read"],
+        "account": ["read", "write (limited: addresses/newsletter)"]
+      },
+      "admin (seed-only)": {
+        "product": ["read", "seed"],
+        "category": ["read", "seed"],
+        "cart": ["read"],
+        "wishlist": ["read"],
+        "order": ["read", "seed"],
+        "account": ["read", "seed"]
+      }
+    }
+  },
+  "entities": {
+    "Category": {
+      "description": "Three-level category tree used for navigation and browse pages.",
+      "constraints": [
+        "Exactly 3 levels maximum (level 1 root categories, level 2 subcategories, level 3 leaf categories).",
+        "Products must belong to a level 3 leaf category, but browse filter supports any level slug.",
+        "Slug is unique across entire tree (recommended)."
+      ],
+      "fields": {
+        "id": "string",
+        "slug": "string",
+        "name": "string",
+        "level": "1|2|3",
+        "parentId": "string|null",
+        "childrenIds": "string[]",
+        "path": "{slug,name}[]"
+      },
+      "relationships": {
+        "parent": "Category?",
+        "children": "Category[]"
+      }
+    },
+    "Product": {
+      "description": "Sellable catalog item displayed in grids and search results.",
+      "fields": {
+        "id": "string",
+        "sku": "string",
+        "name": "string",
+        "price": "{currency:'USD',amount:number}",
+        "rating": "number (0..5)",
+        "reviewCount": "integer",
+        "images": "Image[]",
+        "primaryImage": "Image",
+        "categoryPath": "{slug,name}[] (length 3)",
+        "shortDescription": "string",
+        "description": "string",
+        "attributes": "Record<string, string|number|boolean>",
+        "inventoryStatus": "in_stock|low_stock|out_of_stock",
+        "createdAt": "ISO date",
+        "updatedAt": "ISO date"
+      },
+      "relationships": {
+        "categoryLeaf": "Category (level 3)"
+      }
+    },
+    "User": {
+      "description": "Customer profile and account data.",
+      "fields": {
+        "id": "string",
+        "firstName": "string",
+        "lastName": "string",
+        "email": "string",
+        "newsletterSubscribed": "boolean",
+        "addresses": "Address[]",
+        "defaultBillingAddressId": "string|null",
+        "defaultShippingAddressId": "string|null",
+        "wishlistProductIds": "string[]",
+        "createdAt": "ISO date"
+      }
+    },
+    "Address": {
+      "fields": {
+        "id": "string",
+        "fullName": "string",
+        "company": "string|null",
+        "line1": "string",
+        "line2": "string|null",
+        "city": "string",
+        "state": "string",
+        "postalCode": "string",
+        "country": "US",
+        "phone": "string|null"
+      }
+    },
+    "Order": {
+      "description": "Read-only seeded purchase history shown in account.",
+      "fields": {
+        "id": "string",
+        "orderNumber": "string",
+        "createdAt": "ISO date",
+        "shipToName": "string",
+        "total": "Money",
+        "status": "processing|shipped|delivered|cancelled",
+        "items": "OrderItem[]"
+      }
+    },
+    "OrderItem": {
+      "fields": {
+        "productId": "string",
+        "sku": "string",
+        "name": "string",
+        "unitPrice": "Money",
+        "quantity": "integer",
+        "lineTotal": "Money"
+      }
+    },
+    "Cart": {
+      "description": "Mutable shopping cart for guest or signed-in user.",
+      "fields": {
+        "id": "string",
+        "userId": "string|null",
+        "items": "CartItem[]",
+        "currency": "USD",
+        "subtotal": "Money",
+        "itemCount": "integer",
+        "updatedAt": "ISO date"
+      },
+      "rules": [
+        "itemCount = sum(items.quantity)",
+        "subtotal = sum(item.quantity * product.price.amount)",
+        "quantity must be >=1; setting quantity to 0 removes item"
+      ]
+    },
+    "CartItem": {
+      "fields": {
+        "productId": "string",
+        "quantity": "integer",
+        "addedAt": "ISO date"
+      }
+    },
+    "Session": {
+      "description": "Mock authentication session.",
+      "fields": {
+        "token": "string",
+        "userId": "string",
+        "createdAt": "ISO date",
+        "expiresAt": "ISO date"
+      },
+      "rules": [
+        "Login accepts any non-empty email/password.",
+        "Register creates a user and logs in.",
+        "Logout invalidates token in memory (best-effort)."
+      ]
+    },
+    "Wishlist": {
+      "description": "Per-user list of product ids.",
+      "fields": {
+        "userId": "string",
+        "productIds": "string[]",
+        "updatedAt": "ISO date"
+      },
+      "rules": [
+        "Wishlist is only available when signed in.",
+        "Toggling wishlist from ProductCard adds/removes productId.",
+        "Wishlist page supports remove and add-to-cart actions."
+      ]
+    }
+  },
+  "workflows": {
+    "navigation_and_guarding": {
+      "states": ["signed_out", "signed_in"],
+      "events": ["LOGIN_SUCCESS", "LOGOUT", "SESSION_EXPIRED"],
+      "transitions": [
+        {
+          "from": "signed_out",
+          "event": "LOGIN_SUCCESS",
+          "to": "signed_in",
+          "effects": [
+            "Persist session to localStorage",
+            "Merge anonymous cart into user cart",
+            "Fetch /account/summary in background"
+          ]
+        },
+        {
+          "from": "signed_in",
+          "event": "LOGOUT",
+          "to": "signed_out",
+          "effects": ["Clear session localStorage", "Clear wishlist localStorage", "Keep cart as anonymous unless user clears"]
+        },
+        {
+          "from": "signed_in",
+          "event": "SESSION_EXPIRED",
+          "to": "signed_out",
+          "effects": ["Clear session", "Show toast: 'Session expired'"]
+        }
+      ],
+      "route_guards": [
+        { "route": "/account", "requires": "signed_in", "on_fail": "redirect:/login?next=/account" },
+        { "route": "/account/wishlist", "requires": "signed_in", "on_fail": "redirect:/login?next=/account/wishlist" }
+      ]
+    },
+    "cart_workflow": {
+      "states": ["idle", "updating", "error"],
+      "events": ["ADD_ITEM", "SET_QTY", "REMOVE_ITEM", "CLEAR", "SYNC_SUCCESS", "SYNC_FAIL"],
+      "rules": [
+        "Cart updates are optimistic in UI; rollback on SYNC_FAIL.",
+        "Cart icon badge updates immediately.",
+        "If product is out_of_stock, ADD_ITEM is blocked with inline message."
+      ]
+    },
+    "wishlist_workflow": {
+      "states": ["idle", "toggling", "error"],
+      "events": ["TOGGLE", "SYNC_SUCCESS", "SYNC_FAIL"],
+      "rules": [
+        "Wishlist toggle requires signed-in; if signed-out, open login modal/redirect.",
+        "Wishlist state is reflected on ProductCard heart icon."
+      ]
+    },
+    "search_workflow": {
+      "states": ["idle", "typing", "submitting", "results", "empty", "error"],
+      "events": ["TYPE", "SUBMIT", "ADVANCED_SUBMIT", "CLEAR"],
+      "rules": [
+        "Header search submits to /category/:slug? or /?q=... depending on design; recommended: /category/all?q=... or /?q=...",
+        "Advanced search uses POST /search/advanced and shows results under the form.",
+        "Search input supports Enter to submit and shows clear button when non-empty."
+      ]
+    }
+  }
+}

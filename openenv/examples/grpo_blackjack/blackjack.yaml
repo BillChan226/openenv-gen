@@ -11,24 +11,29 @@
 #    python -m apps.grpo.blackjack_main --config apps/grpo/blackjack.yaml
 
 # Global configuration
-group_size: 4  # Number of parallel games per rollout
+group_size: 8  # Number of parallel games per rollout
 local_batch_size: 8  # Per-device batch size
 max_req_tokens: 512  # Max tokens for prompt (BlackJack prompts are ~200-300 tokens)
 max_res_tokens: 32  # Max tokens for response (just "HIT" or "STAND" + thinking)
 model: "Qwen/Qwen3-1.7B"
+model_local_path: /scratch/czr/huggingface/hub/models--Qwen--Qwen3-1.7B/snapshots/70d244cc86ccca08cf5af4e1e306ecf908b1ad5e
 off_by_n: 1  # Off-policy tolerance
 
 # Main loop configuration
 rollout_threads: 1  # Number of parallel rollout threads
 
+# Evaluation configuration
+eval_interval: 10  # Evaluate every N training steps
+eval_games: 20  # Number of games per evaluation
+
 # Observability configuration
 metric_logging:
   wandb:
     project: "blackjack-grpo-tutorial"
-    group: "blackjack_exp_${oc.env:USER}"
-    reduce_across_ranks: True
+    group: "blackjack_exp"
+    logging_mode: global_reduce
   console:
-    reduce_across_ranks: True
+    logging_mode: global_reduce
 
 # BlackJack environment configuration
 blackjack_env:
@@ -42,10 +47,11 @@ policy:
     tensor_parallel_size: 1
     pipeline_parallel_size: 1
     enforce_eager: false
+    gpu_memory_utilization: 0.7 # Reduce to avoid OOM with other services
   sampling_params:  # https://docs.vllm.ai/en/v0.10.0/api/vllm/sampling_params.html#vllm.sampling_params.SamplingParams
     n: 1  # Generate 1 response per game state (not group_size, since we play full games)
     max_tokens: ${max_res_tokens}
-    temperature: 1.0
+    temperature: 0.7
     top_p: 1.0
 
 # Trainer configuration
@@ -53,10 +59,10 @@ trainer:
   model:
     name: qwen3
     flavor: 1.7B
-    hf_assets_path: hf://${model}
+    hf_assets_path: ${model_local_path}
   optimizer:
     name: AdamW
-    lr: 1e-5
+    lr: 5e-5
     eps: 1e-8
   lr_scheduler:
     warmup_steps: 1
@@ -79,7 +85,7 @@ trainer:
     disable_loss_parallel: true
   checkpoint:
     enable: true
-    initial_load_path: hf://${model}
+    initial_load_path: ${model_local_path}
     initial_load_in_hf: true
     last_save_in_hf: true
     interval: 500
@@ -99,7 +105,7 @@ ref_model:
   model:
     name: qwen3
     flavor: 1.7B
-    hf_assets_path: hf://${model}
+    hf_assets_path: ${model_local_path}
   training:
     seq_len: ${trainer.training.seq_len}
     dtype: bfloat16
@@ -115,7 +121,7 @@ ref_model:
     expert_parallel_degree: 1
   checkpoint:
     enable: true
-    initial_load_path: hf://${model}
+    initial_load_path: ${model_local_path}
     initial_load_in_hf: true
 
 # All resource allocations

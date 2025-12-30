@@ -1,0 +1,32 @@
+0 verbose cli /usr/bin/node /usr/bin/npm
+1 info using npm@10.8.2
+2 info using node@v20.19.4
+3 silly config load:file:/usr/lib/node_modules/npm/npmrc
+4 silly config load:file:/scratch/czr/env-gen/demos/ebay-web/app/frontend/.npmrc
+5 silly config load:file:/home/macos/.npmrc
+6 silly config load:file:/usr/etc/npmrc
+7 verbose title npm test
+8 verbose argv "test"
+9 verbose logfile logs-max:10 dir:/scratch/czr/env-gen/demos/ebay-web/app/frontend/.npm-cache/_logs/2025-12-29T07_52_21_688Z-
+10 verbose logfile /scratch/czr/env-gen/demos/ebay-web/app/frontend/.npm-cache/_logs/2025-12-29T07_52_21_688Z-debug-0.log
+11 silly logfile start cleaning logs, removing 1 files
+12 silly logfile done cleaning log files
+13 verbose stack Error: Missing script: "test"
+13 verbose stack
+13 verbose stack To see a list of scripts, run:
+13 verbose stack   npm run
+13 verbose stack     at #run (/usr/lib/node_modules/npm/lib/commands/run-script.js:110:13)
+13 verbose stack     at async RunScript.exec (/usr/lib/node_modules/npm/lib/commands/run-script.js:39:7)
+13 verbose stack     at async Npm.exec (/usr/lib/node_modules/npm/lib/npm.js:207:9)
+13 verbose stack     at async module.exports (/usr/lib/node_modules/npm/lib/cli/entry.js:74:5)
+14 error Missing script: "test"
+14 error
+14 error To see a list of scripts, run:
+14 error   npm run
+15 verbose cwd /scratch/czr/env-gen/demos/ebay-web/app/frontend
+16 verbose os Linux 5.15.0-138-generic
+17 verbose node v20.19.4
+18 verbose npm  v10.8.2
+19 verbose exit 1
+20 verbose code 1
+21 error A complete log of this run can be found in: /scratch/czr/env-gen/demos/ebay-web/app/frontend/.npm-cache/_logs/2025-12-29T07_52_21_688Z-debug-0.log

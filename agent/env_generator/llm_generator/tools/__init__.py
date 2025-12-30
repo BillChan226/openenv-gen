@@ -240,6 +240,26 @@ from .reasoning_debugger import (
     CodeChange,
 )
 
+# Data Engine Tools (LLM-powered)
+from .data_engine_tools import (
+    create_data_engine_tools,
+    DiscoverDatasetTool,
+    LoadDatasetTool,
+    DataEnginePipelineTool,
+    GetDatasetSchemaTool,
+    FieldMappingTool,
+    DATA_ENGINE_AVAILABLE,
+)
+
+# Data Engine (LLM-powered core)
+from .data_engine import (
+    DataEngine,
+    create_data_engine,
+    DomainInferenceResult,
+    FieldMappingResult,
+    DatasetEvaluationResult,
+)
+
 
 def get_all_tools(
     output_dir: str = None, 
@@ -324,6 +344,9 @@ def get_all_tools(
         
         # Project tools
         *create_project_tools(workspace=workspace),
+
+        # Data Engine tools
+        *create_data_engine_tools(workspace=workspace),
     ]
     
     # Browser tools (optional, requires Playwright)
@@ -503,7 +526,23 @@ __all__ = [
     "IterativeDebugger",
     "DebugDiagnosis",
     "CodeChange",
-    
+
+    # Data Engine Tools (LLM-powered)
+    "create_data_engine_tools",
+    "DiscoverDatasetTool",
+    "LoadDatasetTool",
+    "DataEnginePipelineTool",
+    "GetDatasetSchemaTool",
+    "FieldMappingTool",
+    "DATA_ENGINE_AVAILABLE",
+
+    # Data Engine (LLM-powered core)
+    "DataEngine",
+    "create_data_engine",
+    "DomainInferenceResult",
+    "FieldMappingResult",
+    "DatasetEvaluationResult",
+
     # Helpers
     "get_all_tools",
     "get_tool_params",

@@ -96,7 +96,15 @@ PROJECT_STRUCTURE = {
             "Dockerfile",
         ],
     },
-    
+
+    "data_engine": {
+        "path": "app/database/data/",
+        "description": "HuggingFace dataset loaded via data_engine",
+        "files": [
+            "products.db",          # SQLite database with realistic data
+        ],
+    },
+
     "env": {
         "path": "env/",
         "description": "OpenEnv adapter",
@@ -169,12 +177,36 @@ IMPORTANT: These specs will be used by backend/frontend phases. Be comprehensive
         "depends_on": ["design"],
     },
     {
+        "id": "data_engine",
+        "type": TaskType.DATA_ENGINE,
+        "name": "Data Engine",
+        "description": """Discover and load realistic data from HuggingFace into the database.
+
+This phase uses the data_engine to:
+1. Infer the domain from the project description (e-commerce, social-media, news, etc.)
+2. Search HuggingFace Hub for relevant datasets
+3. Evaluate and rank candidate datasets by relevance, popularity, and field coverage
+4. Download and transform the best matching dataset
+5. Load data into SQLite database with proper schema mapping
+
+Use the data_engine_pipeline tool to run the complete pipeline:
+- instruction: The project description (e.g., "e-commerce website like eBay")
+- output_path: Path to the SQLite database file (e.g., "app/database/data/products.db")
+- db_type: "sqlite" (default) or "postgres"
+- max_per_category: Maximum records per category (default: 1000)
+
+This phase runs automatically after database schema generation and provides realistic
+product/content data instead of synthetic seed data.""",
+        "target_directory": "app/database/data/",
+        "depends_on": ["database"],
+    },
+    {
         "id": "backend",
         "type": TaskType.BACKEND,
         "name": "Backend",
         "description": "Generate Express.js backend API",
         "target_directory": "app/backend/",
-        "depends_on": ["design", "database"],
+        "depends_on": ["design", "database", "data_engine"],
     },
     {
         "id": "frontend",

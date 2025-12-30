@@ -1,0 +1,703 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "spec_version": "1.0.2",
+  "project": {
+    "name": "ebay-web",
+    "description": "Mock eBay-style storefront demo with browse/search/cart/wishlist/account flows."
+  },
+  "spec_authority": {
+    "entrypoint": "design/spec.json",
+    "source_of_truth": [
+      "UI routes/pages/components/UX states",
+      "navigation flows and guards",
+      "persistence rules (localStorage keys and read/write/clear rules)",
+      "offline/demo-mode behavior"
+    ],
+    "supporting_references": {
+      "api_contracts": "design/api_contracts.md",
+      "components_catalog": "design/components.md",
+      "split_specs": {
+        "design/spec.api.json": "Supporting reference for data model schemas and endpoint examples (non-authoritative).",
+        "design/spec.ui.json": "Supporting reference for UI notes (non-authoritative).",
+        "design/spec.project.json": "Supporting reference for project metadata (non-authoritative)."
+      }
+    },
+    "precedence_rules": [
+      "If any supporting reference conflicts with design/spec.json, design/spec.json wins.",
+      "If a supporting reference adds detail not present here, it may be used as implementation guidance only if it does not contradict this file."
+    ],
+    "pages_vs_page_requirements": {
+      "canonical_section": "pages",
+      "derived_section": "page_requirements",
+      "rule": "Implementers MUST follow pages[]. page_requirements is a legacy/derived subset kept for backwards compatibility and MUST NOT introduce new requirements or contradict pages.",
+      "enforcement": [
+        "If a page exists in both sections, pages.<PageName> is authoritative.",
+        "New requirements must be added only under pages." 
+      ]
+    }
+  },
+
+  "sources": {
+    "consolidated_from": [
+      "design/spec.project.json",
+      "design/spec.ui.json",
+      "design/spec.api.json"
+    ],
+    "documentation": {
+      "api_contracts": "design/api_contracts.md",
+      "components": "design/components.md"
+    },
+    "notes": [
+      "This file (design/spec.json) is the single entrypoint and authoritative spec for implementation.",
+      "The split spec files listed in consolidated_from are historical inputs used to assemble this file and are not required for implementation."
+    ]
+  },
+
+  "seed": {
+    "products_min": 60,
+    "categories": {
+      "level1": 12,
+      "level2_per_level1": 4,
+      "level3_per_level2": 4,
+      "total_level3_estimate": 192
+    },
+    "users_min": 1,
+    "orders_per_user_min": 3,
+    "wishlist_items_per_user_min": 6
+  },
+
+  "persistence": {
+    "client": {
+      "storage": "localStorage",
+      "keys": {
+        "session": "ebay.session",
+        "cart": "ebay.cart",
+        "wishlist": "ebay.wishlist",
+        "recentSearch": "ebay.search.recent",
+        "ui": "ebay.ui"
+      },
+      "data_shapes": {
+        "ebay.session": {
+          "token": "string",
+          "user": "{id:string,email:string,firstName?:string,lastName?:string} (subset of User from design/spec.api.json)"
+        },
+        "ebay.cart": {
+          "id": "string",
+          "items": "{productId:string,quantity:number}[] (subset of Cart/CartItem from design/spec.api.json)",
+          "updatedAt": "ISO date"
+        },
+        "ebay.wishlist": {
+          "userId": "string",
+          "productIds": "string[] (subset of Wishlist from design/spec.api.json)",
+          "updatedAt": "ISO date"
+        },
+        "ebay.search.recent": {
+          "queries": "{q:string,ts:ISO date}[] (max 10)"
+        },
+        "ebay.ui": {
+          "version": "number",
+          "preferences": "{currency?:string,gridDensity?:'comfortable'|'compact'}"
+        }
+      },
+      "read_write_clear_rules": [
+        "On app boot: read ebay.session, ebay.cart, ebay.search.recent, ebay.ui (best-effort; ignore parse errors).",
+        "On login success: write ebay.session; merge anonymous cart from ebay.cart into server cart; keep ebay.cart in sync with server response.",
+        "On logout: clear ebay.session and ebay.wishlist; keep ebay.cart as anonymous cart unless user explicitly clears cart.",
+        "On cart mutation: optimistically update UI then write ebay.cart after successful API response (or on optimistic update if API is mocked).",
+        "On wishlist mutation (signed-in only): update server then mirror to ebay.wishlist; clear on logout.",
+        "On search submit: append query to ebay.search.recent (dedupe by q; keep most recent 10).",
+        "On UI preference change: write ebay.ui.",
+        "If API is unavailable: UI may fall back to localStorage seed data and in-memory operations (demo mode)."
+      ],
+      "versioning_and_migration": {
+        "ebay.ui": {
+          "version_field": "version",
+          "current_version": 1,
+          "migration_rule": "If stored version is missing or < current_version, reset preferences to defaults and overwrite."
+        }
+      }
+    },
+    "server": {
+      "mode": "mock in-memory",
+      "rules": [
+        "All entities are seeded at boot and stored in memory; optional file-based persistence is out of scope.",
+        "JWT tokens are unsigned mock strings but treated as Bearer tokens by middleware.",
+        "Per-user carts and wishlists are stored in memory keyed by userId; anonymous cart keyed by a client-provided cartId."
+      ]
+    }
+  },
+
+  "route_scope": {
+    "notes": [
+      "This section removes ambiguity about which UI routes must be implemented.",
+      "The canonical list of routes remains in routes[]. Each route entry also includes a required boolean."
+    ],
+    "routes_required": [
+      "/",
+      "/search",
+      "/category/:slug",
+      "/product/:id",
+      "/advanced-search",
+      "/cart",
+      "/login",
+      "/account",
+      "/account/orders",
+      "/account/wishlist"
+    ],
+    "routes_optional": [],
+    "requirements_mapping": [
+      {
+        "id": "REQ-NAV-001",
+        "requirement": "Mega-menu category navigation (desktop hover/click; mobile drawer accordion)",
+        "owned_by": {
+          "routes_pages": ["/", "/category/:slug"],
+          "components": ["GlobalHeader", "MegaMenu", "CategoryNav"],
+          "api": ["GET /api/categories", "GET /api/categories/:slug"],
+          "state": ["in-memory UI state: open panel; keyboard focus state"]
+        },
+        "edge_cases": [
+          "Only one top-level panel open at a time",
+          "Click outside / Escape closes",
+          "Keyboard navigation per navigation_behavior.mega_menu"
+        ]
+      },
+      {
+        "id": "REQ-SEARCH-001",
+        "requirement": "Global header search submit navigates to /search?q=",
+        "owned_by": {
+          "routes_pages": ["/search"],
+          "components": ["GlobalHeader", "SearchBar", "SearchResults"],
+          "api": ["GET /api/products?q=..."],
+          "state": ["URL querystring is canonical; recentSearch persisted in localStorage"]
+        },
+        "edge_cases": [
+          "Empty query keeps user on current page or navigates to /search with empty state",
+          "Back/forward restores query and results"
+        ]
+      },
+      {
+        "id": "REQ-FILTERS-001",
+        "requirement": "Search/category filters + sort + pagination; responsive filters drawer on mobile",
+        "owned_by": {
+          "routes_pages": ["/search", "/category/:slug"],
+          "components": ["FiltersPanel", "SortSelect", "Pagination"],
+          "api": ["GET /api/products?category=...", "GET /api/products?q=..."],
+          "state": ["filters/sort/page reflected in URL query params"]
+        },
+        "edge_cases": [
+          "Mobile: filters open in drawer; apply/clear actions",
+          "No results -> empty state",
+          "Loading skeletons on refetch"
+        ]
+      },
+      {
+        "id": "REQ-CART-001",
+        "requirement": "Cart supports anonymous use; merges into user cart on login; persists locally",
+        "owned_by": {
+          "routes_pages": ["/cart", "/login"],
+          "components": ["Cart", "CartItemRow", "CartSummary"],
+          "api": ["GET /api/cart", "PATCH /api/cart/items/:productId", "DELETE /api/cart/items/:productId"],
+          "state": ["localStorage ebay.cart; server cart keyed by userId or cartId"]
+        },
+        "edge_cases": [
+          "Quantity updates optimistic",
+          "API offline -> fallback to local cart (demo mode)"
+        ]
+      },
+      {
+        "id": "REQ-WISHLIST-001",
+        "requirement": "Wishlist requires auth; toggling from product cards/details prompts login when signed out",
+        "owned_by": {
+          "routes_pages": ["/account/wishlist"],
+          "components": ["WishlistButton", "WishlistPage"],
+          "api": ["GET /api/wishlist", "POST /api/wishlist/items", "DELETE /api/wishlist/items/:productId"],
+          "state": ["localStorage ebay.wishlist mirrors server when signed in"]
+        },
+        "edge_cases": [
+          "Signed out: show prompt and redirect to /login?next=<currentPath>",
+          "Logout clears local wishlist"
+        ]
+      },
+      {
+        "id": "REQ-ORDERS-001",
+        "requirement": "User includes orders; Orders page lists signed-in user's orders",
+        "owned_by": {
+          "routes_pages": ["/account/orders"],
+          "components": ["OrdersTable"],
+          "api": ["GET /api/account/orders"],
+          "state": ["auth token from localStorage ebay.session"]
+        },
+        "edge_cases": [
+          "Empty orders -> empty state",
+          "401 -> clear session and redirect to login"
+        ]
+      },
+      {
+        "id": "REQ-AUTH-001",
+        "requirement": "Per-page signed-in vs signed-out UX states; protected routes redirect to login",
+        "owned_by": {
+          "routes_pages": ["/account", "/account/orders", "/account/wishlist", "/login"],
+          "components": ["AuthGuard", "LoginForm"],
+          "api": ["POST /api/auth/login", "GET /api/auth/me"],
+          "state": ["localStorage ebay.session; redirect next param"]
+        },
+        "edge_cases": [
+          "Already authenticated -> /login redirects to /account",
+          "API 401 -> treat as signed out"
+        ]
+      }
+    ]
+  },
+
+  "routes": [
+    { "path": "/", "page": "HomePage", "requires_auth": false, "required": true, "title": "Home" },
+    {
+      "path": "/search",
+      "page": "SearchResultsPage",
+      "requires_auth": false,
+      "required": true,
+      "title": "Search Results",
+      "description": "Search results page used by global header search submit; reads q from querystring."
+    },
+    { "path": "/category/:slug", "page": "CategoryPage", "requires_auth": false, "required": true, "title": "Category" },
+    { "path": "/advanced-search", "page": "AdvancedSearchPage", "requires_auth": false, "required": true, "title": "Advanced Search" },
+    { "path": "/cart", "page": "CartPage", "requires_auth": false, "required": true, "title": "Shopping Cart" },
+    { "path": "/login", "page": "LoginPage", "requires_auth": false, "required": true, "title": "Customer Login" },
+    { "path": "/account", "page": "AccountOverviewPage", "requires_auth": true, "required": true, "title": "My Account" },
+    {
+      "path": "/account/orders",
+      "page": "OrdersPage",
+      "requires_auth": true,
+      "required": true,
+      "title": "My Orders",
+      "description": "Dedicated orders list page. Primary content is OrdersTable; data comes from GET /api/account/orders."
+    },
+    { "path": "/account/wishlist", "page": "WishlistPage", "requires_auth": true, "required": true, "title": "My Wish List" },
+    {
+      "path": "/product/:id",
+      "page": "ProductDetailPage",
+      "requires_auth": false,
+      "required": true,
+      "title": "Item",
+      "description": "Product detail page reachable from ProductCard; loads product by id."
+    }
+  ],
+
+  "navigation_map": {
+    "primary_entry_points": [
+      { "from": "global_header", "to": "/", "label": "Logo/Home" },
+      { "from": "global_header", "to": "/search?q=<query>", "label": "Search submit" },
+      { "from": "global_header", "to": "/cart", "label": "Cart icon" },
+      { "from": "global_header", "to": "/account", "label": "Account link" },
+      { "from": "global_header", "to": "/account/orders", "label": "Orders link" },
+      { "from": "global_header", "to": "/account/wishlist", "label": "Wishlist link" },
+      { "from": "mega_menu", "to": "/category/:slug", "label": "Category navigation" }
+    ],
+    "guards_and_redirects": [
+      {
+        "when": "unauthenticated",
+        "attempted": "/account",
+        "redirect_to": "/login?next=/account",
+        "notes": "Account routes are protected. After login, redirect to next if present."
+      },
+      {
+        "when": "unauthenticated",
+        "attempted": "/account/orders",
+        "redirect_to": "/login?next=/account/orders",
+        "notes": "Orders is protected; deep-linking should preserve next."
+      },
+      {
+        "when": "unauthenticated",
+        "attempted": "/account/wishlist",
+        "redirect_to": "/login?next=/account/wishlist",
+        "notes": "Wishlist is protected; deep-linking should preserve next."
+      },
+      {
+        "when": "authenticated",
+        "attempted": "/login",
+        "redirect_to": "/account",
+        "notes": "Optional: if already signed in, avoid showing login form."
+      }
+    ],
+    "common_transitions": [
+      { "from": "HomePage", "action": "select_category", "to": "CategoryPage", "route": "/category/:slug" },
+      { "from": "HomePage", "action": "submit_search", "to": "SearchResultsPage", "route": "/search?q=<query>" },
+      { "from": "SearchResultsPage", "action": "refine_filters_or_sort", "to": "SearchResultsPage", "route": "/search?q=<query>&..." },
+      { "from": "CategoryPage", "action": "paginate_or_sort", "to": "CategoryPage", "route": "/category/:slug?page=<n>&sort=<key>" },
+      {
+        "from": "any_product_grid",
+        "action": "add_to_cart",
+        "to": "CartPage",
+        "route": "/cart",
+        "notes": "May stay on current page and show toast; cart icon count updates immediately."
+      },
+      {
+        "from": "any_product_grid",
+        "action": "toggle_wishlist",
+        "to": "WishlistPage",
+        "route": "/account/wishlist",
+        "notes": "If unauthenticated, show prompt and/or redirect to login with next back to originating page."
+      }
+    ]
+  },
+
+  "global_layout": {
+    "header": {
+      "behavior": "sticky",
+      "css_guidance": "position: sticky; top: 0; z-index: 1000; background: #fff;",
+      "notes": [
+        "Header stays visible while scrolling on all breakpoints.",
+        "When sticky, ensure content below accounts for header height (no overlap)."
+      ]
+    },
+    "footer": {
+      "behavior": "standard",
+      "notes": [
+        "Footer is NOT sticky.",
+        "Footer appears after main content and may be pushed to bottom on short pages using a flex column layout (min-height: 100vh; main { flex: 1 }).",
+        "Do not use position: fixed for the footer; it should not cover content on small screens."
+      ]
+    },
+    "content_spacing_rules": [
+      "Main content container uses consistent horizontal padding (mobile 16px, tablet 24px, desktop 32px).",
+      "If header is sticky, add top padding/margin to main equal to header height when needed."
+    ]
+  },
+
+  "navigation_behavior": {
+    "mega_menu": {
+      "source_of_truth": "design/spec.json#navigation_behavior.mega_menu (this block). components.md may include additional narrative examples but must not contradict.",
+      "desktop": {
+        "open_interaction": "hover_or_click",
+        "open_rules": [
+          "Hovering a top-level category trigger opens its panel.",
+          "Clicking a top-level category trigger toggles its panel (open/close).",
+          "Only one top-level panel may be open at a time. Opening a new one closes the previous."
+        ],
+        "close_interactions": ["mouse_leave_with_delay_150ms", "click_outside", "escape_key"],
+        "keyboard": {
+          "esc": "closes the open panel and returns focus to the trigger",
+          "arrow_navigation": "Left/Right moves between top-level triggers; Down moves focus into first link in open panel; Up moves focus back to trigger",
+          "tab_order": "When a panel is open, Tab cycles through links in the panel then continues to next header control; Shift+Tab reverses."
+        },
+        "focus_management": {
+          "on_open": "keep focus on trigger unless opened via keyboard Down, in which case move focus into panel",
+          "aria": "Triggers use aria-expanded and aria-controls; panel uses role=region and is labelled by trigger"
+        }
+      },
+      "mobile": {
+        "pattern": "drawer_with_accordion",
+        "entrypoint": "hamburger_button",
+        "tap_behavior_top_level": "first_tap_expands_second_tap_navigates",
+        "level_access": {
+          "level1": "accordion section headers in drawer",
+          "level2": "accordion nested under level1",
+          "level3": "links inside expanded level2"
+        },
+        "close_behavior": {
+          "methods": ["x_button", "tap_backdrop", "escape_key"],
+          "backdrop": "drawer renders a semi-transparent backdrop; tapping backdrop closes drawer",
+          "focus_trap": true,
+          "focus": "when drawer opens, focus moves to close button; focus is trapped within drawer until closed"
+        }
+      }
+    },
+    "cart_entry": {
+      "mini_cart": {
+        "enabled": false,
+        "mvp_requirement": "out_of_scope",
+        "notes": [
+          "MVP does not include a mini-cart popover.",
+          "Clicking the header cart icon navigates directly to /cart.",
+          "Cart count badge updates immediately on add/remove/quantity change."
+        ]
+      }
+    }
+  },
+
+  "auth_and_offline_rules": {
+    "canonical_auth_model": "Bearer token stored in localStorage (ebay.session.token).",
+    "protected_pages": ["/account", "/account/orders", "/account/wishlist"],
+    "when_signed_out": {
+      "behavior": "redirect_to_login",
+      "login_next_param": true,
+      "notes": [
+        "Protected routes must not render protected content when no session token is present.",
+        "Show a brief message on LoginPage if redirected (e.g., 'Please sign in to continue')."
+      ]
+    },
+    "when_api_returns_401": {
+      "behavior": "treat_as_signed_out",
+      "client_actions": [
+        "clear ebay.session",
+        "redirect to /login?next=<currentPath>",
+        "show toast/banner 'Session expired. Please sign in again.'"
+      ]
+    },
+    "when_api_unavailable_offline_demo_mode": {
+      "definition": "Network error / fetch failure / backend unreachable.",
+      "public_pages": {
+        "behavior": "allow_with_fallback_data",
+        "notes": [
+          "Home/Category/Search/Cart may use seeded local data and localStorage cart when API is unavailable.",
+          "Search remains canonical at /search?q=<query>."
+        ]
+      },
+      "protected_pages": {
+        "behavior": "disable_and_prompt_sign_in",
+        "notes": [
+          "Offline/demo mode does NOT bypass auth.",
+          "Account/Wishlist/Orders features are disabled when API is unavailable.",
+          "If user is already signed in but API is offline, show a read-only error state: 'Account features are unavailable offline.'"
+        ]
+      }
+    }
+  },
+
+  "pages": {
+    "HomePage": {
+      "route": "/",
+      "data_sources": [
+        { "method": "GET", "path": "/api/categories" },
+        { "method": "GET", "path": "/api/products", "query": { "limit": 12 } }
+      ],
+      "actions": [
+        "Navigate to category via CategoryNav/MegaMenu",
+        "Search submit navigates to /search?q=<encoded query>",
+        "Add to cart from ProductCard",
+        "Toggle wishlist from ProductCard (requires auth)"
+      ],
+      "forms": [],
+      "ux_states": {
+        "signed_out": [
+          "Wishlist toggles prompt sign-in and offer redirect to /login?next=<currentPath>.",
+          "Cart is available and persists as anonymous cart (localStorage)."
+        ],
+        "signed_in": [
+          "Wishlist toggles update server and reflect in header wishlist count.",
+          "Cart mutations apply to signed-in cart; anonymous cart is merged on login."
+        ],
+        "loading": ["Show skeleton for category nav and product grid."],
+        "error": ["Show error banner and retry for categories/products."],
+        "empty": ["If no products returned, show empty state with suggested categories."],
+        "responsive_notes": ["On mobile, mega-menu becomes drawer with accordion."]
+      }
+    },
+
+    "SearchResultsPage": {
+      "route": "/search",
+      "data_sources": [{ "method": "GET", "path": "/api/products", "query": { "q": "<query>" } }],
+      "actions": [
+        "Refine filters (price buckets)",
+        "Change sort",
+        "Paginate",
+        "Add to cart",
+        "Toggle wishlist (requires auth)"
+      ],
+      "forms": [],
+      "ux_states": {
+        "signed_out": [
+          "Wishlist toggles prompt sign-in and offer redirect to /login?next=<currentPath>.",
+          "Cart is available and persists locally."
+        ],
+        "signed_in": [
+          "Wishlist toggles update server.",
+          "Cart updates sync to server and localStorage."
+        ],
+        "loading": ["Show skeleton grid and disable filter controls while fetching."],
+        "error": ["Show error banner and retry."],
+        "empty": ["No results: show empty state with suggestions and clear-filters action."],
+        "interaction_states": ["Filters/sort/pagination update URL query params and trigger refetch."],
+        "responsive_notes": ["On mobile, filters open in a drawer; apply/clear actions."]
+      }
+    },
+
+    "CategoryPage": {
+      "route": "/category/:slug",
+      "data_sources": [
+        { "method": "GET", "path": "/api/categories/:slug" },
+        { "method": "GET", "path": "/api/products", "query": { "category": ":slug" } }
+      ],
+      "actions": [
+        "Apply filters (price buckets)",
+        "Change sort",
+        "Paginate",
+        "Add to cart",
+        "Toggle wishlist (requires auth)"
+      ],
+      "forms": [],
+      "ux_states": {
+        "signed_out": [
+          "Wishlist toggles prompt sign-in.",
+          "Cart is available and persists locally."
+        ],
+        "signed_in": [
+          "Wishlist toggles update server.",
+          "Cart updates sync to server and localStorage."
+        ],
+        "loading": ["Show skeleton for category header and product grid."],
+        "error": ["Show error banner and retry."],
+        "empty": ["If category has no products, show empty state and link back to home."],
+        "interaction_states": ["Filters/sort/pagination update URL query params and trigger refetch."],
+        "responsive_notes": ["On mobile, filters open in a drawer."]
+      }
+    },
+
+    "AdvancedSearchPage": {
+      "route": "/advanced-search",
+      "data_sources": [{ "method": "POST", "path": "/api/search/advanced" }],
+      "actions": ["Submit advanced search", "View results", "Add to cart from results", "Toggle wishlist (requires auth)"],
+      "forms": [
+        {
+          "id": "advancedSearch",
+          "fields": ["q", "category", "minPrice", "maxPrice", "sort"],
+          "submit": { "method": "POST", "path": "/api/search/advanced" }
+        }
+      ],
+      "ux_states": {
+        "signed_out": ["Submitting search is allowed; wishlist prompts sign-in."],
+        "signed_in": ["Submitting search is allowed; wishlist updates server."],
+        "loading": ["Disable submit and show inline spinner while searching."],
+        "error": ["Show form-level error and allow retry."],
+        "empty": ["No results: show empty state and allow editing criteria."]
+      }
+    },
+
+    "CartPage": {
+      "route": "/cart",
+      "data_sources": [{ "method": "GET", "path": "/api/cart" }],
+      "actions": [
+        "Update quantity (PATCH /api/cart/items/:productId)",
+        "Remove item (DELETE /api/cart/items/:productId)",
+        "Proceed to checkout (stub)"
+      ],
+      "forms": [],
+      "ux_states": {
+        "signed_out": [
+          "Cart is usable without signing in and persists locally.",
+          "Checkout remains a stub; may prompt sign-in in future (out of scope)."
+        ],
+        "signed_in": [
+          "Cart is tied to user; anonymous cart merges on login.",
+          "Cart persists across sessions via server + local mirror."
+        ],
+        "loading": ["Show skeleton rows and disable quantity controls while fetching."],
+        "error": ["Show error banner and retry; if offline, fall back to local cart demo mode."],
+        "empty": ["Show empty cart state with CTA back to home."]
+      }
+    },
+
+    "LoginPage": {
+      "route": "/login",
+      "data_sources": [{ "method": "POST", "path": "/api/auth/login" }],
+      "actions": ["Sign in", "Redirect to next or /account"],
+      "forms": [
+        {
+          "id": "login",
+          "fields": ["email", "password"],
+          "submit": { "method": "POST", "path": "/api/auth/login" }
+        }
+      ],
+      "ux_states": {
+        "signed_out": [
+          "Show login form.",
+          "If next param present, show message 'Please sign in to continue.'"
+        ],
+        "signed_in": ["Redirect immediately to /account (do not show login form)."],
+        "loading": ["Disable submit and show spinner."],
+        "error": ["Invalid credentials: show inline error message."]
+      }
+    },
+
+    "AccountOverviewPage": {
+      "route": "/account",
+      "data_sources": [
+        { "method": "GET", "path": "/api/auth/me", "auth_required": true },
+        { "method": "GET", "path": "/api/account/summary", "auth_required": true }
+      ],
+      "actions": ["View account summary", "View orders (read-only)", "Sign out"],
+      "forms": [],
+      "ux_states": {
+        "signed_out": ["Redirect to /login?next=/account."],
+        "signed_in": ["Show account summary cards and links to orders/wishlist."],
+        "loading": ["Show skeleton for summary cards."],
+        "error": ["Show error banner; allow retry; 401 triggers sign-out flow."]
+      }
+    },
+
+    "OrdersPage": {
+      "route": "/account/orders",
+      "data_sources": [{ "method": "GET", "path": "/api/account/orders", "auth_required": true }],
+      "actions": ["View orders list", "Paginate"],
+      "forms": [],
+      "ux_states": {
+        "signed_out": ["Redirect to /login?next=/account/orders."],
+        "signed_in": ["Show OrdersTable with order summaries."],
+        "loading": ["Show table skeleton."],
+        "error": ["Show error banner; allow retry; 401 triggers sign-out flow."],
+        "empty": ["No orders: show empty state with CTA back to home."],
+        "responsive_notes": ["On mobile, OrdersTable may collapse to stacked cards per row."]
+      }
+    },
+
+    "WishlistPage": {
+      "route": "/account/wishlist",
+      "data_sources": [{ "method": "GET", "path": "/api/wishlist", "auth_required": true }],
+      "actions": ["View wishlist", "Remove item", "Add to cart from wishlist"],
+      "forms": [],
+      "ux_states": {
+        "signed_out": ["Redirect to /login?next=/account/wishlist."],
+        "signed_in": ["Show wishlist grid; allow remove and add-to-cart."],
+        "loading": ["Show skeleton grid."],
+        "error": ["Show error banner; allow retry; 401 triggers sign-out flow."],
+        "empty": ["Empty wishlist: show empty state and link to browse categories."]
+      }
+    },
+
+    "ProductDetailPage": {
+      "route": "/product/:id",
+      "data_sources": [{ "method": "GET", "path": "/api/products/:id" }],
+      "actions": [
+        "View product details",
+        "Select quantity (optional)",
+        "Add to cart",
+        "Toggle wishlist (requires auth)",
+        "Navigate back to search/category"
+      ],
+      "forms": [],
+      "ux_states": {
+        "signed_out": ["Wishlist toggles prompt sign-in and offer redirect to /login?next=<currentPath>."],
+        "signed_in": ["Wishlist toggles update server and reflect in UI."],
+        "loading": [
+          "Show skeleton for title, gallery, and buy box.",
+          "Disable add-to-cart until product is loaded."
+        ],
+        "error": [
+          "If product not found: show 404-like state with link back to home.",
+          "If fetch fails: show error banner and retry."
+        ],
+        "empty": ["Not applicable; treat missing product as error/not-found."],
+        "interaction_states": [
+          "Add-to-cart success: show toast and update cart count.",
+          "Wishlist unauthenticated: show sign-in prompt and offer redirect to /login?next=<currentPath>."
+        ],
+        "responsive_notes": ["On mobile, gallery stacks above buy box; on desktop, use 2-column layout."]
+      }
+    }
+  },
+
+  "page_requirements": {
+    "note": "Legacy/derived subset. Do not implement from this section; use pages.",
+    "derived_from": "pages",
+    "HomePage": { "route": "/" },
+    "CategoryPage": { "route": "/category/:slug" },
+    "AdvancedSearchPage": { "route": "/advanced-search" },
+    "CartPage": { "route": "/cart" },
+    "LoginPage": { "route": "/login" },
+    "AccountOverviewPage": { "route": "/account" },
+    "OrdersPage": { "route": "/account/orders" },
+    "WishlistPage": { "route": "/account/wishlist" },
+    "ProductDetailPage": { "route": "/product/:id" },
+    "SearchResultsPage": { "route": "/search" }
+  }
+}

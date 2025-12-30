@@ -1,0 +1,64 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ebay
+      POSTGRES_USER: ebay
+      POSTGRES_PASSWORD: ebay
+    # Do not publish Postgres to a fixed host port by default.
+    # Other services connect via the internal Docker network at db:5432.
+    expose:
+      - "5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ../app/database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://ebay:ebay@db:5432/ebay
+      SESSION_SECRET: dev-secret
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "18000:3000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend.prod
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "13000:80"
+    restart: unless-stopped
+
+  e2e:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.e2e
+    environment:
+      E2E_BASE_URL: http://frontend
+      E2E_BACKEND_URL: http://backend:3000
+    depends_on:
+      backend:
+        condition: service_started
+      frontend:
+        condition: service_started
+    # Run on-demand: `docker compose run --rm e2e`
+    profiles: ["test"]
+
+volumes:
+  db_data:
