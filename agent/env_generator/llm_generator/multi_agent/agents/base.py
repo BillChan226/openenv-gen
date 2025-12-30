@@ -190,6 +190,19 @@ class EnvGenAgent(CoreBaseAgent):
     def set_other_agents(self, agents: Dict[str, "EnvGenAgent"]):
         """Set references to other agents for direct communication."""
         self._other_agents = agents
+        
+        # Register communication tools now that we know other agents
+        self._register_communication_tools()
+    
+    def _register_communication_tools(self):
+        """Register communication tools after other agents are known."""
+        from ..communication_tools import create_communication_tools
+        
+        comm_tools = create_communication_tools(self)
+        for tool in comm_tools:
+            self.tools.register(tool)
+        
+        self._logger.debug(f"Registered {len(comm_tools)} communication tools")
     
     def get_available_agents(self) -> List[Dict[str, str]]:
         """
@@ -247,38 +260,53 @@ class EnvGenAgent(CoreBaseAgent):
     
     def get_communication_prompt(self) -> str:
         """
-        Generate a prompt section describing available communication.
-        Use this in system prompts to inform the agent about its peers.
+        Generate a prompt section describing available communication tools.
         """
         if not self._other_agents:
             return "You are working alone with no other agents available."
         
         lines = [
-            "## Available Agents for Communication",
+            "## Multi-Agent Communication",
             "",
-            "You can communicate with the following agents using these methods:",
-            "- `ask(agent_id, question)` - Ask a question and wait for answer",
-            "- `tell(agent_id, message)` - Send one-way notification",
-            "- `broadcast(message)` - Notify all agents",
+            "You are part of a multi-agent system. Use these TOOLS to communicate:",
             "",
-            "| Agent ID | Name | Role |",
-            "|----------|------|------|",
+            "### Communication Tools",
+            "",
+            "| Tool | Usage | Example |",
+            "|------|-------|---------|",
+            '| `ask_agent` | Ask another agent a question | `ask_agent(agent_id="design", question="What is the API spec?")` |',
+            '| `tell_agent` | Send notification to an agent | `tell_agent(agent_id="frontend", message="API ready")` |',
+            '| `broadcast` | Notify all agents | `broadcast(message="Schema updated")` |',
+            '| `get_agents` | List available agents | `get_agents()` |',
+            "",
+            "### Available Agents",
+            "",
+            "| Agent ID | Role |",
+            "|----------|------|",
         ]
         
         for info in self.get_available_agents():
-            lines.append(f"| {info['id']} | {info['name']} | {info['role']} |")
+            lines.append(f"| `{info['id']}` | {info['role']} |")
         
         lines.extend([
             "",
-            "### When to Communicate",
-            "- **ask()**: When you need information from another agent's domain",
-            "- **tell()**: When you've completed something others should know about",
-            "- **broadcast()**: When a major milestone is reached",
+            "### When to Use Communication Tools",
             "",
-            "### Examples",
-            '- `await self.ask("design", "What is the API endpoint for user authentication?")`',
-            '- `await self.tell("frontend", "Backend API is ready for integration")`',
-            '- `await self.broadcast("Database schema has been updated")`',
+            "**Use `ask_agent` when you need:**",
+            "- Information from another agent's domain",
+            "- Clarification about specifications",
+            "- Data format or API contract details",
+            "",
+            "**Use `tell_agent` when you have:**",
+            "- Completed something others should know",
+            "- Important information to share",
+            "- Warnings or updates",
+            "",
+            "**Use `broadcast` for:**",
+            "- Major milestone completions",
+            "- System-wide announcements",
+            "",
+            "**IMPORTANT: Actually call these tools! Don't just think about communicating.**",
         ])
         
         return "\n".join(lines)
@@ -482,11 +510,52 @@ Provide a helpful, concise answer based on your expertise and current work.
     
     # ==================== LLM Interaction ====================
     
-    async def think(self, prompt: str, system: str = None) -> str:
-        """Have the agent think about something using LLM."""
+    def _build_system_prompt(self, custom_system: str = None) -> str:
+        """Build system prompt with agent identity and communication info."""
+        parts = [
+            f"You are {self.agent_name}, a specialized agent in a multi-agent system.",
+            f"Your role: {self._get_role_description()}",
+            "",
+        ]
+        
+        # Add communication capabilities
+        if self._other_agents:
+            parts.append(self.get_communication_prompt())
+            parts.append("")
+        
+        # Add custom system prompt if provided
+        if custom_system:
+            parts.append(custom_system)
+        
+        return "\n".join(parts)
+    
+    def _get_role_description(self) -> str:
+        """Get role description for this agent type."""
+        roles = {
+            "user": "Requirements refinement, application testing, and quality assurance",
+            "design": "Project architecture, specifications, and design documents",
+            "database": "Database schema, SQL generation, and data management",
+            "backend": "Backend API development with Express.js",
+            "frontend": "Frontend UI development with React",
+        }
+        return roles.get(self.agent_id, "Code generation and problem solving")
+    
+    async def think(self, prompt: str, system: str = None, include_comm_info: bool = True) -> str:
+        """
+        Have the agent think about something using LLM.
+        
+        Args:
+            prompt: The prompt/question
+            system: Optional custom system prompt
+            include_comm_info: Whether to include communication capabilities in system prompt
+        """
         messages = []
         
-        if system:
+        # Build system prompt with agent identity and communication info
+        if include_comm_info:
+            full_system = self._build_system_prompt(system)
+            messages.append(Message(role="system", content=full_system))
+        elif system:
             messages.append(Message(role="system", content=system))
         
         messages.append(Message(role="user", content=prompt))
@@ -536,18 +605,19 @@ Generate clean, production-ready code. Only output the code, no explanations.
     # ==================== Helper Methods ====================
     
     async def request_help(self, problem: str):
-        """Request help when stuck."""
+        """Request help when stuck - emits event for orchestrator to handle."""
         self._logger.warning(f"Requesting help: {problem}")
         
         if self._events:
             await self._events.emit("agent_stuck", self.agent_id, problem)
         
-        # Ask design agent for guidance
-        if "design" in self._other_agents:
-            guidance = await self.ask("design", f"I'm stuck with: {problem}\nCan you provide guidance?")
-            return guidance
-        
-        return None
+        # LLM can use ask_agent tool to request help from other agents
+        # This method just emits event for orchestrator tracking
+        return {
+            "status": "help_requested",
+            "problem": problem,
+            "suggestion": "Use ask_agent tool to request guidance from another agent",
+        }
     
     def get_status(self) -> Dict[str, Any]:
         """Get agent status."""

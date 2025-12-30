@@ -87,12 +87,13 @@ class DatabaseAgent(EnvGenAgent):
                 schema = json.loads(content)
         
         if not schema:
-            # Ask design agent
-            schema_str = await self.ask("design", "Please provide the database schema JSON.")
-            try:
-                schema = json.loads(self._extract_json(schema_str))
-            except:
-                return {"success": False, "error": "No database schema available"}
+            # Schema not found - use LLM with tools to decide what to do
+            # The LLM can use ask_agent tool to communicate with design agent
+            return {
+                "success": False, 
+                "error": "No database schema found. Use ask_agent tool to request from design agent.",
+                "suggestion": "ask_agent(agent_id='design', question='Please provide the database schema JSON.')"
+            }
         
         self._schema = schema
         
@@ -115,21 +116,13 @@ class DatabaseAgent(EnvGenAgent):
             # 4. Try to load real data from HuggingFace
             real_data_loaded = await self._load_real_data(schema)
             
-            # Notify backend
-            await self.tell(
-                "backend",
-                "Database tables created. Schema ready for ORM mapping.",
-                msg_type="update",
-                context={
-                    "tables": [t["name"] for t in schema.get("tables", [])],
-                    "real_data_loaded": real_data_loaded,
-                }
-            )
-            
+            # Return result - LLM can decide to notify others using tell_agent/broadcast tools
             return {
                 "success": True,
                 "files_created": self._files_created,
                 "real_data_loaded": real_data_loaded,
+                "tables": [t["name"] for t in schema.get("tables", [])],
+                "notify_suggestion": "Consider using tell_agent or broadcast to notify other agents about database completion.",
             }
             
         except Exception as e:
@@ -170,11 +163,13 @@ Output raw SQL only.
             )
         except Exception as e:
             self._logger.warning(f"Could not load j2 template: {e}")
+            # Get test credentials from context or use defaults
+            test_users = self._get_test_credentials()
             prompt = f"""Generate PostgreSQL seed data for:
 {json.dumps(schema, indent=2)}
 
 Include:
-- Test users: admin@example.com (admin123), user@example.com (password123)
+- Test users: {test_users}
 - Use bcrypt hashes
 - 5-10 realistic records per table
 
@@ -182,6 +177,13 @@ Output raw SQL only.
 """
         
         return await self.think(prompt)
+    
+    def _get_test_credentials(self) -> str:
+        """Get test credentials from context or return defaults."""
+        if self.context and hasattr(self.context, 'test_users'):
+            return self.context.test_users
+        # Default test users - can be overridden via context
+        return "admin@example.com (admin123), user@example.com (password123)"
     
     def _generate_dockerfile(self) -> str:
         """Generate database Dockerfile."""
@@ -253,18 +255,7 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=5 \\
                     f"from {result.get('dataset_id', 'unknown dataset')}"
                 )
                 self._files_created.append("app/data/products.db")
-                
-                # Notify user agent about the data
-                await self.tell(
-                    "user",
-                    f"Loaded real data from HuggingFace: {load_stats.get('total_loaded', 0)} records",
-                    msg_type="update",
-                    context={
-                        "dataset": result.get("dataset_id"),
-                        "records": load_stats.get("total_loaded"),
-                        "categories": load_stats.get("categories", {}),
-                    }
-                )
+                # LLM can use tell_agent to notify user if needed
                 return True
             else:
                 self._logger.warning(f"Data loading failed: {result.get('error')}")

@@ -192,6 +192,14 @@ Output ONLY valid JSON, no markdown.
         result = await self.call_tool("docker_status")
         return result and "running" in str(result).lower()
     
+    def _get_test_credentials(self) -> tuple[str, str]:
+        """Get test credentials from context or return defaults."""
+        if self.context:
+            email = getattr(self.context, 'test_email', 'admin@example.com')
+            password = getattr(self.context, 'test_password', 'admin123')
+            return email, password
+        return 'admin@example.com', 'admin123'
+    
     async def _test_api(self) -> tuple[bool, List[Dict]]:
         """Test API endpoints using dynamic port."""
         issues = []
@@ -210,9 +218,10 @@ Output ONLY valid JSON, no markdown.
             })
             return False, issues
         
-        # Test auth endpoints
+        # Test auth endpoints - get credentials from context or use defaults
+        test_email, test_password = self._get_test_credentials()
         auth_endpoints = [
-            ("POST", "/api/auth/login", {"email": "admin@example.com", "password": "admin123"}),
+            ("POST", "/api/auth/login", {"email": test_email, "password": test_password}),
         ]
         
         for method, path, body in auth_endpoints:
@@ -295,11 +304,14 @@ Output ONLY valid JSON, no markdown.
         """Test login functionality."""
         issues = []
         
+        # Get test credentials from context or use defaults
+        test_email, test_password = self._get_test_credentials()
+        
         # Fill email
-        await self.call_tool("browser_fill", selector="input[type='email'], input[name='email']", value="admin@example.com")
+        await self.call_tool("browser_fill", selector="input[type='email'], input[name='email']", value=test_email)
         
         # Fill password
-        await self.call_tool("browser_fill", selector="input[type='password'], input[name='password']", value="admin123")
+        await self.call_tool("browser_fill", selector="input[type='password'], input[name='password']", value=test_password)
         
         # Click submit
         await self.call_tool("browser_click", selector="button[type='submit'], button:has-text('Login'), button:has-text('Sign in')")

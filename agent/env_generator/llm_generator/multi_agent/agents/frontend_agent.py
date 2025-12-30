@@ -81,8 +81,9 @@ class FrontendAgent(EnvGenAgent):
         self._ui_spec = ui_spec
         self._api_spec = api_spec or {}
         
-        # Ask backend about endpoints
-        api_info = await self.ask("backend", "What API endpoints are available?")
+        # Get API info from file - LLM can use ask_agent if more info needed
+        api_content = self.read_file("design/spec.api.json")
+        api_info = api_content if api_content else "API spec not found - check design/spec.api.json"
         
         try:
             # 1. package.json
@@ -171,22 +172,24 @@ class FrontendAgent(EnvGenAgent):
         }, indent=2)
     
     def _generate_vite_config(self) -> str:
-        return '''import { defineConfig } from 'vite'
+        # Get backend port from context or use default
+        backend_internal_port = getattr(self.context, 'backend_internal_port', 3000) if self.context else 3000
+        return f'''import {{ defineConfig }} from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
+export default defineConfig({{
   plugins: [react()],
-  server: {
+  server: {{
     host: '0.0.0.0',
     port: 5173,
-    proxy: {
-      '/api': {
-        target: 'http://backend:3000',
+    proxy: {{
+      '/api': {{
+        target: 'http://backend:{backend_internal_port}',
         changeOrigin: true
-      }
-    }
-  }
-})
+      }}
+    }}
+  }}
+}})
 '''
     
     def _generate_index_html(self) -> str:
@@ -364,21 +367,23 @@ CMD ["nginx", "-g", "daemon off;"]
 '''
     
     def _generate_nginx_config(self) -> str:
-        return '''server {
+        # Get backend port from context or use default
+        backend_internal_port = getattr(self.context, 'backend_internal_port', 3000) if self.context else 3000
+        return f'''server {{
     listen 80;
     root /usr/share/nginx/html;
     index index.html;
 
-    location / {
+    location / {{
         try_files $uri $uri/ /index.html;
-    }
+    }}
 
-    location /api {
-        proxy_pass http://backend:3000;
+    location /api {{
+        proxy_pass http://backend:{backend_internal_port};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
-    }
-}
+    }}
+}}
 '''
     
     # ==================== Fix Issues ====================
@@ -406,13 +411,13 @@ CMD ["nginx", "-g", "daemon off;"]
         """Fix a single frontend issue."""
         description = issue.get("description", "")
         
-        # Check if API-related issue
+        # Check if API-related issue - read API spec from file
         if "map" in description.lower() or "undefined" in description.lower():
-            api_info = await self.ask(
-                "backend",
-                f"What is the response format for: {description}"
-            )
-            description += f"\n\nBackend says: {api_info}"
+            api_spec_content = self.read_file("design/spec.api.json")
+            if api_spec_content:
+                description += f"\n\nAPI Spec: {api_spec_content[:1000]}"
+            else:
+                description += "\n\nNote: LLM can use ask_agent tool to get API response format from backend"
         
         related_files = issue.get("related_files", [])
         files_content = {}

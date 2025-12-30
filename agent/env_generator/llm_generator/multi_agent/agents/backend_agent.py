@@ -71,16 +71,17 @@ class BackendAgent(EnvGenAgent):
                 api_spec = json.loads(content)
         
         if not api_spec:
-            spec_str = await self.ask("design", "Please provide the API specification JSON.")
-            try:
-                api_spec = json.loads(self._extract_json(spec_str))
-            except:
-                return {"success": False, "error": "No API spec available"}
+            return {
+                "success": False, 
+                "error": "No API spec found. Use ask_agent tool to request from design agent.",
+                "suggestion": "ask_agent(agent_id='design', question='Please provide the API specification JSON.')"
+            }
         
         self._api_spec = api_spec
         
-        # Get database table info
-        db_tables = await self.ask("database", "What tables are available?")
+        # Get database table info from file or LLM can use ask_agent tool
+        db_content = self.read_file("design/spec.database.json")
+        db_tables = db_content if db_content else "Tables not yet defined - check with database agent"
         
         try:
             # 1. package.json
@@ -110,17 +111,12 @@ class BackendAgent(EnvGenAgent):
             self.write_file("app/backend/Dockerfile", dockerfile)
             self._files_created.append("app/backend/Dockerfile")
             
-            # Notify frontend
-            await self.tell(
-                "frontend",
-                "Backend API is ready. All endpoints implemented.",
-                msg_type="complete",
-                context={"endpoints": [e.get("path") for e in api_spec.get("endpoints", [])]}
-            )
-            
+            # LLM can use tell_agent/broadcast to notify other agents
             return {
                 "success": True,
                 "files_created": self._files_created,
+                "endpoints": [e.get("path") for e in api_spec.get("endpoints", [])],
+                "notify_suggestion": "Consider using tell_agent or broadcast to notify frontend about API completion.",
             }
             
         except Exception as e:
@@ -323,7 +319,8 @@ Provide fix as JSON: {{"files": [{{"path": "...", "content": "..."}}]}}
                 if path and content:
                     self.write_file(path, content)
             
-            await self.tell("frontend", f"Fixed: {issue.get('title', '')}", msg_type="update")
+            # LLM can use tell_agent to notify if needed
+            self._logger.info(f"Fixed: {issue.get('title', '')}")
             return True
             
         except Exception as e:

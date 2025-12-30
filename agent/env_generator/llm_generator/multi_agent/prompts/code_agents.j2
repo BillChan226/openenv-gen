@@ -57,19 +57,17 @@ Generate PostgreSQL seed.sql for testing.
 ## Requirements
 
 1. Create realistic test data
-2. Include test users:
-   - admin@example.com / admin123 (bcrypt hash)
-   - user@example.com / password123 (bcrypt hash)
+2. Include test users (bcrypt hashed passwords):
+   - {{ test_email | default('admin@example.com') }} / {{ test_password | default('admin123') }}
+   - user@example.com / password123
 3. 5-10 records per table minimum
 4. Maintain referential integrity
 5. Use realistic values (not "test1", "test2")
 
-For bcrypt password hashes, use:
+For bcrypt password hashes, generate appropriate hashes. Example format:
 ```sql
--- admin123
+-- password hash example
 '$2a$10$rQEY1f.bqRm2e1HnO8bKLOrLvBKwKBHHJXKRxhBqXTwN8xKqjVJWe'
--- password123  
-'$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'
 ```
 
 Output raw SQL only, no markdown code blocks.

@@ -363,6 +363,13 @@ class Orchestrator:
     
     async def _generate_docker(self):
         """Generate Docker configuration with DYNAMIC ports."""
+        # Get internal ports from context or use defaults
+        backend_internal_port = getattr(self.context, 'backend_internal_port', 3000)
+        db_port = getattr(self.context, 'db_port', 5432)
+        db_user = getattr(self.context, 'db_user', 'postgres')
+        db_password = getattr(self.context, 'db_password', 'postgres')
+        db_name = getattr(self.context, 'db_name', 'app')
+        
         docker_compose = f'''version: '3.8'
 
 services:
@@ -371,13 +378,13 @@ services:
       context: ./app/database
       dockerfile: Dockerfile
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: app
+      POSTGRES_USER: {db_user}
+      POSTGRES_PASSWORD: {db_password}
+      POSTGRES_DB: {db_name}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U {db_user}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -388,14 +395,14 @@ services:
       dockerfile: Dockerfile
     environment:
       DB_HOST: database
-      DB_PORT: 5432
-      DB_NAME: app
-      DB_USER: postgres
-      DB_PASSWORD: postgres
+      DB_PORT: {db_port}
+      DB_NAME: {db_name}
+      DB_USER: {db_user}
+      DB_PASSWORD: {db_password}
       JWT_SECRET: change-in-production
-      PORT: 3000
+      PORT: {backend_internal_port}
     ports:
-      - "{self.context.api_port}:3000"
+      - "{self.context.api_port}:{backend_internal_port}"
     depends_on:
       database:
         condition: service_healthy

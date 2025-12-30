@@ -85,21 +85,16 @@ class DesignAgent(EnvGenAgent):
         if ui_result["success"]:
             files_created.append("design/spec.ui.json")
         
-        # Broadcast to other agents
-        await self.broadcast(
-            "Design phase complete. All specs are ready.",
-            msg_type="complete",
-            context={
-                "files": files_created,
-                "db_schema": self._db_schema,
-                "api_spec": self._api_spec,
-                "ui_spec": self._ui_spec,
-            }
-        )
-        
+        # LLM can use broadcast tool to notify other agents
         return {
             "success": True,
             "files_created": files_created,
+            "design_docs": {
+                "db_schema": self._db_schema,
+                "api_spec": self._api_spec,
+                "ui_spec": self._ui_spec,
+            },
+            "notify_suggestion": "Consider using broadcast to notify all agents: 'Design phase complete'",
         }
     
     async def _create_readme(self, requirements: Dict) -> str:
@@ -144,10 +139,7 @@ Output markdown directly.
             self._db_schema = json.loads(json_str)
             self.write_file("design/spec.database.json", json.dumps(self._db_schema, indent=2))
             
-            # Notify database agent
-            if "database" in self._other_agents:
-                await self.tell("database", "Database schema is ready", msg_type="update", context={"schema": self._db_schema})
-            
+            # LLM can use tell_agent to notify database agent if needed
             return {"success": True, "schema": self._db_schema}
             
         except json.JSONDecodeError as e:
@@ -176,10 +168,7 @@ Output markdown directly.
             self._api_spec = json.loads(json_str)
             self.write_file("design/spec.api.json", json.dumps(self._api_spec, indent=2))
             
-            # Notify backend and frontend agents
-            await self.tell("backend", "API specification is ready", msg_type="update", context={"api_spec": self._api_spec})
-            await self.tell("frontend", "API specification is ready", msg_type="update", context={"api_spec": self._api_spec})
-            
+            # LLM can use tell_agent or broadcast to notify agents if needed
             return {"success": True, "api_spec": self._api_spec}
             
         except json.JSONDecodeError as e:
@@ -208,10 +197,7 @@ Output markdown directly.
             self._ui_spec = json.loads(json_str)
             self.write_file("design/spec.ui.json", json.dumps(self._ui_spec, indent=2))
             
-            # Notify frontend agent
-            if "frontend" in self._other_agents:
-                await self.tell("frontend", "UI specification is ready", msg_type="update", context={"ui_spec": self._ui_spec})
-            
+            # LLM can use tell_agent to notify frontend if needed
             return {"success": True, "ui_spec": self._ui_spec}
             
         except json.JSONDecodeError as e:
