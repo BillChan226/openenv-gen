@@ -1,0 +1,1181 @@
+{
+  "design_tokens": {
+    "sources": {
+      "screenshots/jira_example.png": "Dark board layout tokens: surfaces, borders, primary blue, purple tag, green done",
+      "screenshots/jira_ticketing.png": "Atlassian-like app shell and table tokens",
+      "screenshots/click_todo_item.png": "Modal/drawer overlay tokens and details panel patterns"
+    },
+    "themes": {
+      "dark": {
+        "colors": {
+          "bg": "#0F1115",
+          "surface": "#1D1F23",
+          "surfaceRaised": "#22262D",
+          "surfaceSunken": "#15171A",
+          "border": "#3A3F47",
+          "divider": "#2B2F36",
+          "text": "#E6E8EE",
+          "textMuted": "#9AA4B2",
+          "textSubtle": "#C7CDD8",
+          "link": "#1D7AFC",
+          "primary": "#1D7AFC",
+          "primaryHover": "#0C66E4",
+          "primaryText": "#FFFFFF",
+          "focusRing": "#579DFF",
+          "danger": "#EF4444",
+          "warning": "#F5CD47",
+          "success": "#22C55E",
+          "purple": "#8B5CF6",
+          "tealAvatar": "#00A3BF",
+          "chipBg": "#22262D",
+          "inputBg": "#1F232A",
+          "shadow": "rgba(0,0,0,0.55)"
+        },
+        "typography": {
+          "fontFamily": "Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+          "fontSizes": {
+            "xs": 12,
+            "sm": 13,
+            "md": 14,
+            "lg": 16,
+            "xl": 20,
+            "2xl": 28,
+            "3xl": 32
+          },
+          "fontWeights": {
+            "regular": 400,
+            "medium": 500,
+            "semibold": 600,
+            "bold": 700
+          },
+          "lineHeights": {
+            "tight": 1.2,
+            "normal": 1.4,
+            "relaxed": 1.6
+          }
+        },
+        "spacing": {
+          "0": 0,
+          "1": 4,
+          "2": 8,
+          "3": 12,
+          "4": 16,
+          "5": 20,
+          "6": 24,
+          "8": 32,
+          "10": 40,
+          "12": 48
+        },
+        "radius": {
+          "sm": 6,
+          "md": 10,
+          "lg": 12,
+          "pill": 999
+        },
+        "shadows": {
+          "sm": "0 2px 8px rgba(0,0,0,0.35)",
+          "md": "0 8px 24px rgba(0,0,0,0.45)",
+          "xl": "0 12px 40px rgba(0,0,0,0.55)"
+        }
+      },
+      "light": {
+        "colors": {
+          "bg": "#F7F8F9",
+          "surface": "#FFFFFF",
+          "surfaceRaised": "#FFFFFF",
+          "surfaceSunken": "#F1F2F4",
+          "border": "#D0D5DD",
+          "divider": "#EAECF0",
+          "text": "#172B4D",
+          "textMuted": "#5E6C84",
+          "link": "#0C66E4",
+          "primary": "#0C66E4",
+          "primaryHover": "#0052CC",
+          "primaryText": "#FFFFFF",
+          "focusRing": "#579DFF",
+          "danger": "#D92D20",
+          "warning": "#B54708",
+          "success": "#067647",
+          "purple": "#6E5DC6",
+          "chipBg": "#F1F2F4",
+          "inputBg": "#FFFFFF",
+          "shadow": "rgba(16,24,40,0.18)"
+        },
+        "typography": {
+          "fontFamily": "Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+          "fontSizes": {
+            "xs": 12,
+            "sm": 13,
+            "md": 14,
+            "lg": 16,
+            "xl": 20,
+            "2xl": 28,
+            "3xl": 32
+          },
+          "fontWeights": {
+            "regular": 400,
+            "medium": 500,
+            "semibold": 600,
+            "bold": 700
+          },
+          "lineHeights": {
+            "tight": 1.2,
+            "normal": 1.4,
+            "relaxed": 1.6
+          }
+        },
+        "spacing": {
+          "0": 0,
+          "1": 4,
+          "2": 8,
+          "3": 12,
+          "4": 16,
+          "5": 20,
+          "6": 24,
+          "8": 32,
+          "10": 40,
+          "12": 48
+        },
+        "radius": {
+          "sm": 6,
+          "md": 10,
+          "lg": 12,
+          "pill": 999
+        },
+        "shadows": {
+          "sm": "0 2px 8px rgba(16,24,40,0.12)",
+          "md": "0 8px 24px rgba(16,24,40,0.16)",
+          "xl": "0 12px 40px rgba(16,24,40,0.18)"
+        }
+      }
+    },
+    "semantic_tokens": {
+      "status": {
+        "BACKLOG": {
+          "label": "Backlog",
+          "color": "#9AA4B2"
+        },
+        "TODO": {
+          "label": "To Do",
+          "color": "#579DFF"
+        },
+        "IN_PROGRESS": {
+          "label": "In Progress",
+          "color": "#00B8D9"
+        },
+        "IN_REVIEW": {
+          "label": "In Review",
+          "color": "#8B5CF6"
+        },
+        "DONE": {
+          "label": "Done",
+          "color": "#22C55E"
+        }
+      },
+      "priority": {
+        "LOW": {
+          "label": "Low",
+          "color": "#9AA4B2"
+        },
+        "MEDIUM": {
+          "label": "Medium",
+          "color": "#579DFF"
+        },
+        "HIGH": {
+          "label": "High",
+          "color": "#F5CD47"
+        },
+        "CRITICAL": {
+          "label": "Critical",
+          "color": "#EF4444"
+        }
+      },
+      "issueType": {
+        "BUG": {
+          "label": "Bug"
+        },
+        "TASK": {
+          "label": "Task"
+        },
+        "STORY": {
+          "label": "Story"
+        },
+        "EPIC": {
+          "label": "Epic"
+        }
+      }
+    }
+  },
+  "responsive_behavior": {
+    "breakpoints": {
+      "sm": 640,
+      "md": 768,
+      "lg": 1024,
+      "xl": 1280
+    },
+    "layout_adaptations": [
+      {
+        "range": "<md",
+        "behavior": [
+          "Sidebar collapses to icon rail (as seen in screenshots/click_todo_item.png)",
+          "Board columns become horizontally scrollable",
+          "Issue detail uses full-screen modal (single column; details panel collapsible)",
+          "Tables become horizontally scrollable with sticky first column"
+        ]
+      },
+      {
+        "range": ">=md",
+        "behavior": [
+          "Sidebar expanded (240-280px)",
+          "Issue detail opens as right-side drawer or centered large modal with 2 columns",
+          "Board shows 4-5 columns in a row with gutter spacing"
+        ]
+      }
+    ]
+  },
+  "layouts": {
+    "AppShell": {
+      "description": "Global app layout matching Jira references: top header with global search, left sidebar navigation, and main content area.",
+      "regions": {
+        "topHeader": "GlobalTopNav",
+        "leftSidebar": "SidebarNav",
+        "main": "Outlet/Router view"
+      },
+      "persistence": {
+        "globalSearchVisible": true,
+        "themeClassOnHtml": true,
+        "tokenInLocalStorage": true
+      },
+      "reference": [
+        "screenshots/jira_ticketing.png",
+        "screenshots/jira_example.png"
+      ]
+    },
+    "ProjectShell": {
+      "description": "Project-level header row with view tabs (Summary/List/Board) and project toolbar (search/filter/group) above the chosen view.",
+      "regions": {
+        "projectHeader": "ProjectHeader",
+        "projectToolbar": "ProjectToolbar",
+        "view": "BoardView|ListView|SummaryView"
+      },
+      "reference": [
+        "screenshots/jira_example.png"
+      ]
+    }
+  },
+  "components": {
+    "ui_primitives": {
+      "Button": {
+        "responsibility": "Clickable actions with variants (primary/secondary/ghost/icon).",
+        "props": {
+          "variant": "primary|secondary|ghost|danger|icon",
+          "size": "sm|md|lg",
+          "disabled": "boolean",
+          "loading": "boolean",
+          "leftIcon": "ReactNode|null",
+          "rightIcon": "ReactNode|null",
+          "onClick": "() => void",
+          "type": "button|submit"
+        },
+        "states": [
+          "default",
+          "hover",
+          "active",
+          "focus",
+          "disabled",
+          "loading"
+        ],
+        "testids": {
+          "pattern": "btn-{purpose}"
+        }
+      },
+      "IconButton": {
+        "responsibility": "Square icon-only buttons used in headers/toolbars (reference: screenshots/click_todo_item.png toolbar).",
+        "props": {
+          "icon": "ReactNode",
+          "ariaLabel": "string",
+          "onClick": "() => void",
+          "badge": "string|number|null",
+          "disabled": "boolean"
+        },
+        "states": [
+          "default",
+          "hover",
+          "focus",
+          "disabled"
+        ],
+        "testids": {
+          "pattern": "iconbtn-{name}"
+        }
+      },
+      "Input": {
+        "responsibility": "Single-line text input with optional icon and error state.",
+        "props": {
+          "value": "string",
+          "placeholder": "string",
+          "leftIcon": "ReactNode|null",
+          "onChange": "(value: string) => void",
+          "onKeyDown": "(event) => void",
+          "disabled": "boolean",
+          "error": "string|null"
+        },
+        "states": [
+          "default",
+          "focus",
+          "error",
+          "disabled"
+        ]
+      },
+      "Textarea": {
+        "responsibility": "Multi-line input for markdown description/comments.",
+        "props": {
+          "value": "string",
+          "placeholder": "string",
+          "rows": "number",
+          "onChange": "(value: string) => void",
+          "error": "string|null"
+        },
+        "states": [
+          "default",
+          "focus",
+          "error"
+        ]
+      },
+      "Select": {
+        "responsibility": "Dropdown selector (status, priority, type, assignee).",
+        "props": {
+          "value": "string|null",
+          "options": "Array<{value:string,label:string,icon?:ReactNode}>",
+          "onChange": "(value: string|null) => void",
+          "disabled": "boolean"
+        },
+        "states": [
+          "default",
+          "open",
+          "disabled"
+        ]
+      },
+      "MultiSelect": {
+        "responsibility": "Multi-select for labels/tags.",
+        "props": {
+          "values": "string[]",
+          "options": "Array<{value:string,label:string,color?:string}>",
+          "onChange": "(values: string[]) => void"
+        }
+      },
+      "Badge": {
+        "responsibility": "Small pill/rect badge for status/priority/counts.",
+        "props": {
+          "variant": "status|priority|count|neutral|success|warning|danger",
+          "label": "string",
+          "color": "string|null"
+        }
+      },
+      "Avatar": {
+        "responsibility": "User avatar (image or initials).",
+        "props": {
+          "name": "string",
+          "src": "string|null",
+          "size": "xs|sm|md",
+          "shape": "circle"
+        }
+      },
+      "Chip": {
+        "responsibility": "Filter chips and quick comment chips.",
+        "props": {
+          "label": "string",
+          "icon": "ReactNode|null",
+          "onRemove": "() => void | null",
+          "onClick": "() => void | null"
+        }
+      },
+      "Toast": {
+        "responsibility": "Non-blocking notifications for create/update/delete/move.",
+        "props": {
+          "type": "success|error|info",
+          "message": "string",
+          "actionLabel": "string|null",
+          "onAction": "() => void | null",
+          "durationMs": "number"
+        }
+      },
+      "Skeleton": {
+        "responsibility": "Loading placeholders for cards, table rows, columns, widgets.",
+        "props": {
+          "variant": "text|rect|circle|tableRow|card|column",
+          "width": "number|string",
+          "height": "number|string"
+        }
+      },
+      "EmptyState": {
+        "responsibility": "Standard empty state with title, description, and optional CTA.",
+        "props": {
+          "title": "string",
+          "description": "string",
+          "ctaLabel": "string|null",
+          "onCta": "() => void | null"
+        }
+      },
+      "ErrorState": {
+        "responsibility": "Standard error panel with retry.",
+        "props": {
+          "title": "string",
+          "description": "string",
+          "onRetry": "() => void",
+          "details": "string|null"
+        }
+      },
+      "Modal": {
+        "responsibility": "Centered overlay container with backdrop.",
+        "props": {
+          "open": "boolean",
+          "title": "string|null",
+          "onClose": "() => void",
+          "size": "sm|md|lg|xl",
+          "children": "ReactNode"
+        },
+        "states": [
+          "open",
+          "closed"
+        ],
+        "reference": [
+          "screenshots/click_todo_item.png"
+        ]
+      },
+      "Drawer": {
+        "responsibility": "Side panel overlay (right) for issue detail on desktop.",
+        "props": {
+          "open": "boolean",
+          "onClose": "() => void",
+          "width": "number|string",
+          "children": "ReactNode"
+        }
+      },
+      "Tabs": {
+        "responsibility": "View mode switcher tabs with URL integration.",
+        "props": {
+          "items": "Array<{id:string,label:string,icon?:ReactNode,to:string}>",
+          "activeId": "string",
+          "onChange": "(id: string) => void"
+        },
+        "reference": [
+          "screenshots/jira_example.png"
+        ]
+      },
+      "Table": {
+        "responsibility": "Table container with header, rows, sorting indicators.",
+        "props": {
+          "columns": "Array<{id:string,label:string,sortable:boolean,width?:string}>",
+          "sort": "{field:string,order:'asc'|'desc'}",
+          "onSort": "(field: string) => void",
+          "children": "ReactNode"
+        },
+        "reference": [
+          "screenshots/jira_ticketing.png"
+        ]
+      },
+      "Pagination": {
+        "responsibility": "Pagination controls for tables and lists.",
+        "props": {
+          "limit": "number",
+          "offset": "number",
+          "total": "number",
+          "onChange": "(nextOffset:number) => void"
+        }
+      }
+    },
+    "feature_components": {
+      "GlobalTopNav": {
+        "responsibility": "Top header with app name/logo, global search, create button, theme toggle entry, user menu.",
+        "props": {
+          "user": "User|null",
+          "onOpenCreateIssue": "() => void",
+          "onLogout": "() => void"
+        },
+        "events": [
+          "search.open",
+          "issue.create.open",
+          "user.menu.open"
+        ],
+        "reference": [
+          "screenshots/jira_ticketing.png",
+          "screenshots/click_todo_item.png"
+        ],
+        "testids": {
+          "searchInput": "global-search-input",
+          "createButton": "global-create-issue",
+          "userMenuButton": "global-user-menu"
+        }
+      },
+      "SidebarNav": {
+        "responsibility": "Left navigation with grouped sections and active route highlight.",
+        "props": {
+          "collapsed": "boolean",
+          "items": "Array<{id:string,label:string,icon:ReactNode,to:string,section?:string}>",
+          "activeTo": "string"
+        },
+        "reference": [
+          "screenshots/jira_ticketing.png",
+          "screenshots/jira_example.png"
+        ]
+      },
+      "ProjectCard": {
+        "responsibility": "Dashboard card showing project name/key/description/issue count.",
+        "props": {
+          "project": "Project",
+          "onClick": "() => void"
+        },
+        "states": [
+          "default",
+          "hover"
+        ]
+      },
+      "CreateProjectModal": {
+        "responsibility": "Form modal to create a project.",
+        "props": {
+          "open": "boolean",
+          "onClose": "() => void",
+          "onCreated": "(project: Project) => void"
+        },
+        "states": [
+          "idle",
+          "submitting",
+          "error"
+        ],
+        "testids": {
+          "submit": "create-project-submit"
+        }
+      },
+      "ProjectHeader": {
+        "responsibility": "Project title + view tabs (Summary/List/Board) with URL integration and persistence.",
+        "props": {
+          "project": "Project",
+          "activeView": "summary|list|board",
+          "onChangeView": "(view) => void"
+        },
+        "reference": [
+          "screenshots/jira_example.png"
+        ],
+        "testids": {
+          "tabBoard": "project-tab-board",
+          "tabList": "project-tab-list",
+          "tabSummary": "project-tab-summary"
+        }
+      },
+      "ProjectToolbar": {
+        "responsibility": "Per-view toolbar row: search-in-project, filter button, group dropdown.",
+        "props": {
+          "query": "string",
+          "onQueryChange": "(q:string) => void",
+          "filters": "{status?:string,assigneeUserId?:string,priority?:string,label?:string}",
+          "onOpenFilters": "() => void",
+          "groupBy": "none|assignee|priority",
+          "onGroupByChange": "(groupBy) => void"
+        },
+        "reference": [
+          "screenshots/jira_example.png"
+        ],
+        "testids": {
+          "search": "project-search-input",
+          "filter": "project-filter-button",
+          "group": "project-group-select"
+        }
+      },
+      "BoardView": {
+        "responsibility": "Kanban board with columns and draggable issue cards.",
+        "props": {
+          "issues": "Issue[]",
+          "columns": "Array<{status:IssueStatus,label:string}>",
+          "onOpenIssue": "(issueId: string) => void",
+          "onMoveIssue": "(issueId: string, toStatus: IssueStatus, position?: number) => Promise<void>",
+          "onCreateIssue": "(status?: IssueStatus) => void"
+        },
+        "states": [
+          "loading",
+          "ready",
+          "empty",
+          "error",
+          "dragging"
+        ],
+        "drag_and_drop_contract": {
+          "library": "@dnd-kit/core (recommended) or react-beautiful-dnd",
+          "events": {
+            "onDragStart": "captures activeIssueId",
+            "onDragOver": "sets overColumnId and placeholder index",
+            "onDragEnd": "if destination differs -> call onMoveIssue and optimistically update"
+          },
+          "visual_feedback": [
+            "Dragged card opacity 0.6 + elevated shadow",
+            "Target column border highlight using primary tint",
+            "Placeholder gap at insertion point"
+          ]
+        },
+        "reference": [
+          "screenshots/jira_example.png"
+        ],
+        "testids": {
+          "column": "board-column-{status}",
+          "card": "issue-card-{issueId}",
+          "createInColumn": "board-create-{status}"
+        }
+      },
+      "BoardColumn": {
+        "responsibility": "Single column panel with header count badge and droppable area.",
+        "props": {
+          "status": "IssueStatus",
+          "label": "string",
+          "count": "number",
+          "children": "ReactNode",
+          "onCreate": "() => void"
+        },
+        "states": [
+          "default",
+          "dragOver",
+          "empty"
+        ]
+      },
+      "IssueCard": {
+        "responsibility": "Compact card displaying key, title, priority badge, assignee avatar, optional label tag.",
+        "props": {
+          "issue": "Issue",
+          "assignee": "User|null",
+          "onClick": "() => void",
+          "draggable": "boolean"
+        },
+        "reference": [
+          "screenshots/jira_example.png",
+          "screenshots/jira_ticketing.png"
+        ]
+      },
+      "ListView": {
+        "responsibility": "Issues table with sorting, inline status dropdown, and row click.",
+        "props": {
+          "issues": "Issue[]",
+          "usersById": "Record<string,User>",
+          "sort": "{field:string,order:'asc'|'desc'}",
+          "onSort": "(field:string) => void",
+          "onUpdateIssueStatus": "(issueId:string,status:IssueStatus)=>Promise<void>",
+          "onOpenIssue": "(issueId:string)=>void"
+        },
+        "states": [
+          "loading",
+          "ready",
+          "empty",
+          "error"
+        ],
+        "reference": [
+          "screenshots/jira_ticketing.png"
+        ],
+        "testids": {
+          "table": "issues-table",
+          "sortHeader": "issues-sort-{field}"
+        }
+      },
+      "IssueRow": {
+        "responsibility": "Table row rendering issue fields and inline status control.",
+        "props": {
+          "issue": "Issue",
+          "assignee": "User|null",
+          "onOpen": "() => void",
+          "onStatusChange": "(status:IssueStatus)=>Promise<void>"
+        },
+        "testids": {
+          "row": "issue-row-{issueId}",
+          "status": "issue-status-{issueId}"
+        }
+      },
+      "SummaryView": {
+        "responsibility": "Project statistics dashboard.",
+        "props": {
+          "project": "Project",
+          "countsByStatus": "Record<IssueStatus, number>",
+          "assigneeWorkload": "Array<{user:User,openCount:number}>",
+          "recentActivity": "ActivityEvent[]",
+          "onNavigateToFilteredList": "(filters) => void"
+        },
+        "states": [
+          "loading",
+          "ready",
+          "empty",
+          "error"
+        ],
+        "widgets": [
+          "StatusChart",
+          "ActivityTimeline",
+          "AssigneeWorkloadChart",
+          "QuickLinks"
+        ]
+      },
+      "StatusChart": {
+        "responsibility": "Bar or pie chart of issue counts by status.",
+        "props": {
+          "countsByStatus": "Record<IssueStatus, number>",
+          "onSelectStatus": "(status:IssueStatus)=>void"
+        }
+      },
+      "ActivityTimeline": {
+        "responsibility": "Timeline list of activity events.",
+        "props": {
+          "events": "ActivityEvent[]",
+          "onOpenIssue": "(issueId:string)=>void"
+        }
+      },
+      "AssigneeWorkloadChart": {
+        "responsibility": "Distribution of open issues per assignee.",
+        "props": {
+          "items": "Array<{user:User,openCount:number}>",
+          "onSelectUser": "(userId:string)=>void"
+        }
+      },
+      "CreateIssueModal": {
+        "responsibility": "Modal form for creating issues; appears from header or board '+ Create'.",
+        "props": {
+          "open": "boolean",
+          "project": "Project",
+          "users": "User[]",
+          "labels": "Label[]",
+          "defaultStatus": "IssueStatus|null",
+          "onClose": "() => void",
+          "onCreated": "(issue: Issue) => void"
+        },
+        "states": [
+          "idle",
+          "submitting",
+          "validationError",
+          "serverError"
+        ],
+        "testids": {
+          "submit": "create-issue-submit",
+          "title": "create-issue-title",
+          "type": "create-issue-type",
+          "priority": "create-issue-priority",
+          "assignee": "create-issue-assignee",
+          "labels": "create-issue-labels"
+        }
+      },
+      "IssueDetailOverlay": {
+        "responsibility": "Issue detail drawer/modal with two-column layout, inline editing, comments, activity, attachments placeholder.",
+        "props": {
+          "open": "boolean",
+          "issueId": "string",
+          "onClose": "() => void",
+          "onIssueUpdated": "(issue: Issue) => void"
+        },
+        "states": [
+          "loading",
+          "ready",
+          "error",
+          "saving"
+        ],
+        "reference": [
+          "screenshots/click_todo_item.png"
+        ],
+        "testids": {
+          "close": "issue-detail-close",
+          "title": "issue-detail-title",
+          "status": "issue-detail-status",
+          "priority": "issue-detail-priority",
+          "assignee": "issue-detail-assignee",
+          "description": "issue-detail-description"
+        }
+      },
+      "IssueDetailHeader": {
+        "responsibility": "Top area in issue detail showing issue key breadcrumbs and title + toolbar icon buttons.",
+        "props": {
+          "issue": "Issue",
+          "onClose": "() => void",
+          "onCopyLink": "() => void",
+          "onExpand": "() => void"
+        },
+        "reference": [
+          "screenshots/click_todo_item.png"
+        ]
+      },
+      "IssueDescriptionEditor": {
+        "responsibility": "Markdown editor/viewer for issue description with inline edit.",
+        "props": {
+          "value": "string|null",
+          "mode": "view|edit",
+          "onChange": "(value:string) => void",
+          "onSave": "() => Promise<void>",
+          "onCancel": "() => void"
+        }
+      },
+      "IssueDetailsPanel": {
+        "responsibility": "Right column details card (assignee, priority, parent placeholder, due date placeholder, labels, reporter).",
+        "props": {
+          "issue": "Issue",
+          "assignee": "User|null",
+          "reporter": "User",
+          "labels": "Label[]",
+          "users": "User[]",
+          "onPatch": "(patch: Partial<Issue>) => Promise<void>"
+        },
+        "reference": [
+          "screenshots/click_todo_item.png"
+        ]
+      },
+      "CommentsSection": {
+        "responsibility": "Comments list and composer with markdown support.",
+        "props": {
+          "issueId": "string",
+          "currentUser": "User",
+          "onCommentAdded": "(comment: Comment) => void"
+        },
+        "states": [
+          "loading",
+          "ready",
+          "empty",
+          "error"
+        ],
+        "testids": {
+          "composer": "comment-composer",
+          "submit": "comment-submit"
+        }
+      },
+      "CommentItem": {
+        "responsibility": "Single comment with author avatar, timestamp, markdown body, and edit/delete actions for owner.",
+        "props": {
+          "comment": "Comment",
+          "author": "User",
+          "canEdit": "boolean",
+          "canDelete": "boolean",
+          "onEdit": "(body:string)=>Promise<void>",
+          "onDelete": "()=>Promise<void>"
+        },
+        "states": [
+          "default",
+          "editing",
+          "saving",
+          "error"
+        ]
+      },
+      "AttachmentsSection": {
+        "responsibility": "Placeholder attachments list.",
+        "props": {
+          "issueId": "string"
+        },
+        "states": [
+          "empty",
+          "ready"
+        ]
+      },
+      "GlobalSearch": {
+        "responsibility": "Typeahead search dropdown/panel attached to GlobalTopNav input.",
+        "props": {
+          "query": "string",
+          "filters": "{projectId?:string,status?:IssueStatus,assigneeUserId?:string}",
+          "onQueryChange": "(q:string)=>void",
+          "onFiltersChange": "(filters)=>void",
+          "results": "SearchResultItem[]",
+          "loading": "boolean",
+          "error": "string|null",
+          "onSelectResult": "(item: SearchResultItem)=>void"
+        },
+        "states": [
+          "closed",
+          "open",
+          "loading",
+          "empty",
+          "error"
+        ],
+        "testids": {
+          "panel": "global-search-panel",
+          "result": "global-search-result-{index}"
+        }
+      },
+      "SettingsForm": {
+        "responsibility": "Settings page form: profile display/edit, theme toggle, notification preferences.",
+        "props": {
+          "user": "User",
+          "settings": "UserSettings",
+          "onSave": "(patch: Partial<UserSettings>) => Promise<void>"
+        },
+        "testids": {
+          "themeToggle": "settings-theme-toggle",
+          "save": "settings-save"
+        }
+      }
+    },
+    "pages": {
+      "LoginPage": {
+        "route": "/login",
+        "responsibility": "Login form with demo credentials prefilled.",
+        "states": [
+          "idle",
+          "submitting",
+          "error"
+        ],
+        "testids": {
+          "email": "login-email",
+          "password": "login-password",
+          "submit": "login-submit"
+        }
+      },
+      "DashboardPage": {
+        "route": "/dashboard",
+        "responsibility": "Projects grid and create project CTA.",
+        "states": [
+          "loading",
+          "ready",
+          "empty",
+          "error"
+        ]
+      },
+      "ProjectBoardPage": {
+        "route": "/projects/:projectKey/board",
+        "responsibility": "Project board view with toolbar.",
+        "states": [
+          "loading",
+          "ready",
+          "empty",
+          "error"
+        ]
+      },
+      "ProjectListPage": {
+        "route": "/projects/:projectKey/list",
+        "responsibility": "Project list/table view.",
+        "states": [
+          "loading",
+          "ready",
+          "empty",
+          "error"
+        ]
+      },
+      "ProjectSummaryPage": {
+        "route": "/projects/:projectKey/summary",
+        "responsibility": "Project summary dashboard.",
+        "states": [
+          "loading",
+          "ready",
+          "empty",
+          "error"
+        ]
+      },
+      "SettingsPage": {
+        "route": "/settings",
+        "responsibility": "User settings including theme toggle.",
+        "states": [
+          "loading",
+          "ready",
+          "error",
+          "saving"
+        ]
+      },
+      "NotFoundPage": {
+        "route": "*",
+        "responsibility": "404 page with link back to dashboard."
+      }
+    },
+    "hooks": {
+      "useAuth": {
+        "responsibility": "Auth state (user/token), login/logout, session restore.",
+        "api": {
+          "login": "(email,password)=>Promise<void>",
+          "logout": "()=>Promise<void>",
+          "restore": "()=>Promise<void>",
+          "isAuthenticated": "boolean",
+          "user": "User|null"
+        }
+      },
+      "useTheme": {
+        "responsibility": "Theme state with persistence to localStorage and server settings.",
+        "api": {
+          "theme": "light|dark",
+          "setTheme": "(theme)=>Promise<void>",
+          "toggleTheme": "()=>Promise<void>"
+        },
+        "persistence": {
+          "localStorageKey": "jira.theme",
+          "server": "PATCH /settings/me"
+        }
+      },
+      "useProjects": {
+        "responsibility": "Fetch/list/create projects.",
+        "api": {
+          "projects": "Project[]",
+          "fetch": "()=>Promise<void>",
+          "create": "(payload)=>Promise<Project>"
+        }
+      },
+      "useProjectIssues": {
+        "responsibility": "Fetch issues for a project with filters/sort/pagination.",
+        "api": {
+          "issues": "Issue[]",
+          "filters": "object",
+          "setFilters": "(filters)=>void",
+          "sort": "{field,order}",
+          "setSort": "(field)=>void",
+          "moveIssue": "(issueId,toStatus,position)=>Promise<void>",
+          "updateIssue": "(issueId,patch)=>Promise<Issue>"
+        }
+      },
+      "useIssueDetail": {
+        "responsibility": "Load issue detail with relations, patch fields, and manage comments/activity/attachments.",
+        "api": {
+          "issue": "IssueWithRelations|null",
+          "loading": "boolean",
+          "error": "string|null",
+          "patch": "(patch)=>Promise<void>",
+          "refresh": "()=>Promise<void>"
+        }
+      },
+      "useGlobalSearch": {
+        "responsibility": "Debounced global search with filters.",
+        "api": {
+          "query": "string",
+          "setQuery": "(q)=>void",
+          "filters": "object",
+          "setFilters": "(filters)=>void",
+          "results": "SearchResultItem[]",
+          "loading": "boolean",
+          "error": "string|null"
+        }
+      },
+      "useToasts": {
+        "responsibility": "Centralized toast queue.",
+        "api": {
+          "success": "(message)=>void",
+          "error": "(message,action?)=>void",
+          "info": "(message)=>void"
+        }
+      }
+    },
+    "stores": {
+      "authStore": {
+        "state": [
+          "token",
+          "user",
+          "status: idle|loading|ready|error"
+        ],
+        "actions": [
+          "login",
+          "logout",
+          "restore"
+        ],
+        "persistence": "token in localStorage"
+      },
+      "themeStore": {
+        "state": [
+          "theme"
+        ],
+        "actions": [
+          "setTheme",
+          "toggleTheme"
+        ],
+        "persistence": "localStorage + server settings"
+      },
+      "projectsStore": {
+        "state": [
+          "projects",
+          "status",
+          "error"
+        ],
+        "actions": [
+          "fetch",
+          "create"
+        ]
+      },
+      "issuesStore": {
+        "state": [
+          "issuesByProjectId",
+          "filtersByProjectId",
+          "sortByProjectId",
+          "paginationByProjectId"
+        ],
+        "actions": [
+          "fetch",
+          "create",
+          "patch",
+          "move"
+        ],
+        "notes": "View mode persistence per project uses localStorage key jira.projectViewMode.{projectKey}."
+      },
+      "uiStore": {
+        "state": [
+          "createIssueModalOpen",
+          "issueDetailOpenIssueId",
+          "globalSearchOpen"
+        ],
+        "actions": [
+          "openCreateIssue",
+          "closeCreateIssue",
+          "openIssueDetail",
+          "closeIssueDetail",
+          "openSearch",
+          "closeSearch"
+        ]
+      }
+    }
+  },
+  "ux_states": {
+    "loading": {
+      "global": "App boot: show full-page skeleton until /auth/me finishes",
+      "dashboard": "Skeleton cards",
+      "project_board": "Skeleton columns/cards",
+      "project_list": "Skeleton table rows",
+      "project_summary": "Skeleton widgets",
+      "issue_detail": "Skeleton title + panels"
+    },
+    "error": {
+      "pattern": "ErrorState component with retry that replays last request",
+      "network": "Show toast + inline error",
+      "unauthorized": "Redirect to /login and clear token"
+    },
+    "empty": {
+      "projects": "No projects -> EmptyState with CTA",
+      "issues": "No issues -> EmptyState with 'Create issue'",
+      "search": "No results -> EmptyState with suggestions"
+    },
+    "success_toasts": {
+      "project_created": "Project created",
+      "issue_created": "Issue created",
+      "issue_updated": "Issue updated",
+      "issue_moved": "Moved to {status}",
+      "comment_added": "Comment added",
+      "comment_updated": "Comment updated",
+      "comment_deleted": "Comment deleted",
+      "theme_updated": "Theme updated"
+    },
+    "navigation_persistence": {
+      "project_view_mode": {
+        "storage": "localStorage",
+        "keyPattern": "jira.projectViewMode.{projectKey}",
+        "routes": [
+          "/projects/:projectKey/board",
+          "/projects/:projectKey/list",
+          "/projects/:projectKey/summary"
+        ],
+        "rules": [
+          "Tab click updates route",
+          "Returning to project uses last view mode if route doesn't specify",
+          "Deep links always honored"
+        ]
+      },
+      "issue_detail_deeplink": {
+        "pattern": "?issueId={uuid}",
+        "behavior": "Opening issue sets query param; closing removes it; refresh keeps drawer open."
+      }
+    }
+  },
+  "acceptance_test_checklist": {
+    "items": [
+      "[1] Login works with demo credentials and redirects to dashboard",
+      "[2] Dashboard shows project cards with issue counts",
+      "[3] Clicking project navigates to /projects/{key}/board",
+      "[4] Board shows 5 columns and draggable issue cards",
+      "[5] Dragging card between columns updates status and persists via API",
+      "[6] List view shows sortable table and inline status dropdown",
+      "[7] Summary view shows counts by status, activity timeline, assignee workload",
+      "[8] View toggle updates URL and persists per project",
+      "[9] Clicking issue opens detail drawer/modal",
+      "[10] Create issue modal validates and submits",
+      "[11] Newly created issue appears in current view",
+      "[12] Inline editing in issue detail persists",
+      "[13] Comments can be added/edited/deleted",
+      "[14] Global search returns relevant issues and opens detail",
+      "[15] Theme toggle switches dark/light",
+      "[16] Theme persists after refresh"
+    ]
+  }
+}

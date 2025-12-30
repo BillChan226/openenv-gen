@@ -11,28 +11,36 @@ from utils.message import TaskType
 PROJECT_STRUCTURE = {
     "design": {
         "path": "design/",
-        "description": "Design documents and specifications (JSON format)",
+        "description": "Design documents and specifications (JSON format) - enables parallel development",
         "files": [
-            "spec.api.json",      # API contracts (endpoints, schemas, auth)
+            "spec.api.json",      # API contracts (endpoints, schemas, auth, response_keys)
+            "spec.database.json", # Database schema (tables, relationships, seeds)
             "spec.project.json",  # Project spec (entities, workflows, permissions)
-            "spec.ui.json",       # UI spec (components, tokens, responsive)
+            "spec.ui.json",       # UI spec (components, tokens, responsive, api_integration)
         ],
         "required_schemas": {
             "spec.api.json": [
-                "conventions (base_url, auth, error_format, pagination)",
+                "conventions (base_url, auth, error_format, pagination, response_wrapper)",
                 "schemas (all entity types with properties)",
-                "endpoints (path, method, auth_required, request, response)",
+                "endpoints (path, method, auth_required, request, response, response_key)",
+            ],
+            "spec.database.json": [
+                "tables (columns, types, constraints, indexes)",
+                "relationships (foreign keys)",
+                "seed_data (test users, sample data)",
             ],
             "spec.project.json": [
                 "user_roles_and_personas",
                 "permissions_matrix",
                 "entities and relationships",
                 "workflows and state machines",
+                "validation_rules",
             ],
             "spec.ui.json": [
                 "design_tokens (colors, typography, spacing, radius)",
                 "responsive_behavior (breakpoints, layouts)",
-                "components (props, callbacks, states)",
+                "components (props, callbacks, states, api_integration)",
+                "pages (routes, data_fetching)",
             ],
         },
     },
@@ -96,15 +104,7 @@ PROJECT_STRUCTURE = {
             "Dockerfile",
         ],
     },
-
-    "data_engine": {
-        "path": "app/database/data/",
-        "description": "HuggingFace dataset loaded via data_engine",
-        "files": [
-            "products.db",          # SQLite database with realistic data
-        ],
-    },
-
+    
     "env": {
         "path": "env/",
         "description": "OpenEnv adapter",
@@ -138,6 +138,7 @@ PROJECT_STRUCTURE = {
 
 
 # Phase definitions - what to generate in each phase
+# NOTE: With parallel execution enabled, database/backend/frontend run concurrently after design
 PHASES = [
     {
         "id": "design",
@@ -145,68 +146,57 @@ PHASES = [
         "name": "Design",
         "description": """Generate detailed design specifications in JSON format.
 
-THREE SPEC FILES REQUIRED (all JSON, not markdown):
+FOUR SPEC FILES REQUIRED (all JSON, not markdown) - These enable PARALLEL development:
 
-1. **spec.api.json** - Complete API contract
-   - conventions: base_url, auth method (JWT Bearer), error format, pagination
-   - schemas: All entity types (User, Project, Issue, etc.) with full JSON Schema
+1. **spec.api.json** - Complete API contract (CRITICAL for frontend-backend consistency)
+   - conventions: base_url, auth method (JWT Bearer), error format, pagination, response_wrapper
+   - schemas: All entity types with full JSON Schema
    - endpoints: Every REST endpoint with path, method, auth_required, request/response schemas
+   - response_key: How each endpoint wraps its response (e.g., "items", "user", "issue")
    - MUST include auth endpoints: POST /auth/login, POST /auth/register, GET /auth/me
 
-2. **spec.project.json** - Business logic and workflows
+2. **spec.database.json** - Database schema contract
+   - tables: All tables with columns, types, constraints, indexes
+   - relationships: Foreign key relationships
+   - seed_data: Test users and sample data
+
+3. **spec.project.json** - Business logic and workflows
    - user_roles_and_personas: All user types with their capabilities
    - permissions_matrix: What each role can do
    - entities: All domain objects with relationships
    - workflows: State machines for entities (e.g., issue status transitions)
+   - validation_rules: Input validation for each entity
 
-3. **spec.ui.json** - UI component inventory
+4. **spec.ui.json** - UI component inventory with API integration details
    - design_tokens: colors (dark theme preferred), typography, spacing, radius
    - responsive_behavior: breakpoints and layout adaptations
-   - components: Every UI component with props, callbacks, states
+   - components: Every UI component with props, callbacks, states, api_integration
+   - pages: Routes with data_fetching details (which API, how to parse response)
 
-IMPORTANT: These specs will be used by backend/frontend phases. Be comprehensive!""",
+CRITICAL: These specs are the CONTRACT between parallel teams. Be comprehensive and consistent!
+- If spec.api.json says response is { items: [...] }, frontend MUST expect data.items
+- Inconsistency here causes bugs that are hard to debug later""",
         "target_directory": "design/",
         "depends_on": [],
+        "parallel_group": "phase_1_design",
     },
     {
         "id": "database",
         "type": TaskType.DATABASE,
         "name": "Database",
-        "description": "Generate database schema and seed data",
+        "description": "Generate database schema and seed data based on spec.database.json",
         "target_directory": "app/database/",
         "depends_on": ["design"],
-    },
-    {
-        "id": "data_engine",
-        "type": TaskType.DATA_ENGINE,
-        "name": "Data Engine",
-        "description": """Discover and load realistic data from HuggingFace into the database.
-
-This phase uses the data_engine to:
-1. Infer the domain from the project description (e-commerce, social-media, news, etc.)
-2. Search HuggingFace Hub for relevant datasets
-3. Evaluate and rank candidate datasets by relevance, popularity, and field coverage
-4. Download and transform the best matching dataset
-5. Load data into SQLite database with proper schema mapping
-
-Use the data_engine_pipeline tool to run the complete pipeline:
-- instruction: The project description (e.g., "e-commerce website like eBay")
-- output_path: Path to the SQLite database file (e.g., "app/database/data/products.db")
-- db_type: "sqlite" (default) or "postgres"
-- max_per_category: Maximum records per category (default: 1000)
-
-This phase runs automatically after database schema generation and provides realistic
-product/content data instead of synthetic seed data.""",
-        "target_directory": "app/database/data/",
-        "depends_on": ["database"],
+        "parallel_group": "phase_2_parallel",  # Can run in parallel with backend/frontend
     },
     {
         "id": "backend",
         "type": TaskType.BACKEND,
         "name": "Backend",
-        "description": "Generate Express.js backend API",
+        "description": "Generate Express.js backend API based on spec.api.json",
         "target_directory": "app/backend/",
-        "depends_on": ["design", "database", "data_engine"],
+        "depends_on": ["design"],  # Only depends on design, not database
+        "parallel_group": "phase_2_parallel",  # Can run in parallel with database/frontend
     },
     {
         "id": "frontend",
@@ -227,9 +217,13 @@ REQUIREMENTS:
 - Loading states must show while fetching data
 - Error states must show when API fails
 - No dead UI: every visible button/link must work, be disabled with explanation, or be hidden
-- Design must be polished and user-friendly""",
+- Design must be polished and user-friendly
+
+IMPORTANT: Use spec.api.json to know exact response formats from backend.
+If spec says GET /api/issues returns { items: [...] }, use data.items in frontend.""",
         "target_directory": "app/frontend/",
-        "depends_on": ["design", "backend"],
+        "depends_on": ["design"],  # Only depends on design for parallel execution
+        "parallel_group": "phase_2_parallel",  # Can run in parallel with database/backend
     },
     {
         "id": "integration",
@@ -250,6 +244,7 @@ This phase tests:
 Use browser tools to navigate, click, fill forms, and verify results.""",
         "target_directory": "",
         "depends_on": ["backend", "frontend"],
+        "parallel_group": "phase_4_integration",
     },
     {
         "id": "env",
@@ -258,6 +253,7 @@ Use browser tools to navigate, click, fill forms, and verify results.""",
         "description": "Generate OpenEnv adapter for agent interaction",
         "target_directory": "env/",
         "depends_on": ["integration"],
+        "parallel_group": "phase_5_env",
     },
     {
         "id": "docker",
@@ -276,6 +272,7 @@ Docker requirements (avoid common integration pitfalls):
 """,
         "target_directory": "docker/",
         "depends_on": ["backend", "frontend", "database"],
+        "parallel_group": "phase_3_docker",
     },
 ]
 

@@ -1,0 +1,8 @@
+{
+  "name": "jira-root",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "verify": "node scripts/verify.mjs"
+  }
+}

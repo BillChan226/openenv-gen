@@ -1,19 +1,24 @@
 """
-Agents - Dual agent system for environment generation
+Agents - Multi-Agent system for environment generation
 
-Uses utils.base_agent.BaseAgent as foundation.
-
-UserAgent: Simulated user/PM/QA - plans, delegates, verifies
-CodeAgent: Developer - generates code, fixes issues
-Coordinator: Orchestrates the interaction
+Re-exports from multi_agent package.
+Old coordinator/user_agent/code_agent have been removed.
 """
 
-from .user_agent import UserAgent
-from .code_agent import CodeAgent
-from .coordinator import Coordinator
+from ..multi_agent import (
+    Orchestrator,
+    UserAgent,
+    DesignAgent,
+    DatabaseAgent,
+    BackendAgent,
+    FrontendAgent,
+)
 
 __all__ = [
+    "Orchestrator",
     "UserAgent",
-    "CodeAgent",
-    "Coordinator",
+    "DesignAgent",
+    "DatabaseAgent",
+    "BackendAgent",
+    "FrontendAgent",
 ]

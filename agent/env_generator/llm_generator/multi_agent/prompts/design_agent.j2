@@ -1,0 +1,341 @@
+{# Design Agent Prompts #}
+
+{% macro system() %}
+You are a senior software architect designing a web application.
+
+Your role:
+1. Create comprehensive design documents
+2. Define clear interfaces between components
+3. Ensure consistency across database, API, and frontend
+4. Answer design questions from other agents
+
+CRITICAL: Your designs are the SOURCE OF TRUTH for all other agents.
+Any inconsistency in your specs will cause bugs in the final product.
+{% endmacro %}
+
+
+{% macro design_database(requirements, features) %}
+Design a PostgreSQL database schema for this project.
+
+<REQUIREMENTS>
+{{ requirements | tojson(indent=2) }}
+</REQUIREMENTS>
+
+<FEATURES>
+{{ features | tojson(indent=2) }}
+</FEATURES>
+
+## Output Format: design/spec.database.json
+
+```json
+{
+    "tables": [
+        {
+            "name": "table_name",
+            "description": "What this table stores",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "UUID",
+                    "constraints": ["PRIMARY KEY", "DEFAULT gen_random_uuid()"],
+                    "description": "Unique identifier"
+                },
+                {
+                    "name": "created_at",
+                    "type": "TIMESTAMP WITH TIME ZONE",
+                    "constraints": ["NOT NULL", "DEFAULT NOW()"]
+                }
+            ],
+            "indexes": ["column_name"],
+            "unique_constraints": [["col1", "col2"]]
+        }
+    ],
+    "relationships": [
+        {
+            "from_table": "table1",
+            "from_column": "column",
+            "to_table": "table2",
+            "to_column": "id",
+            "type": "many-to-one",
+            "on_delete": "CASCADE|SET NULL|RESTRICT"
+        }
+    ],
+    "seed_data": {
+        "table_name": [
+            {"column1": "value1", "column2": "value2"}
+        ]
+    }
+}
+```
+
+## Guidelines
+
+1. **Use UUIDs** for primary keys with `gen_random_uuid()`
+2. **Add timestamps** - created_at, updated_at for all tables
+3. **Include indexes** for frequently queried columns
+4. **Define relationships** with proper foreign keys
+5. **Provide seed data** - at least 5-10 records per table for testing
+6. **Test users** - Include admin@example.com with bcrypt hash of 'admin123'
+
+Output ONLY the JSON, no markdown code blocks.
+{% endmacro %}
+
+
+{% macro design_api(requirements, db_schema) %}
+Design a REST API specification for this project.
+
+<REQUIREMENTS>
+{{ requirements | tojson(indent=2) }}
+</REQUIREMENTS>
+
+<DATABASE_SCHEMA>
+{{ db_schema | tojson(indent=2) }}
+</DATABASE_SCHEMA>
+
+## Output Format: design/spec.api.json
+
+```json
+{
+    "conventions": {
+        "base_url": "/api",
+        "auth_method": "JWT Bearer",
+        "list_response_wrapper": "items",
+        "single_response_wrapper": "item",
+        "error_format": {
+            "error": {
+                "code": "ERROR_CODE",
+                "message": "Human readable message"
+            }
+        },
+        "pagination": {
+            "query_params": ["page", "pageSize"],
+            "response_fields": ["total", "page", "pageSize"]
+        }
+    },
+    "auth": {
+        "endpoints": [
+            {
+                "path": "/auth/register",
+                "method": "POST",
+                "auth_required": false,
+                "request": {
+                    "body": {"email": "string", "password": "string", "name": "string"}
+                },
+                "response": {
+                    "200": {"user": "User", "token": "string"},
+                    "400": "Validation error"
+                },
+                "response_key": "user"
+            }
+        ]
+    },
+    "endpoints": [
+        {
+            "path": "/resource",
+            "method": "GET|POST|PUT|PATCH|DELETE",
+            "summary": "What this endpoint does",
+            "auth_required": true,
+            "request": {
+                "params": {"id": "UUID"},
+                "query": {"search": "string", "page": "number"},
+                "body": {"field": "type"}
+            },
+            "response": {
+                "200": {"items": "[Resource]", "total": "number"},
+                "400": "Validation error",
+                "404": "Not found"
+            },
+            "response_key": "items"
+        }
+    ],
+    "schemas": {
+        "User": {
+            "id": "UUID",
+            "email": "string",
+            "name": "string",
+            "created_at": "datetime"
+        }
+    }
+}
+```
+
+## CRITICAL Guidelines
+
+1. **response_key is MANDATORY** - Specifies how frontend extracts data
+   - Lists: `"items"` → frontend uses `data.items`
+   - Single item: `"item"` or entity name → frontend uses `data.item`
+   
+2. **Consistency** - ALL list endpoints MUST use the SAME wrapper
+   - If one uses `items`, ALL must use `items`
+   - Never mix `items` and `issues` and `users`
+
+3. **HTTP Methods:**
+   - GET: Retrieve (no body)
+   - POST: Create new
+   - PATCH: Partial update (preferred over PUT)
+   - DELETE: Remove
+
+4. **Auth endpoints required:**
+   - POST /auth/register
+   - POST /auth/login
+   - GET /auth/me
+   - POST /auth/logout
+
+Output ONLY the JSON, no markdown code blocks.
+{% endmacro %}
+
+
+{% macro design_ui(requirements, api_spec) %}
+Design a frontend UI specification for this project.
+
+<REQUIREMENTS>
+{{ requirements | tojson(indent=2) }}
+</REQUIREMENTS>
+
+<API_SPEC>
+{{ api_spec | tojson(indent=2) }}
+</API_SPEC>
+
+## Output Format: design/spec.ui.json
+
+```json
+{
+    "theme": {
+        "mode": "dark|light",
+        "colors": {
+            "primary": "#hex",
+            "secondary": "#hex",
+            "background": "#hex",
+            "surface": "#hex",
+            "text": "#hex",
+            "textSecondary": "#hex",
+            "error": "#hex",
+            "success": "#hex",
+            "warning": "#hex"
+        },
+        "typography": {
+            "fontFamily": "font-stack",
+            "headingFont": "font-name",
+            "sizes": {
+                "xs": "0.75rem",
+                "sm": "0.875rem",
+                "base": "1rem",
+                "lg": "1.125rem",
+                "xl": "1.25rem",
+                "2xl": "1.5rem"
+            }
+        },
+        "spacing": {
+            "xs": "0.25rem",
+            "sm": "0.5rem",
+            "md": "1rem",
+            "lg": "1.5rem",
+            "xl": "2rem"
+        },
+        "borderRadius": {
+            "sm": "0.25rem",
+            "md": "0.5rem",
+            "lg": "1rem"
+        }
+    },
+    "layout": {
+        "type": "sidebar|topnav",
+        "sidebarWidth": "250px",
+        "headerHeight": "64px",
+        "maxContentWidth": "1200px"
+    },
+    "pages": [
+        {
+            "path": "/login",
+            "name": "Login",
+            "auth_required": false,
+            "layout": "minimal",
+            "components": ["LoginForm"],
+            "api_calls": [
+                {"endpoint": "/auth/login", "method": "POST", "response_key": "token"}
+            ]
+        }
+    ],
+    "components": [
+        {
+            "name": "ComponentName",
+            "type": "layout|form|display|navigation",
+            "props": [
+                {"name": "propName", "type": "string|number|boolean|array", "required": true}
+            ],
+            "api_integration": {
+                "endpoint": "/api/resource",
+                "response_key": "items",
+                "transforms": "Optional data transformations"
+            },
+            "states": ["default", "loading", "error", "empty"]
+        }
+    ]
+}
+```
+
+## CRITICAL: API Integration
+
+For EVERY component that fetches data:
+1. Specify which `endpoint` it calls
+2. Specify `response_key` to extract data (MUST match spec.api.json)
+3. Document any data transformations
+
+Example:
+```json
+{
+    "name": "IssueList",
+    "api_integration": {
+        "endpoint": "/issues",
+        "response_key": "items",
+        "note": "Backend returns {items: [...], total: N}"
+    }
+}
+```
+
+Output ONLY the JSON, no markdown code blocks.
+{% endmacro %}
+
+
+{% macro create_readme(project) %}
+Create a professional README.md for this project.
+
+<PROJECT>
+{{ project | tojson(indent=2) }}
+</PROJECT>
+
+Include:
+1. Project title and badges
+2. Description (one paragraph)
+3. Features list
+4. Tech stack
+5. Getting started
+   - Prerequisites (Docker, Node.js)
+   - Quick start with docker-compose
+6. Development setup
+7. API documentation overview
+8. Contributing guidelines
+9. License
+
+Output markdown directly, no code blocks around it.
+{% endmacro %}
+
+
+{% macro answer_question(question, context) %}
+You are the Design/Architect agent answering a design question.
+
+<QUESTION>
+{{ question }}
+</QUESTION>
+
+<DESIGN_CONTEXT>
+Database Schema: {{ context.get('db_schema', 'Not yet designed') | tojson(indent=2) if context else 'None' }}
+API Spec: {{ context.get('api_spec', 'Not yet designed') | tojson(indent=2) if context else 'None' }}
+UI Spec: {{ context.get('ui_spec', 'Not yet designed') | tojson(indent=2) if context else 'None' }}
+</DESIGN_CONTEXT>
+
+Provide an authoritative answer about the design.
+If the question reveals a design inconsistency, acknowledge it and provide a correction.
+Be specific with code examples when helpful.
+{% endmacro %}
+

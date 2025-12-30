@@ -1,0 +1,2121 @@
+{
+  "conventions": {
+    "base_url": "/api",
+    "auth": {
+      "type": "jwt",
+      "header": "Authorization",
+      "scheme": "Bearer",
+      "token_ttl_seconds": 604800,
+      "refresh": {
+        "supported": false,
+        "notes": "Simplified: single JWT token. Session persistence handled by storing token in localStorage and validating via /auth/me."
+      }
+    },
+    "content_type": "application/json",
+    "id_format": "uuid",
+    "timestamps": {
+      "format": "iso-8601",
+      "fields": [
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "error_format": {
+      "media_type": "application/json",
+      "schema_ref": "#/schemas/ErrorResponse",
+      "example": {
+        "error": {
+          "code": "VALIDATION_ERROR",
+          "message": "title is required",
+          "details": [
+            {
+              "field": "title",
+              "message": "Required"
+            }
+          ],
+          "requestId": "req_9a2f2e9b"
+        }
+      }
+    },
+    "pagination": {
+      "style": "offset",
+      "query_params": {
+        "limit": {
+          "type": "integer",
+          "default": 50,
+          "max": 200
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0,
+          "min": 0
+        }
+      },
+      "response_envelope": {
+        "items_field": "items",
+        "meta_field": "meta",
+        "meta_schema_ref": "#/schemas/PaginationMeta"
+      }
+    },
+    "sorting": {
+      "query_params": {
+        "sort": {
+          "type": "string",
+          "example": "createdAt",
+          "notes": "Field name"
+        },
+        "order": {
+          "type": "string",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "default": "desc"
+        }
+      }
+    },
+    "filtering": {
+      "style": "query",
+      "notes": "Filtering uses explicit query params per resource (e.g., status=IN_PROGRESS)."
+    },
+    "envelopes": {
+      "single": {
+        "style": "plain",
+        "notes": "Most endpoints return a single resource object."
+      },
+      "list": {
+        "style": "paginated",
+        "schema_ref": "#/schemas/PaginatedResponse"
+      }
+    },
+    "reference_screenshots": {
+      "screenshots/jira_example.png": "App shell layout + board columns/cards styling reference",
+      "screenshots/jira_ticketing.png": "Header + sidebar + table/list patterns reference",
+      "screenshots/click_todo_item.png": "Issue detail modal/drawer layout and inline editing/comments reference"
+    }
+  },
+  "schemas": {
+    "UUID": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "ISODateTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ErrorDetail": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ]
+    },
+    "Error": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "UNAUTHORIZED",
+            "FORBIDDEN",
+            "NOT_FOUND",
+            "VALIDATION_ERROR",
+            "CONFLICT",
+            "RATE_LIMITED",
+            "INTERNAL_ERROR"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "$ref": "#/schemas/ErrorDetail"
+          }
+        },
+        "requestId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ]
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "$ref": "#/schemas/Error"
+        }
+      },
+      "required": [
+        "error"
+      ]
+    },
+    "PaginationMeta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "type": "integer"
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "total": {
+          "type": "integer"
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "limit",
+        "offset",
+        "total",
+        "hasMore"
+      ]
+    },
+    "PaginatedResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {}
+        },
+        "meta": {
+          "$ref": "#/schemas/PaginationMeta"
+        }
+      },
+      "required": [
+        "items",
+        "meta"
+      ]
+    },
+    "Theme": {
+      "type": "string",
+      "enum": [
+        "light",
+        "dark"
+      ]
+    },
+    "User": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/schemas/UUID"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "admin",
+            "member",
+            "viewer"
+          ]
+        },
+        "avatarUrl": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "createdAt": {
+          "$ref": "#/schemas/ISODateTime"
+        },
+        "updatedAt": {
+          "$ref": "#/schemas/ISODateTime"
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "name",
+        "role",
+        "avatarUrl",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AuthToken": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "token": {
+          "type": "string",
+          "minLength": 20
+        },
+        "tokenType": {
+          "type": "string",
+          "const": "Bearer"
+        },
+        "expiresIn": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "token",
+        "tokenType",
+        "expiresIn"
+      ]
+    },
+    "Session": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": {
+          "$ref": "#/schemas/User"
+        },
+        "auth": {
+          "$ref": "#/schemas/AuthToken"
+        }
+      },
+      "required": [
+        "user",
+        "auth"
+      ]
+    },
+    "Project": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/schemas/UUID"
+        },
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9]{1,9}$",
+          "description": "Project key used for issue keys (e.g., ACME)."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "leadUserId": {
+          "$ref": "#/schemas/UUID"
+        },
+        "issueCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "createdAt": {
+          "$ref": "#/schemas/ISODateTime"
+        },
+        "updatedAt": {
+          "$ref": "#/schemas/ISODateTime"
+        }
+      },
+      "required": [
+        "id",
+        "key",
+        "name",
+        "description",
+        "leadUserId",
+        "issueCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "IssueType": {
+      "type": "string",
+      "enum": [
+        "BUG",
+        "TASK",
+        "STORY",
+        "EPIC"
+      ]
+    },
+    "IssuePriority": {
+      "type": "string",
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ]
+    },
+    "IssueStatus": {
+      "type": "string",
+      "enum": [
+        "BACKLOG",
+        "TODO",
+        "IN_PROGRESS",
+        "IN_REVIEW",
+        "DONE"
+      ]
+    },
+    "Label": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/schemas/UUID"
+        },
+        "projectId": {
+          "$ref": "#/schemas/UUID"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "createdAt": {
+          "$ref": "#/schemas/ISODateTime"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "name",
+        "color",
+        "createdAt"
+      ]
+    },
+    "Issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/schemas/UUID"
+        },
+        "projectId": {
+          "$ref": "#/schemas/UUID"
+        },
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9]{1,9}-[0-9]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Markdown supported"
+        },
+        "type": {
+          "$ref": "#/schemas/IssueType"
+        },
+        "priority": {
+          "$ref": "#/schemas/IssuePriority"
+        },
+        "status": {
+          "$ref": "#/schemas/IssueStatus"
+        },
+        "assigneeUserId": {
+          "anyOf": [
+            {
+              "$ref": "#/schemas/UUID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reporterUserId": {
+          "$ref": "#/schemas/UUID"
+        },
+        "labelIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/schemas/UUID"
+          }
+        },
+        "createdAt": {
+          "$ref": "#/schemas/ISODateTime"
+        },
+        "updatedAt": {
+          "$ref": "#/schemas/ISODateTime"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "key",
+        "title",
+        "description",
+        "type",
+        "priority",
+        "status",
+        "assigneeUserId",
+        "reporterUserId",
+        "labelIds",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "IssueWithRelations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "issue": {
+          "$ref": "#/schemas/Issue"
+        },
+        "project": {
+          "$ref": "#/schemas/Project"
+        },
+        "assignee": {
+          "anyOf": [
+            {
+              "$ref": "#/schemas/User"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reporter": {
+          "$ref": "#/schemas/User"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/schemas/Label"
+          }
+        }
+      },
+      "required": [
+        "issue",
+        "project",
+        "assignee",
+        "reporter",
+        "labels"
+      ]
+    },
+    "Comment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/schemas/UUID"
+        },
+        "issueId": {
+          "$ref": "#/schemas/UUID"
+        },
+        "authorUserId": {
+          "$ref": "#/schemas/UUID"
+        },
+        "bodyMarkdown": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Markdown supported"
+        },
+        "createdAt": {
+          "$ref": "#/schemas/ISODateTime"
+        },
+        "updatedAt": {
+          "$ref": "#/schemas/ISODateTime"
+        }
+      },
+      "required": [
+        "id",
+        "issueId",
+        "authorUserId",
+        "bodyMarkdown",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ActivityEventType": {
+      "type": "string",
+      "enum": [
+        "ISSUE_CREATED",
+        "ISSUE_UPDATED",
+        "ISSUE_STATUS_CHANGED",
+        "ISSUE_COMMENT_ADDED",
+        "ISSUE_COMMENT_UPDATED",
+        "ISSUE_COMMENT_DELETED",
+        "PROJECT_CREATED"
+      ]
+    },
+    "ActivityEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/schemas/UUID"
+        },
+        "projectId": {
+          "$ref": "#/schemas/UUID"
+        },
+        "issueId": {
+          "anyOf": [
+            {
+              "$ref": "#/schemas/UUID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "actorUserId": {
+          "$ref": "#/schemas/UUID"
+        },
+        "type": {
+          "$ref": "#/schemas/ActivityEventType"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "createdAt": {
+          "$ref": "#/schemas/ISODateTime"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "issueId",
+        "actorUserId",
+        "type",
+        "summary",
+        "metadata",
+        "createdAt"
+      ]
+    },
+    "Attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/schemas/UUID"
+        },
+        "issueId": {
+          "$ref": "#/schemas/UUID"
+        },
+        "fileName": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": "string"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "createdAt": {
+          "$ref": "#/schemas/ISODateTime"
+        }
+      },
+      "required": [
+        "id",
+        "issueId",
+        "fileName",
+        "mimeType",
+        "sizeBytes",
+        "url",
+        "createdAt"
+      ]
+    },
+    "UserSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "userId": {
+          "$ref": "#/schemas/UUID"
+        },
+        "theme": {
+          "$ref": "#/schemas/Theme"
+        },
+        "notifications": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "type": "boolean"
+            },
+            "inApp": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "email",
+            "inApp"
+          ]
+        },
+        "createdAt": {
+          "$ref": "#/schemas/ISODateTime"
+        },
+        "updatedAt": {
+          "$ref": "#/schemas/ISODateTime"
+        }
+      },
+      "required": [
+        "userId",
+        "theme",
+        "notifications",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SearchResultItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "issue"
+          ]
+        },
+        "issue": {
+          "$ref": "#/schemas/Issue"
+        },
+        "project": {
+          "$ref": "#/schemas/Project"
+        },
+        "snippet": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "issue",
+        "project",
+        "snippet"
+      ]
+    }
+  },
+  "endpoints": [
+    {
+      "path": "/health",
+      "method": "GET",
+      "summary": "Health check",
+      "auth_required": false,
+      "request": {
+        "query": {},
+        "body_schema": null
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "type": "string",
+                "const": "ok"
+              },
+              "time": {
+                "$ref": "#/schemas/ISODateTime"
+              }
+            },
+            "required": [
+              "status",
+              "time"
+            ]
+          },
+          "example": {
+            "status": "ok",
+            "time": "2025-01-01T00:00:00.000Z"
+          }
+        }
+      }
+    },
+    {
+      "path": "/auth/register",
+      "method": "POST",
+      "summary": "Register a new user",
+      "auth_required": false,
+      "request": {
+        "query": {},
+        "body_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "password": {
+              "type": "string",
+              "minLength": 8
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "email",
+            "password",
+            "name"
+          ]
+        },
+        "example": {
+          "email": "admin@example.com",
+          "password": "Password123!",
+          "name": "Admin"
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Created",
+          "body_schema": {
+            "$ref": "#/schemas/Session"
+          }
+        },
+        "409": {
+          "description": "Email already exists",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        },
+        "422": {
+          "description": "Validation error",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/auth/login",
+      "method": "POST",
+      "summary": "Login with email/password",
+      "auth_required": false,
+      "request": {
+        "query": {},
+        "body_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "password": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "email",
+            "password"
+          ]
+        },
+        "example": {
+          "email": "admin@example.com",
+          "password": "Password123!"
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "$ref": "#/schemas/Session"
+          }
+        },
+        "401": {
+          "description": "Invalid credentials",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        },
+        "422": {
+          "description": "Validation error",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/auth/me",
+      "method": "GET",
+      "summary": "Get current authenticated user",
+      "auth_required": true,
+      "request": {
+        "query": {},
+        "body_schema": null
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "$ref": "#/schemas/User"
+          }
+        },
+        "401": {
+          "description": "Missing/invalid token",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/auth/logout",
+      "method": "POST",
+      "summary": "Logout (client should discard token)",
+      "auth_required": true,
+      "request": {
+        "query": {},
+        "body_schema": null
+      },
+      "responses": {
+        "204": {
+          "description": "No content",
+          "body_schema": null
+        },
+        "401": {
+          "description": "Missing/invalid token",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/users",
+      "method": "GET",
+      "summary": "List users (for assignee selection)",
+      "auth_required": true,
+      "request": {
+        "query": {
+          "q": {
+            "type": "string",
+            "required": false
+          },
+          "limit": {
+            "type": "integer",
+            "required": false
+          },
+          "offset": {
+            "type": "integer",
+            "required": false
+          }
+        },
+        "body_schema": null
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/schemas/User"
+                }
+              },
+              "meta": {
+                "$ref": "#/schemas/PaginationMeta"
+              }
+            },
+            "required": [
+              "items",
+              "meta"
+            ]
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/projects",
+      "method": "GET",
+      "summary": "List projects for dashboard",
+      "auth_required": true,
+      "request": {
+        "query": {
+          "limit": {
+            "type": "integer",
+            "required": false
+          },
+          "offset": {
+            "type": "integer",
+            "required": false
+          }
+        },
+        "body_schema": null
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/schemas/Project"
+                }
+              },
+              "meta": {
+                "$ref": "#/schemas/PaginationMeta"
+              }
+            },
+            "required": [
+              "items",
+              "meta"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/projects",
+      "method": "POST",
+      "summary": "Create a project",
+      "auth_required": true,
+      "request": {
+        "query": {},
+        "body_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9]{1,9}$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "key",
+            "name"
+          ]
+        },
+        "example": {
+          "key": "ACME",
+          "name": "Acme Platform",
+          "description": "Internal issue tracking"
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Created",
+          "body_schema": {
+            "$ref": "#/schemas/Project"
+          }
+        },
+        "409": {
+          "description": "Project key already exists",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        },
+        "422": {
+          "description": "Validation error",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/projects/{projectId}",
+      "method": "GET",
+      "summary": "Get project by id",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "projectId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {},
+        "body_schema": null
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "$ref": "#/schemas/Project"
+          }
+        },
+        "404": {
+          "description": "Not found",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/projects/{projectId}/labels",
+      "method": "GET",
+      "summary": "List labels for a project",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "projectId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {
+          "limit": {
+            "type": "integer",
+            "required": false
+          },
+          "offset": {
+            "type": "integer",
+            "required": false
+          }
+        },
+        "body_schema": null
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/schemas/Label"
+                }
+              },
+              "meta": {
+                "$ref": "#/schemas/PaginationMeta"
+              }
+            },
+            "required": [
+              "items",
+              "meta"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/projects/{projectId}/labels",
+      "method": "POST",
+      "summary": "Create label",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "projectId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {},
+        "body_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            }
+          },
+          "required": [
+            "name",
+            "color"
+          ]
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Created",
+          "body_schema": {
+            "$ref": "#/schemas/Label"
+          }
+        },
+        "409": {
+          "description": "Label already exists",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/projects/{projectId}/issues",
+      "method": "GET",
+      "summary": "List issues for a project (supports board/list/summary)",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "projectId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {
+          "status": {
+            "type": "string",
+            "required": false,
+            "enum": [
+              "BACKLOG",
+              "TODO",
+              "IN_PROGRESS",
+              "IN_REVIEW",
+              "DONE"
+            ]
+          },
+          "assigneeUserId": {
+            "type": "string",
+            "required": false
+          },
+          "priority": {
+            "type": "string",
+            "required": false,
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "required": false,
+            "enum": [
+              "BUG",
+              "TASK",
+              "STORY",
+              "EPIC"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "required": false,
+            "notes": "Label name filter"
+          },
+          "q": {
+            "type": "string",
+            "required": false,
+            "notes": "Search within project issues (title/description/key)"
+          },
+          "sort": {
+            "type": "string",
+            "required": false,
+            "notes": "createdAt|updatedAt|priority|status|key"
+          },
+          "order": {
+            "type": "string",
+            "required": false,
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "required": false
+          },
+          "offset": {
+            "type": "integer",
+            "required": false
+          }
+        },
+        "body_schema": null
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/schemas/Issue"
+                }
+              },
+              "meta": {
+                "$ref": "#/schemas/PaginationMeta"
+              }
+            },
+            "required": [
+              "items",
+              "meta"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/projects/{projectId}/issues",
+      "method": "POST",
+      "summary": "Create issue",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "projectId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {},
+        "body_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "$ref": "#/schemas/IssueType"
+            },
+            "priority": {
+              "$ref": "#/schemas/IssuePriority"
+            },
+            "assigneeUserId": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/UUID"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "labelIds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/schemas/UUID"
+              }
+            }
+          },
+          "required": [
+            "title",
+            "type",
+            "priority"
+          ]
+        },
+        "example": {
+          "title": "Fix login redirect",
+          "description": "Steps to reproduce...",
+          "type": "BUG",
+          "priority": "HIGH",
+          "assigneeUserId": null,
+          "labelIds": []
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Created",
+          "body_schema": {
+            "$ref": "#/schemas/Issue"
+          }
+        },
+        "422": {
+          "description": "Validation error",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/issues/{issueId}",
+      "method": "GET",
+      "summary": "Get issue by id (with relations)",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "issueId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {
+          "include": {
+            "type": "string",
+            "required": false,
+            "notes": "Comma-separated: project,assignee,reporter,labels"
+          }
+        },
+        "body_schema": null
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "$ref": "#/schemas/IssueWithRelations"
+          }
+        },
+        "404": {
+          "description": "Not found",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/issues/{issueId}",
+      "method": "PATCH",
+      "summary": "Update issue fields (inline editing)",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "issueId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {},
+        "body_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "$ref": "#/schemas/IssueType"
+            },
+            "priority": {
+              "$ref": "#/schemas/IssuePriority"
+            },
+            "status": {
+              "$ref": "#/schemas/IssueStatus"
+            },
+            "assigneeUserId": {
+              "anyOf": [
+                {
+                  "$ref": "#/schemas/UUID"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "labelIds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/schemas/UUID"
+              }
+            }
+          },
+          "required": []
+        },
+        "example": {
+          "status": "IN_PROGRESS"
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "$ref": "#/schemas/Issue"
+          }
+        },
+        "409": {
+          "description": "Conflict (e.g., invalid transition)",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        },
+        "422": {
+          "description": "Validation error",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/issues/{issueId}/move",
+      "method": "POST",
+      "summary": "Move issue to a new status (board drag-and-drop)",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "issueId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {},
+        "body_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "toStatus": {
+              "$ref": "#/schemas/IssueStatus"
+            },
+            "position": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Optional: index within target column"
+            }
+          },
+          "required": [
+            "toStatus"
+          ]
+        },
+        "example": {
+          "toStatus": "IN_REVIEW",
+          "position": 0
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "$ref": "#/schemas/Issue"
+          }
+        },
+        "409": {
+          "description": "Invalid move",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/issues/{issueId}/comments",
+      "method": "GET",
+      "summary": "List comments for an issue",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "issueId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {
+          "limit": {
+            "type": "integer",
+            "required": false
+          },
+          "offset": {
+            "type": "integer",
+            "required": false
+          },
+          "sort": {
+            "type": "string",
+            "required": false,
+            "notes": "createdAt"
+          },
+          "order": {
+            "type": "string",
+            "required": false,
+            "enum": [
+              "asc",
+              "desc"
+            ]
+          }
+        },
+        "body_schema": null
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/schemas/Comment"
+                }
+              },
+              "meta": {
+                "$ref": "#/schemas/PaginationMeta"
+              }
+            },
+            "required": [
+              "items",
+              "meta"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/issues/{issueId}/comments",
+      "method": "POST",
+      "summary": "Create comment",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "issueId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {},
+        "body_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "body": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "body"
+          ]
+        },
+        "example": {
+          "body": "This is blocked by API access."
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Created",
+          "body_schema": {
+            "$ref": "#/schemas/Comment"
+          }
+        },
+        "422": {
+          "description": "Validation error",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/comments/{commentId}",
+      "method": "PATCH",
+      "summary": "Update comment (author only)",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "commentId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {},
+        "body_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "body": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "body"
+          ]
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "$ref": "#/schemas/Comment"
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/comments/{commentId}",
+      "method": "DELETE",
+      "summary": "Delete comment (author only)",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "commentId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {},
+        "body_schema": null
+      },
+      "responses": {
+        "204": {
+          "description": "No content",
+          "body_schema": null
+        },
+        "403": {
+          "description": "Forbidden",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/issues/{issueId}/activity",
+      "method": "GET",
+      "summary": "Get issue activity log",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "issueId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {
+          "limit": {
+            "type": "integer",
+            "required": false
+          },
+          "offset": {
+            "type": "integer",
+            "required": false
+          }
+        },
+        "body_schema": null
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/schemas/ActivityEvent"
+                }
+              },
+              "meta": {
+                "$ref": "#/schemas/PaginationMeta"
+              }
+            },
+            "required": [
+              "items",
+              "meta"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/issues/{issueId}/attachments",
+      "method": "GET",
+      "summary": "List attachments (placeholder supported)",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "issueId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {
+          "limit": {
+            "type": "integer",
+            "required": false
+          },
+          "offset": {
+            "type": "integer",
+            "required": false
+          }
+        },
+        "body_schema": null
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/schemas/Attachment"
+                }
+              },
+              "meta": {
+                "$ref": "#/schemas/PaginationMeta"
+              }
+            },
+            "required": [
+              "items",
+              "meta"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/projects/{projectId}/summary",
+      "method": "GET",
+      "summary": "Project summary stats for Summary view",
+      "auth_required": true,
+      "request": {
+        "path_params": {
+          "projectId": {
+            "schema": {
+              "$ref": "#/schemas/UUID"
+            }
+          }
+        },
+        "query": {
+          "range": {
+            "type": "string",
+            "required": false,
+            "notes": "e.g., 7d|30d|90d"
+          }
+        },
+        "body_schema": null
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "project": {
+                "$ref": "#/schemas/Project"
+              },
+              "countsByStatus": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "BACKLOG": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "TODO": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "IN_PROGRESS": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "IN_REVIEW": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "DONE": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "BACKLOG",
+                  "TODO",
+                  "IN_PROGRESS",
+                  "IN_REVIEW",
+                  "DONE"
+                ]
+              },
+              "assigneeWorkload": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "user": {
+                      "$ref": "#/schemas/User"
+                    },
+                    "openCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "user",
+                    "openCount"
+                  ]
+                }
+              },
+              "recentActivity": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/schemas/ActivityEvent"
+                }
+              }
+            },
+            "required": [
+              "project",
+              "countsByStatus",
+              "assigneeWorkload",
+              "recentActivity"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "path": "/search",
+      "method": "GET",
+      "summary": "Global search across issues",
+      "auth_required": true,
+      "request": {
+        "query": {
+          "q": {
+            "type": "string",
+            "required": true
+          },
+          "projectId": {
+            "type": "string",
+            "required": false
+          },
+          "status": {
+            "type": "string",
+            "required": false,
+            "enum": [
+              "BACKLOG",
+              "TODO",
+              "IN_PROGRESS",
+              "IN_REVIEW",
+              "DONE"
+            ]
+          },
+          "assigneeUserId": {
+            "type": "string",
+            "required": false
+          },
+          "limit": {
+            "type": "integer",
+            "required": false
+          },
+          "offset": {
+            "type": "integer",
+            "required": false
+          }
+        },
+        "body_schema": null,
+        "example": null
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/schemas/SearchResultItem"
+                }
+              },
+              "meta": {
+                "$ref": "#/schemas/PaginationMeta"
+              }
+            },
+            "required": [
+              "items",
+              "meta"
+            ]
+          },
+          "example": {
+            "items": [
+              {
+                "type": "issue",
+                "issue": {
+                  "id": "b1d0d6a2-6f1a-4ce9-88a6-4a1abbd2e2a1",
+                  "projectId": "c6b1c1d1-5b2b-4a1a-8b22-1d2f3a4b5c6d",
+                  "key": "ACME-12",
+                  "title": "Fix login redirect",
+                  "description": "Steps...",
+                  "type": "BUG",
+                  "priority": "HIGH",
+                  "status": "TODO",
+                  "assigneeUserId": null,
+                  "reporterUserId": "d2a8f2b0-2b1c-4f1d-9a1b-2c3d4e5f6a7b",
+                  "labelIds": [],
+                  "createdAt": "2025-01-01T00:00:00.000Z",
+                  "updatedAt": "2025-01-01T00:00:00.000Z"
+                },
+                "project": {
+                  "id": "c6b1c1d1-5b2b-4a1a-8b22-1d2f3a4b5c6d",
+                  "key": "ACME",
+                  "name": "Acme Platform",
+                  "description": "Internal issue tracking",
+                  "leadUserId": "d2a8f2b0-2b1c-4f1d-9a1b-2c3d4e5f6a7b",
+                  "issueCount": 42,
+                  "createdAt": "2025-01-01T00:00:00.000Z",
+                  "updatedAt": "2025-01-01T00:00:00.000Z"
+                },
+                "snippet": "...login redirect..."
+              }
+            ],
+            "meta": {
+              "limit": 50,
+              "offset": 0,
+              "total": 1,
+              "hasMore": false
+            }
+          }
+        },
+        "422": {
+          "description": "Validation error",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    },
+    {
+      "path": "/settings/me",
+      "method": "GET",
+      "summary": "Get current user's settings",
+      "auth_required": true,
+      "request": {
+        "query": {},
+        "body_schema": null
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "$ref": "#/schemas/UserSettings"
+          }
+        }
+      }
+    },
+    {
+      "path": "/settings/me",
+      "method": "PATCH",
+      "summary": "Update current user's settings (theme + notifications)",
+      "auth_required": true,
+      "request": {
+        "query": {},
+        "body_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "theme": {
+              "$ref": "#/schemas/Theme"
+            },
+            "notifications": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "email": {
+                  "type": "boolean"
+                },
+                "inApp": {
+                  "type": "boolean"
+                }
+              },
+              "required": []
+            }
+          },
+          "required": []
+        },
+        "example": {
+          "theme": "dark",
+          "notifications": {
+            "email": true,
+            "inApp": true
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "body_schema": {
+            "$ref": "#/schemas/UserSettings"
+          }
+        },
+        "422": {
+          "description": "Validation error",
+          "body_schema": {
+            "$ref": "#/schemas/ErrorResponse"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,790 @@
+{
+  "product": {
+    "name": "Jira Software Clone",
+    "scope": {
+      "in_scope": [
+        "Authentication (login/register/logout, session persistence)",
+        "Dashboard projects list + create project",
+        "Project view with 3 modes: Board (DnD), List (sortable + inline status), Summary (stats + activity)",
+        "Issue management: create issue modal, issue detail drawer/modal with inline editing",
+        "Comments CRUD with markdown",
+        "Global search with filters",
+        "Settings: profile + theme toggle (dark/light) + notification preferences",
+        "Seed data: 3+ projects, 25+ issues, 5+ users, sample comments"
+      ],
+      "out_of_scope": [
+        "Advanced permissions and project roles",
+        "Sprints/backlog planning beyond status columns",
+        "Marketplace apps, SSO/SCIM",
+        "File upload storage (attachments are placeholder)"
+      ]
+    },
+    "reference_screenshots": {
+      "screenshots/jira_example.png": {
+        "used_for": [
+          "App shell: sidebar + header + view tabs",
+          "Board toolbar: search + filter + group",
+          "Kanban columns: panel styling + count badges",
+          "Issue cards: compact card layout with badges and assignee"
+        ]
+      },
+      "screenshots/jira_ticketing.png": {
+        "used_for": [
+          "Global header with search",
+          "Sidebar navigation grouping",
+          "Table/list view visual patterns: header row, separators, pagination",
+          "Buttons and chips styling"
+        ]
+      },
+      "screenshots/click_todo_item.png": {
+        "used_for": [
+          "Issue detail overlay layout: two-column modal/drawer",
+          "Inline editing patterns for fields",
+          "Comments composer and quick chips",
+          "Details panel with label/value rows"
+        ]
+      }
+    }
+  },
+  "user_roles_and_personas": [
+    {
+      "role": "admin",
+      "persona": "Workspace owner / system maintainer",
+      "capabilities": [
+        "Manage users (seeded; minimal UI)",
+        "Create projects",
+        "Create/edit/delete issues",
+        "Move issues across statuses",
+        "Manage labels",
+        "Edit any comment",
+        "Change personal settings"
+      ]
+    },
+    {
+      "role": "member",
+      "persona": "Engineer / PM",
+      "capabilities": [
+        "View projects",
+        "Create/edit issues",
+        "Move issues across statuses",
+        "Comment on issues",
+        "Edit/delete own comments",
+        "Change personal settings"
+      ]
+    },
+    {
+      "role": "viewer",
+      "persona": "Stakeholder",
+      "capabilities": [
+        "View projects",
+        "View issues",
+        "Use search",
+        "Change personal settings"
+      ]
+    }
+  ],
+  "permissions_matrix": {
+    "projects": {
+      "create": {
+        "admin": true,
+        "member": true,
+        "viewer": false
+      },
+      "read": {
+        "admin": true,
+        "member": true,
+        "viewer": true
+      },
+      "update": {
+        "admin": true,
+        "member": false,
+        "viewer": false
+      },
+      "delete": {
+        "admin": true,
+        "member": false,
+        "viewer": false
+      }
+    },
+    "issues": {
+      "create": {
+        "admin": true,
+        "member": true,
+        "viewer": false
+      },
+      "read": {
+        "admin": true,
+        "member": true,
+        "viewer": true
+      },
+      "update": {
+        "admin": true,
+        "member": true,
+        "viewer": false
+      },
+      "move_status": {
+        "admin": true,
+        "member": true,
+        "viewer": false
+      },
+      "delete": {
+        "admin": true,
+        "member": false,
+        "viewer": false
+      }
+    },
+    "comments": {
+      "create": {
+        "admin": true,
+        "member": true,
+        "viewer": false
+      },
+      "read": {
+        "admin": true,
+        "member": true,
+        "viewer": true
+      },
+      "update_own": {
+        "admin": true,
+        "member": true,
+        "viewer": false
+      },
+      "update_any": {
+        "admin": true,
+        "member": false,
+        "viewer": false
+      },
+      "delete_own": {
+        "admin": true,
+        "member": true,
+        "viewer": false
+      },
+      "delete_any": {
+        "admin": true,
+        "member": false,
+        "viewer": false
+      }
+    },
+    "labels": {
+      "create": {
+        "admin": true,
+        "member": true,
+        "viewer": false
+      },
+      "read": {
+        "admin": true,
+        "member": true,
+        "viewer": true
+      }
+    },
+    "settings": {
+      "read_own": {
+        "admin": true,
+        "member": true,
+        "viewer": true
+      },
+      "update_own": {
+        "admin": true,
+        "member": true,
+        "viewer": true
+      }
+    }
+  },
+  "entities": {
+    "User": {
+      "description": "Authenticated actor with a role and profile fields.",
+      "fields": {
+        "id": "uuid",
+        "email": "string",
+        "name": "string",
+        "role": "admin|member|viewer",
+        "avatarUrl": "string|null",
+        "createdAt": "datetime",
+        "updatedAt": "datetime"
+      },
+      "relationships": {
+        "leadsProjects": "Project[] via Project.leadUserId",
+        "assignedIssues": "Issue[] via Issue.assigneeUserId",
+        "reportedIssues": "Issue[] via Issue.reporterUserId",
+        "comments": "Comment[] via Comment.authorUserId"
+      }
+    },
+    "Session": {
+      "description": "Client session represented by JWT token.",
+      "fields": {
+        "token": "string",
+        "expiresAt": "datetime"
+      },
+      "relationships": {
+        "user": "User"
+      },
+      "persistence": {
+        "frontend": {
+          "storage": "localStorage",
+          "keys": {
+            "token": "jira.token",
+            "theme": "jira.theme",
+            "projectViewMode": "jira.projectViewMode.{projectKey}"
+          }
+        }
+      }
+    },
+    "Project": {
+      "description": "Top-level container for issues.",
+      "fields": {
+        "id": "uuid",
+        "key": "string (ACME)",
+        "name": "string",
+        "description": "string|null",
+        "leadUserId": "uuid",
+        "createdAt": "datetime",
+        "updatedAt": "datetime"
+      },
+      "relationships": {
+        "issues": "Issue[]",
+        "labels": "Label[]",
+        "activity": "ActivityEvent[]"
+      }
+    },
+    "Label": {
+      "description": "Project-scoped tag applied to issues.",
+      "fields": {
+        "id": "uuid",
+        "projectId": "uuid",
+        "name": "string",
+        "color": "hex color",
+        "createdAt": "datetime"
+      },
+      "relationships": {
+        "project": "Project",
+        "issues": "Issue[] via IssueLabel join"
+      }
+    },
+    "Issue": {
+      "description": "Work item shown on board/list and editable in detail view.",
+      "fields": {
+        "id": "uuid",
+        "projectId": "uuid",
+        "key": "string (ACME-12)",
+        "title": "string",
+        "description": "markdown|null",
+        "type": "BUG|TASK|STORY|EPIC",
+        "priority": "LOW|MEDIUM|HIGH|CRITICAL",
+        "status": "BACKLOG|TODO|IN_PROGRESS|IN_REVIEW|DONE",
+        "assigneeUserId": "uuid|null",
+        "reporterUserId": "uuid",
+        "createdAt": "datetime",
+        "updatedAt": "datetime"
+      },
+      "relationships": {
+        "project": "Project",
+        "assignee": "User|null",
+        "reporter": "User",
+        "labels": "Label[] via IssueLabel",
+        "comments": "Comment[]",
+        "activity": "ActivityEvent[]",
+        "attachments": "Attachment[] (placeholder)"
+      },
+      "derived_fields": {
+        "boardColumn": "Derived from status",
+        "displayPriorityBadge": "Derived from priority",
+        "displayTypeIcon": "Derived from type"
+      }
+    },
+    "IssueLabel": {
+      "description": "Join table for many-to-many Issue <-> Label.",
+      "fields": {
+        "issueId": "uuid",
+        "labelId": "uuid"
+      }
+    },
+    "Comment": {
+      "description": "Markdown comment attached to an issue.",
+      "fields": {
+        "id": "uuid",
+        "issueId": "uuid",
+        "authorUserId": "uuid",
+        "body": "markdown",
+        "createdAt": "datetime",
+        "updatedAt": "datetime"
+      },
+      "relationships": {
+        "issue": "Issue",
+        "author": "User"
+      }
+    },
+    "ActivityEvent": {
+      "description": "Append-only log events used for timelines and audit trail.",
+      "fields": {
+        "id": "uuid",
+        "projectId": "uuid",
+        "issueId": "uuid|null",
+        "actorUserId": "uuid",
+        "type": "ISSUE_CREATED|ISSUE_UPDATED|ISSUE_STATUS_CHANGED|ISSUE_COMMENT_ADDED|ISSUE_COMMENT_UPDATED|ISSUE_COMMENT_DELETED|PROJECT_CREATED",
+        "summary": "string",
+        "metadata": "json",
+        "createdAt": "datetime"
+      },
+      "relationships": {
+        "project": "Project",
+        "issue": "Issue|null",
+        "actor": "User"
+      }
+    },
+    "Attachment": {
+      "description": "File metadata only; actual upload/storage may be stubbed.",
+      "fields": {
+        "id": "uuid",
+        "issueId": "uuid",
+        "fileName": "string",
+        "mimeType": "string",
+        "sizeBytes": "int",
+        "url": "string",
+        "createdAt": "datetime"
+      },
+      "relationships": {
+        "issue": "Issue"
+      }
+    },
+    "UserSettings": {
+      "description": "Per-user preferences persisted server-side and mirrored client-side (theme).",
+      "fields": {
+        "userId": "uuid",
+        "theme": "light|dark",
+        "notifications": {
+          "email": "boolean",
+          "inApp": "boolean"
+        },
+        "createdAt": "datetime",
+        "updatedAt": "datetime"
+      },
+      "relationships": {
+        "user": "User"
+      }
+    }
+  },
+  "workflows": {
+    "issue_status": {
+      "states": [
+        "BACKLOG",
+        "TODO",
+        "IN_PROGRESS",
+        "IN_REVIEW",
+        "DONE"
+      ],
+      "initial_state": "TODO",
+      "transitions": [
+        {
+          "from": "BACKLOG",
+          "to": [
+            "TODO"
+          ]
+        },
+        {
+          "from": "TODO",
+          "to": [
+            "BACKLOG",
+            "IN_PROGRESS",
+            "DONE"
+          ]
+        },
+        {
+          "from": "IN_PROGRESS",
+          "to": [
+            "TODO",
+            "IN_REVIEW",
+            "DONE"
+          ]
+        },
+        {
+          "from": "IN_REVIEW",
+          "to": [
+            "IN_PROGRESS",
+            "DONE"
+          ]
+        },
+        {
+          "from": "DONE",
+          "to": [
+            "TODO"
+          ],
+          "notes": "Allow reopen"
+        }
+      ],
+      "board_columns": [
+        {
+          "status": "BACKLOG",
+          "label": "Backlog"
+        },
+        {
+          "status": "TODO",
+          "label": "To Do"
+        },
+        {
+          "status": "IN_PROGRESS",
+          "label": "In Progress"
+        },
+        {
+          "status": "IN_REVIEW",
+          "label": "In Review"
+        },
+        {
+          "status": "DONE",
+          "label": "Done"
+        }
+      ]
+    },
+    "comment_lifecycle": {
+      "states": [
+        "ACTIVE",
+        "DELETED"
+      ],
+      "notes": "Hard delete allowed for simplicity; optional soft delete for audit."
+    }
+  },
+  "ux_flows": {
+    "authentication": {
+      "login": {
+        "entry": "Unauthenticated user navigates to /login",
+        "prefill": {
+          "email": "admin@example.com",
+          "password": "Password123!"
+        },
+        "success": {
+          "effects": [
+            "Store token in localStorage (jira.token)",
+            "Fetch /auth/me to hydrate user",
+            "Redirect to /dashboard",
+            "Show toast: 'Welcome back, {name}'"
+          ]
+        },
+        "error_states": [
+          {
+            "code": "UNAUTHORIZED",
+            "ui": "Inline error banner above form + keep inputs",
+            "retry": "User can re-submit"
+          },
+          {
+            "code": "INTERNAL_ERROR",
+            "ui": "Toast + inline banner",
+            "retry": "Retry button re-submits"
+          }
+        ],
+        "loading_states": [
+          "Disable submit button",
+          "Show spinner in button"
+        ]
+      },
+      "logout": {
+        "entry": "User clicks avatar menu -> Logout",
+        "success": {
+          "effects": [
+            "Call POST /auth/logout (best-effort)",
+            "Clear localStorage token",
+            "Clear app stores",
+            "Navigate to /login",
+            "Show toast: 'Logged out'"
+          ]
+        }
+      },
+      "session_persistence": {
+        "on_app_boot": [
+          "If jira.token exists -> call GET /auth/me",
+          "If 200 -> user stays logged in",
+          "If 401 -> clear token and redirect to /login"
+        ]
+      }
+    },
+    "dashboard_projects": {
+      "list_projects": {
+        "entry": "Authenticated user navigates to /dashboard",
+        "loading": "Show skeleton cards in grid",
+        "empty": {
+          "condition": "No projects",
+          "ui": "Empty state illustration + CTA 'Create project'"
+        },
+        "error": {
+          "ui": "Error state with retry button",
+          "retry": "Re-fetch GET /projects"
+        }
+      },
+      "create_project": {
+        "entry": "Click 'Create project' button",
+        "modal": {
+          "fields": [
+            "key (required, uppercase)",
+            "name (required)",
+            "description (optional)"
+          ]
+        },
+        "success": {
+          "effects": [
+            "Toast: 'Project created'",
+            "Close modal",
+            "Optimistically add card or refetch",
+            "Navigate to /projects/{projectKey}/board"
+          ]
+        },
+        "error": {
+          "cases": [
+            "409 key exists -> inline field error",
+            "422 validation -> field errors",
+            "500 -> toast + retry"
+          ]
+        }
+      }
+    },
+    "project_views": {
+      "view_mode_persistence": {
+        "url": [
+          "/projects/:projectKey/board",
+          "/projects/:projectKey/list",
+          "/projects/:projectKey/summary"
+        ],
+        "localStorage": "jira.projectViewMode.{projectKey}",
+        "behavior": "When navigating back to a project from elsewhere, use last view mode for that project unless URL explicitly sets it."
+      },
+      "board_view": {
+        "loading": "Show column skeletons + card placeholders",
+        "empty": "If no issues: show empty board state + 'Create issue' CTA",
+        "error": "Show error panel above board + retry",
+        "drag_and_drop": {
+          "start": "On drag start, card elevates and becomes semi-transparent",
+          "over_column": "Highlight column surface (blue border tint) and show placeholder slot",
+          "drop_success": [
+            "Optimistically update UI",
+            "Call POST /issues/{id}/move",
+            "Toast: 'Moved to {statusLabel}'"
+          ],
+          "drop_error": [
+            "Revert optimistic move",
+            "Toast error with retry action"
+          ]
+        }
+      },
+      "list_view": {
+        "table": {
+          "columns": [
+            "Key",
+            "Title",
+            "Status",
+            "Priority",
+            "Assignee",
+            "Created"
+          ],
+          "sorting": "Click header toggles asc/desc; reflected in query params sort/order",
+          "inline_status": {
+            "interaction": "Dropdown in row; change triggers PATCH /issues/{id} {status}",
+            "success": "Toast 'Status updated'",
+            "error": "Revert selection + toast"
+          },
+          "row_click": "Opens Issue Detail drawer/modal"
+        },
+        "loading": "Show table skeleton rows",
+        "empty": "No matching issues -> empty state with clear filters + create issue",
+        "error": "Inline error with retry"
+      },
+      "summary_view": {
+        "widgets": [
+          "Counts by status (bar/pie)",
+          "Recent activity timeline",
+          "Assignee workload distribution",
+          "Quick links to filtered lists"
+        ],
+        "loading": "Skeleton widgets",
+        "empty": "If no issues: show empty summary + create issue CTA",
+        "error": "Widget-level error + retry"
+      }
+    },
+    "issue_management": {
+      "create_issue": {
+        "entry": "Click 'Create' in header or '+ Create' in board column",
+        "modal_fields": [
+          "Title (required)",
+          "Description (optional, markdown)",
+          "Type (Bug/Task/Story/Epic)",
+          "Priority (Low/Medium/High/Critical)",
+          "Assignee (users)",
+          "Labels multi-select"
+        ],
+        "success": {
+          "effects": [
+            "Toast 'Issue created'",
+            "Issue appears in current view",
+            "Optionally open issue detail drawer"
+          ]
+        },
+        "error": "Field errors (422) + toast for server errors"
+      },
+      "issue_detail": {
+        "presentation": "Drawer on desktop (right side) or centered modal overlay; modeled after screenshots/click_todo_item.png two-column layout",
+        "sections": [
+          "Header: key + title + toolbar icons",
+          "Left: description markdown editor, subtasks placeholder, linked work placeholder",
+          "Bottom-left: comments list + composer",
+          "Right: details panel fields"
+        ],
+        "inline_editing": {
+          "fields": [
+            "title",
+            "description",
+            "status",
+            "priority",
+            "type",
+            "assignee",
+            "labels"
+          ],
+          "save_model": "Optimistic UI with debounced PATCH or explicit save per field (implementation choice).",
+          "error": "Revert field + show inline error + toast"
+        },
+        "close_behavior": {
+          "escape": true,
+          "backdrop_click": true,
+          "route": "Can be driven by query param ?issueId=... to support deep link; closing removes param."
+        }
+      }
+    },
+    "comments": {
+      "crud": {
+        "create": "POST /issues/{id}/comments",
+        "update": "PATCH /comments/{id}",
+        "delete": "DELETE /comments/{id}",
+        "success_toasts": [
+          "Comment added",
+          "Comment updated",
+          "Comment deleted"
+        ],
+        "error": "Toast + inline error in comment row with retry"
+      }
+    },
+    "global_search": {
+      "entry": "Search bar always visible in header (screenshots/jira_ticketing.png)",
+      "interaction": {
+        "typeahead": "Debounced GET /search?q=...",
+        "filters": [
+          "Project",
+          "Status",
+          "Assignee"
+        ],
+        "results": "List with issue key + title + project context + snippet; click opens issue detail"
+      },
+      "states": {
+        "loading": "Spinner in results panel",
+        "empty": "No results -> empty state with suggestions",
+        "error": "Error row + retry"
+      }
+    },
+    "settings": {
+      "theme_toggle": {
+        "entry": "Settings page and/or header toggle",
+        "persistence": [
+          "Apply theme immediately (CSS variables / class on html)",
+          "Store to localStorage (jira.theme)",
+          "Persist server-side via PATCH /settings/me"
+        ],
+        "success": "Toast 'Theme updated'",
+        "error": "Revert toggle + toast"
+      }
+    }
+  },
+  "acceptance_test_checklist": {
+    "mapping": [
+      {
+        "id": 1,
+        "name": "Can login with demo credentials",
+        "feature": "authentication.login",
+        "expected": "Login succeeds with admin@example.com / Password123! and redirects to /dashboard"
+      },
+      {
+        "id": 2,
+        "name": "Dashboard shows projects after login",
+        "feature": "dashboard_projects.list_projects",
+        "expected": "Projects grid shows 3+ seeded projects with issue count"
+      },
+      {
+        "id": 3,
+        "name": "Can click project to view issues",
+        "feature": "project_views.view_mode_persistence",
+        "expected": "Clicking project navigates to /projects/{key}/board by default"
+      },
+      {
+        "id": 4,
+        "name": "Board view shows columns with draggable issue cards",
+        "feature": "project_views.board_view.drag_and_drop",
+        "expected": "Columns Backlog/To Do/In Progress/In Review/Done render; cards show key/title/assignee/priority"
+      },
+      {
+        "id": 5,
+        "name": "Can drag issue card to different column (status updates)",
+        "feature": "project_views.board_view.drag_and_drop",
+        "expected": "Dropping card updates UI and persists via POST /issues/{id}/move"
+      },
+      {
+        "id": 6,
+        "name": "List view shows issues in table format",
+        "feature": "project_views.list_view.table",
+        "expected": "Table columns render and rows open issue detail"
+      },
+      {
+        "id": 7,
+        "name": "Summary view shows project statistics",
+        "feature": "project_views.summary_view",
+        "expected": "Counts by status + activity + assignee workload visible"
+      },
+      {
+        "id": 8,
+        "name": "View toggle switches between Board/List/Summary",
+        "feature": "project_views.view_mode_persistence",
+        "expected": "Tabs update URL and persist view mode per project"
+      },
+      {
+        "id": 9,
+        "name": "Can click issue to see details",
+        "feature": "issue_management.issue_detail",
+        "expected": "Issue detail drawer/modal opens with fields and comments"
+      },
+      {
+        "id": 10,
+        "name": "Can create new issue via modal",
+        "feature": "issue_management.create_issue",
+        "expected": "Modal validates required fields and submits"
+      },
+      {
+        "id": 11,
+        "name": "Issue appears in view after creation",
+        "feature": "issue_management.create_issue.success",
+        "expected": "New issue appears in current board/list and can be opened"
+      },
+      {
+        "id": 12,
+        "name": "Can edit issue fields inline",
+        "feature": "issue_management.issue_detail.inline_editing",
+        "expected": "Editing title/status/priority/assignee persists via PATCH /issues/{id}"
+      },
+      {
+        "id": 13,
+        "name": "Can add comment to issue",
+        "feature": "comments.crud",
+        "expected": "Comment posts and appears in list"
+      },
+      {
+        "id": 14,
+        "name": "Search returns relevant results",
+        "feature": "global_search",
+        "expected": "Search by key/title/description returns issues with context"
+      },
+      {
+        "id": 15,
+        "name": "Dark/Light theme toggle works",
+        "feature": "settings.theme_toggle",
+        "expected": "Theme switches immediately and updates persisted preference"
+      },
+      {
+        "id": 16,
+        "name": "Theme persists after page refresh",
+        "feature": "settings.theme_toggle.persistence",
+        "expected": "Refreshing preserves selected theme (localStorage + /settings/me)"
+      }
+    ]
+  }
+}

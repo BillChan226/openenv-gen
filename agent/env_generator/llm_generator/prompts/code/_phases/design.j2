@@ -1,44 +1,110 @@
 <DESIGN_SPEC_REQUIREMENTS>
-**CRITICAL: Generate THREE JSON specification files (NOT markdown!)**
+**CRITICAL: Generate FOUR JSON specification files (NOT markdown!)**
+
+These specs enable PARALLEL development of Database, Backend, and Frontend.
+Be EXHAUSTIVE - these are the contracts that all teams work from.
 
 You must create exactly these files:
 
-### 1. design/spec.api.json - Complete REST API Contract
+### 1. design/spec.api.json - Complete REST API Contract (CRITICAL FOR PARALLEL EXECUTION)
+
+This is the SINGLE SOURCE OF TRUTH for frontend-backend communication.
 
 Required sections:
-- `conventions`: base_url ("/api"), auth method (JWT Bearer), error format, pagination
-- `schemas`: All entity types with full JSON Schema (User, Project, Issue, etc.)
+- `conventions`: 
+  - base_url: "/api"
+  - auth_method: "JWT Bearer"
+  - error_format: { error: { code, message, details } }
+  - pagination: { page, pageSize, total }
+  - **response_wrapper**: Specify how list responses are wrapped (e.g., { items: [...] } or { issues: [...] })
+  
+- `schemas`: All entity types with full JSON Schema
+  ```json
+  {
+    "User": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "email": { "type": "string", "format": "email" },
+        ...
+      },
+      "required": ["id", "email"]
+    }
+  }
+  ```
+
 - `endpoints`: EVERY REST endpoint with:
   - path, method, summary
   - auth_required (true/false)
-  - request body schema
-  - response schemas for each status code
+  - request: { body: schema, query: params }
+  - response: { 200: schema, 400: error_schema, etc. }
+  - **response_key**: The key used to wrap the response (e.g., "items", "issue", "user")
 
 **MUST include these auth endpoints:**
 ```json
-{ "path": "/auth/register", "method": "POST", "auth_required": false }
-{ "path": "/auth/login", "method": "POST", "auth_required": false }
-{ "path": "/auth/me", "method": "GET", "auth_required": true }
+{ "path": "/auth/register", "method": "POST", "auth_required": false, "response_key": "user" }
+{ "path": "/auth/login", "method": "POST", "auth_required": false, "response_key": "token" }
+{ "path": "/auth/me", "method": "GET", "auth_required": true, "response_key": "user" }
 { "path": "/auth/logout", "method": "POST", "auth_required": true }
 ```
 
-### 2. design/spec.project.json - Business Logic & Domain Model
+**CRITICAL CONSISTENCY RULE:**
+- If backend returns `{ items: [...] }`, frontend MUST expect `data.items`
+- If backend returns `{ issues: [...] }`, frontend MUST expect `data.issues`
+- Document this in the spec to prevent mismatches!
+
+### 2. design/spec.database.json - Database Schema Contract (NEW)
+
+This enables database to be built in parallel with backend.
+
+Required sections:
+- `tables`: All tables with columns, types, constraints
+  ```json
+  {
+    "users": {
+      "columns": {
+        "id": { "type": "UUID", "primary": true, "default": "gen_random_uuid()" },
+        "email": { "type": "VARCHAR(255)", "unique": true, "not_null": true },
+        ...
+      },
+      "indexes": ["email"],
+      "foreign_keys": []
+    }
+  }
+  ```
+- `relationships`: Foreign key relationships between tables
+- `seed_data`: Initial data for development/testing
+  - Must include test users with known passwords
+  - Must include sample data for all entities
+
+### 3. design/spec.project.json - Business Logic & Domain Model
 
 Required sections:
 - `user_roles_and_personas`: All user types with capabilities
 - `permissions_matrix`: What each role can do on each entity
 - `entities`: All domain objects with fields and relationships
 - `workflows`: State machines for entities (e.g., issue status flow)
+- `validation_rules`: Input validation rules for each entity
 
-### 3. design/spec.ui.json - UI Component Inventory
+### 4. design/spec.ui.json - UI Component Inventory
 
 Required sections:
 - `design_tokens`: colors (dark theme), typography, spacing, radius
 - `responsive_behavior`: breakpoints and layout adaptations  
-- `components`: Every UI component with props, callbacks, states
+- `components`: Every UI component with:
+  - props (with types)
+  - callbacks (with signatures)
+  - states
+  - **api_integration**: Which API endpoints this component calls
+- `pages`: Every page with:
+  - route path
+  - required auth
+  - components used
+  - **data_fetching**: Which API endpoints are called and how response is parsed
 
 **IMPORTANT:** 
 - Use `analyze_image` on reference screenshots to extract design tokens and components
 - Be EXHAUSTIVE - missing specs cause issues in later phases
 - Write valid JSON (no trailing commas, no comments)
+- **CONSISTENCY IS CRITICAL**: Response formats in spec.api.json MUST match what frontend expects
 </DESIGN_SPEC_REQUIREMENTS>

@@ -1,0 +1,109 @@
+services:
+  db:
+    build:
+      context: ../app/database
+      dockerfile: Dockerfile
+    container_name: jira-db
+    environment:
+      POSTGRES_DB: jira
+      POSTGRES_USER: jira
+      POSTGRES_PASSWORD: jira
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Still mount init scripts for first-boot convenience, but do NOT rely on them.
+      - ../app/database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jira -d jira"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - jira_net
+
+  # One-shot, repeatable DB init/seed step.
+  # This runs on every `docker compose up` and is safe to re-run because SQL is idempotent.
+  #
+  # The backend service uses:
+  #   depends_on:
+  #     db:      condition: service_healthy
+  #     db_init: condition: service_completed_successfully
+  # so startup ordering is deterministic (requires Docker Compose v2).
+  db_init:
+    image: postgres:16-alpine
+    container_name: jira-db-init
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: jira
+      PGUSER: jira
+      PGPASSWORD: jira
+    volumes:
+      - ../app/database/init:/init:ro
+    command: ["sh", "-lc", "psql -v ON_ERROR_STOP=1 -f /init/01_schema.sql -f /init/02_seed.sql"]
+    restart: "no"
+    networks:
+      - jira_net
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    container_name: jira-backend
+    environment:
+      NODE_ENV: development
+      PORT: 8000
+      # Use service hostname on the compose network
+      DATABASE_URL: postgres://jira:jira@db:5432/jira
+      IN_DOCKER: "true"
+      JWT_SECRET: dev-secret
+      FRONTEND_URL: http://localhost:5173
+      AUTH_TEST_MODE: "true"
+      AUTH_TEST_TOKEN: test-token
+    depends_on:
+      db:
+        condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+    healthcheck:
+      # Use Node itself (available in node:20-alpine) instead of wget/curl.
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://localhost:8000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - jira_net
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+      target: dev
+    container_name: jira-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      VITE_API_BASE_URL: /api
+    ports:
+      - "5173:5173"
+    networks:
+      - jira_net
+
+volumes:
+  postgres_data:
+
+networks:
+  jira_net:
+    driver: bridge

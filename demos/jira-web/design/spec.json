@@ -1,0 +1,340 @@
+{
+  "meta": {
+    "schemaVersion": "1.1.0",
+    "generatedAt": "2025-12-25T00:00:00.000Z",
+    "notes": "Self-contained product spec for the Jira clone. This file is intentionally $ref-free for validators/agents that do not resolve JSON references. The split source specs (spec.project.json/spec.api.json/spec.ui.json) remain as detailed references, but this file is the single consolidated acceptance spec.",
+    "sources": [
+      "spec.project.json",
+      "spec.api.json",
+      "spec.ui.json",
+      "screenshots/jira_ticketing.png",
+      "screenshots/jira_example.png",
+      "screenshots/click_todo_item.png"
+    ]
+  },
+  "project": {
+    "name": "jira",
+    "description": "Jira-like project management app",
+    "stack": {
+      "frontend": "React",
+      "backend": "Node/Express",
+      "database": "PostgreSQL"
+    },
+    "seedData": {
+      "demoCredentials": {
+        "email": "admin@example.com",
+        "password": "Password123!"
+      },
+      "projects": [
+        "ACME",
+        "WEBDEV",
+        "MOBILE"
+      ],
+      "minUsers": 5,
+      "minIssues": 25,
+      "issueStatuses": [
+        "BACKLOG",
+        "TODO",
+        "IN_PROGRESS",
+        "IN_REVIEW",
+        "DONE"
+      ],
+      "issueTypes": [
+        "BUG",
+        "TASK",
+        "STORY",
+        "EPIC"
+      ],
+      "priorities": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ]
+    }
+  },
+  "deployment": {
+    "docker": {
+      "dbInitialization": {
+        "approach": "docker compose one-shot init container",
+        "service": "db_init",
+        "details": [
+          "Postgres runs as service `db` with a healthcheck.",
+          "A one-shot `db_init` service runs SQL scripts (01_schema.sql, 02_seed.sql) against `db` using psql.",
+          "Backend startup is gated on `db` being healthy and `db_init` completing successfully (depends_on conditions).",
+          "If the Postgres data volume already exists, the built-in /docker-entrypoint-initdb.d scripts may not re-run; `db_init` is the deterministic path. For a clean re-init, remove volumes (docker compose down -v)."
+        ]
+      },
+      "backendDependencies": {
+        "productionOnly": true,
+        "requirement": "Backend Docker image installs production dependencies only (npm ci --omit=dev). The `start` script must run with plain node and must not require devDependencies (nodemon/ts-node/etc.)."
+      }
+    }
+  },
+  "ux": {
+    "themes": {
+      "modes": [
+        "light",
+        "dark"
+      ],
+      "persistence": "localStorage+server",
+      "toggleLocations": [
+        "header",
+        "settings"
+      ],
+      "requirements": [
+        "Theme toggle must work and persist after refresh",
+        "All pages must be readable in both themes"
+      ]
+    },
+    "globalStates": {
+      "loading": [
+        "skeletons",
+        "spinners"
+      ],
+      "error": [
+        "inline banner",
+        "retry button"
+      ],
+      "empty": [
+        "helpful message",
+        "primary CTA"
+      ],
+      "toasts": [
+        "created",
+        "updated",
+        "deleted"
+      ]
+    },
+    "responsiveness": {
+      "sidebar": "collapsible",
+      "layout": "sidebar + header + content",
+      "minSupported": "mobile to desktop"
+    }
+  },
+  "routes": [
+    {
+      "path": "/login",
+      "name": "Login",
+      "states": [
+        "idle",
+        "submitting",
+        "error"
+      ],
+      "acceptance": [
+        "Demo credentials are pre-filled",
+        "Successful login redirects to /dashboard",
+        "Session persists on refresh"
+      ]
+    },
+    {
+      "path": "/register",
+      "name": "Register",
+      "states": [
+        "idle",
+        "submitting",
+        "validation_error"
+      ],
+      "acceptance": [
+        "Creates account and logs in or redirects to login"
+      ]
+    },
+    {
+      "path": "/dashboard",
+      "name": "Dashboard",
+      "states": [
+        "loading",
+        "ready",
+        "empty",
+        "error"
+      ],
+      "acceptance": [
+        "Displays all projects as clickable cards",
+        "Project card shows name, key, description, issue count",
+        "Create new project button opens form and creates project"
+      ]
+    },
+    {
+      "path": "/projects/:projectKey/board",
+      "name": "Project Board",
+      "states": [
+        "loading",
+        "ready",
+        "empty",
+        "error"
+      ],
+      "acceptance": [
+        "Shows columns: Backlog, To Do, In Progress, In Review, Done",
+        "Issue cards show key, title, assignee avatar, priority badge",
+        "Drag-and-drop between columns updates status via API",
+        "Visual feedback during drag (highlight/placeholder)"
+      ]
+    },
+    {
+      "path": "/projects/:projectKey/list",
+      "name": "Project List",
+      "states": [
+        "loading",
+        "ready",
+        "empty",
+        "error"
+      ],
+      "acceptance": [
+        "Table columns: Key, Title, Status, Priority, Assignee, Created",
+        "Sortable columns",
+        "Inline status dropdown updates issue",
+        "Click row opens issue detail"
+      ]
+    },
+    {
+      "path": "/projects/:projectKey/summary",
+      "name": "Project Summary",
+      "states": [
+        "loading",
+        "ready",
+        "empty_activity"
+      ],
+      "acceptance": [
+        "Issue count by status (chart)",
+        "Recent activity timeline",
+        "Assignee workload distribution",
+        "Quick links to filtered issue lists"
+      ]
+    },
+    {
+      "path": "/search",
+      "name": "Search",
+      "states": [
+        "loading",
+        "ready",
+        "empty",
+        "error"
+      ],
+      "acceptance": [
+        "Search by issue key or text",
+        "Filters: project, status, type, priority, assignee",
+        "Results show key, title, status, priority, assignee"
+      ]
+    },
+    {
+      "path": "/settings",
+      "name": "Settings",
+      "states": [
+        "loading",
+        "ready",
+        "error"
+      ],
+      "acceptance": [
+        "Profile settings can be viewed and updated",
+        "Theme preference can be changed",
+        "Logout button ends session"
+      ]
+    }
+  ],
+  "api": {
+    "basePath": "/api",
+    "auth": {
+      "token": {
+        "type": "jwt",
+        "transport": "Authorization: Bearer",
+        "storage": "memory+localStorage"
+      },
+      "endpoints": {
+        "login": "/api/auth/login",
+        "logout": "/api/auth/logout",
+        "me": "/api/auth/me"
+      }
+    },
+    "endpoints": {
+      "health": "/health",
+      "projects": "/api/projects",
+      "issues": "/api/issues",
+      "comments": "/api/comments",
+      "settings": "/api/settings",
+      "search": "/api/search"
+    }
+  },
+  "dataModel": {
+    "entities": {
+      "user": {
+        "fields": [
+          "id",
+          "email",
+          "name",
+          "passwordHash",
+          "createdAt"
+        ]
+      },
+      "project": {
+        "fields": [
+          "id",
+          "key",
+          "name",
+          "description",
+          "createdAt"
+        ]
+      },
+      "issue": {
+        "fields": [
+          "id",
+          "projectId",
+          "key",
+          "title",
+          "description",
+          "status",
+          "type",
+          "priority",
+          "assigneeId",
+          "reporterId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "comment": {
+        "fields": [
+          "id",
+          "issueId",
+          "authorId",
+          "body",
+          "createdAt"
+        ]
+      }
+    }
+  },
+  "ui": {
+    "layout": {
+      "shell": "AppShell",
+      "regions": [
+        "sidebar",
+        "header",
+        "content"
+      ]
+    },
+    "components": {
+      "sidebar": {
+        "items": [
+          "Dashboard",
+          "Projects",
+          "Search",
+          "Settings"
+        ]
+      },
+      "header": {
+        "items": [
+          "breadcrumbs",
+          "search",
+          "themeToggle",
+          "userMenu"
+        ]
+      }
+    }
+  },
+  "acceptance": {
+    "docker": [
+      "docker compose -f docker/docker-compose.yml build",
+      "docker compose -f docker/docker-compose.yml up -d",
+      "curl -f http://localhost:8000/health returns 200",
+      "DB initialization is deterministic: backend waits for db healthcheck and db_init completion"
+    ]
+  }
+}
