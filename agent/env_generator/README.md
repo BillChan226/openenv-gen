@@ -1,6 +1,6 @@
 # Environment Generator
 
-A multi-agent system for generating OpenEnv-compatible environments, built on the AgentForge framework.
+A **multi-agent system** for generating complete, runnable web environments through parallel collaborative development.
 
 ## Quick Start
 
@@ -8,78 +8,140 @@ A multi-agent system for generating OpenEnv-compatible environments, built on th
 # Set API key
 export OPENAI_API_KEY=sk-...
 
-# Generate a calendar app
-cd /path/to/Agents/env_generator
-python -m llm_generator.main --name calendar --domain calendar --description "A calendar app"
+# Generate a Jira-like app
+cd /path/to/agent/env_generator
+python -m llm_generator.main \
+    --name jira \
+    --description "Jira-like project management with kanban boards"
 ```
 
 ## Architecture
 
+### Multi-Agent System
+
 ```
-GeneratorOrchestrator (Coordinator)
-    │
-    ├── Phase: design    → env_spec.json
-    ├── Phase: backend   → FastAPI (models, schemas, routers)
-    ├── Phase: frontend  → React (pages, components, services)
-    ├── Phase: openenv   → OpenEnv adapter
-    └── Phase: docker    → Docker configuration
-    
-Each phase uses CodeGeneratorAgent with:
-    THINK → PLAN → GENERATE → REFLECT → FIX (iterative)
+┌─────────────────────────────────────────────────────────────────┐
+│                     ORCHESTRATOR (Event-driven)                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+   ┌──────────────────────────┼──────────────────────────┐
+   │                          │                          │
+   ▼                          ▼                          ▼
+
+╔═══════════════════════════════════════════════════════════════╗
+║                    PHASE 1: DESIGN (Sequential)                ║
+║  UserAgent ──refine──► DesignAgent ──specs──► spec.*.json     ║
+╚═══════════════════════════════════════════════════════════════╝
+                              │
+╔═══════════════════════════════════════════════════════════════╗
+║                 PHASE 2: DEVELOPMENT (Parallel)                ║
+║      ┌─────────────┐ ┌─────────────┐ ┌─────────────┐          ║
+║      │  Database   │ │   Backend   │ │  Frontend   │          ║
+║      │   Agent     │ │   Agent     │ │   Agent     │          ║
+║      └─────────────┘ └─────────────┘ └─────────────┘          ║
+╚═══════════════════════════════════════════════════════════════╝
+                              │
+╔═══════════════════════════════════════════════════════════════╗
+║                 PHASE 3: VERIFICATION & FIX LOOP               ║
+║  UserAgent(test) → Issues → Parallel Fix → Verify → Done      ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
+### 5 Specialized Agents
+
+| Agent | Role | Workspace | Key Tools |
+|-------|------|-----------|-----------|
+| **UserAgent** | PM/QA: Requirements, testing, issues | Full read | Browser, Docker, Vision |
+| **DesignAgent** | Architect: Specs, contracts | `design/` | File, Analysis |
+| **DatabaseAgent** | DBA: Schema, migrations, data | `app/database/` | File, DataEngine |
+| **BackendAgent** | Backend Dev: APIs, routes | `app/backend/` | File, Runtime |
+| **FrontendAgent** | Frontend Dev: UI, components | `app/frontend/` | File, Runtime |
+
+### Inter-Agent Communication
+
+Agents communicate in real-time via MessageBus:
+
+```python
+# Ask and wait for answer
+schema = await self.ask("design", "What's the database schema?")
+
+# Send notification
+await self.tell("frontend", "API ready for integration")
+
+# Broadcast to all
+await self.broadcast("Database migration complete")
 ```
 
 ## Key Features
 
-### 1. Iterative Generation (Not One-Shot)
+### 1. Parallel Development
 
-Unlike simple generators, each phase runs iteratively:
+Database, Backend, and Frontend agents work **simultaneously**, reducing generation time by ~3x.
 
+### 2. Workspace Isolation
+
+Each agent has restricted write access:
+- DatabaseAgent → `app/database/`
+- BackendAgent → `app/backend/`
+- FrontendAgent → `app/frontend/`
+
+### 3. Dynamic Port Allocation
+
+No hardcoded ports - agents find available ports automatically:
+```python
+context.api_port = 8000    # Or next available
+context.ui_port = 3000     # Or next available
 ```
-THINK    → Analyze what needs to be done
-PLAN     → Break into steps, identify dependencies  
-GENERATE → Create files one by one
-REFLECT  → Check for errors, import issues
-FIX      → If issues found, analyze and fix
-(repeat until satisfied)
+
+### 4. Real Data Loading (DataEngine)
+
+DatabaseAgent can load real data from HuggingFace:
+```python
+# Automatic based on project description
+await db_agent._load_real_data(schema)
+
+# Manual
+await db_agent.load_dataset("milistu/AMAZON-Products-2023", "products.db")
 ```
 
-### 2. Tool-Augmented Generation
+### 5. Checkpoint & Resume
 
-Agents have access to developer tools (like how I work):
-
-| Tool | Description |
-|------|-------------|
-| `read_file` | Read existing files for context |
-| `write_file` | Create new files |
-| `grep` | Search for patterns in code |
-| `search_replace` | Make targeted modifications |
-| `lint` | Check code for errors |
-| `syntax_check` | Verify syntax before writing |
-
-### 3. Cross-Phase Consistency
-
-The orchestrator verifies:
-- Backend endpoints match frontend API calls
-- Imports reference existing files
-- Database models match schemas
+Generation progress is saved automatically:
+```bash
+# Resume interrupted generation
+python -m llm_generator.main --name jira --resume
+```
 
 ## Directory Structure
 
 ```
 env_generator/
-├── __init__.py
-├── README.md
-├── generated/              # Output directory
-└── llm_generator/          # Main generator module
-    ├── __init__.py
-    ├── main.py             # CLI entry point
-    ├── context.py          # Shared generation context
-    ├── agents/
-    │   ├── code_agent.py   # CodeGeneratorAgent (THINK/PLAN/GENERATE/REFLECT/FIX)
-    │   └── orchestrator.py # GeneratorOrchestrator (coordinates phases)
-    └── tools/
-        ├── file_tools.py   # read_file, write_file, list_dir
-        └── code_tools.py   # grep, search_replace, lint, syntax_check
+├── llm_generator/
+│   ├── main.py                 # CLI entry point
+│   ├── multi_agent/            # ⭐ Multi-agent system
+│   │   ├── orchestrator.py     # Event-driven coordinator
+│   │   ├── workspace_manager.py # File access control
+│   │   ├── tools.py            # Tool assignment
+│   │   ├── agents/
+│   │   │   ├── base.py         # EnvGenAgent base class
+│   │   │   ├── user_agent.py
+│   │   │   ├── design_agent.py
+│   │   │   ├── database_agent.py
+│   │   │   ├── backend_agent.py
+│   │   │   └── frontend_agent.py
+│   │   └── prompts/            # Jinja2 templates
+│   │       ├── user_agent.j2
+│   │       ├── design_agent.j2
+│   │       └── code_agents.j2
+│   ├── tools/                  # ~60 tools
+│   │   ├── file_tools.py
+│   │   ├── browser/
+│   │   ├── docker_tools.py
+│   │   └── ...
+│   ├── checkpoint.py           # Save/resume
+│   ├── context.py              # Shared state
+│   └── progress.py             # Event streaming
+└── README.md
 ```
 
 ## Usage
@@ -87,47 +149,53 @@ env_generator/
 ### CLI
 
 ```bash
-# Basic usage
-python -m llm_generator.main --name myapp --domain custom
+# Basic generation
+python -m llm_generator.main \
+    --name jira \
+    --description "Jira-like project management"
 
-# With description
-python -m llm_generator.main --name shop --domain ecommerce \
-    --description "An e-commerce platform with products and orders"
+# With specific provider
+python -m llm_generator.main \
+    --name shop \
+    --description "E-commerce platform" \
+    --provider google \
+    --model gemini-2.0-flash-exp
+
+# Resume from checkpoint
+python -m llm_generator.main --name jira --resume
 
 # Verbose output
-python -m llm_generator.main --name calendar --domain calendar --verbose
-
-# Custom model
-python -m llm_generator.main --name api --model gpt-4-turbo
+python -m llm_generator.main --name app --verbose
 ```
 
 ### Python API
 
 ```python
 import asyncio
-from env_generator.llm_generator import GeneratorOrchestrator
-from utils.config import AgentConfig, LLMConfig, LLMProvider
+from pathlib import Path
+from llm_generator.multi_agent import Orchestrator
+from utils.config import LLMConfig, LLMProvider
 
 async def main():
-    config = AgentConfig(
-        agent_name="Generator",
-        llm=LLMConfig(
-            provider=LLMProvider.OPENAI,
-            model_name="gpt-4o",
-            api_key="sk-...",
-        ),
+    llm_config = LLMConfig(
+        provider=LLMProvider.OPENAI,
+        model_name="gpt-4o",
+        api_key="sk-...",
     )
     
-    orchestrator = GeneratorOrchestrator(config, output_dir=Path("./generated"))
-    await orchestrator.initialize()
-    
-    result = await orchestrator.generate_environment(
-        name="myapp",
-        description="My application",
-        domain_type="custom",
+    orchestrator = Orchestrator(
+        llm_config=llm_config,
+        output_dir=Path("./generated/myapp"),
+        verbose=True,
     )
     
-    print(f"Generated {result['total_files']} files")
+    result = await orchestrator.run(
+        goal="Create a project management tool like Jira",
+        requirements=["Kanban boards", "Issue tracking", "User authentication"],
+    )
+    
+    print(f"Success: {result.success}")
+    print(f"Files generated: {len(result.phases_completed)}")
 
 asyncio.run(main())
 ```
@@ -135,72 +203,40 @@ asyncio.run(main())
 ## Generated Output
 
 ```
-generated/
-└── calendar/
-    ├── env_spec.json           # Environment specification
-    ├── calendar_api/           # FastAPI backend
-    │   ├── main.py
-    │   ├── models.py
-    │   ├── schemas.py
-    │   ├── database.py
-    │   ├── routers/
-    │   │   └── auth.py
-    │   ├── requirements.txt
-    │   └── Dockerfile
-    ├── calendar_ui/            # React frontend
-    │   ├── package.json
-    │   ├── src/
-    │   │   ├── App.tsx
-    │   │   ├── main.tsx
-    │   │   ├── contexts/
-    │   │   ├── pages/
-    │   │   └── services/
-    │   └── Dockerfile
-    ├── openenv_adapter/        # OpenEnv integration
-    │   ├── models.py
-    │   └── server/
-    │       └── environment.py
-    ├── docker-compose.yml
-    └── generation_result.json  # Generation report
+generated/jira/
+├── design/
+│   ├── README.md              # Project overview
+│   ├── spec.api.json          # API contracts (with response_key)
+│   ├── spec.database.json     # Database schema
+│   └── spec.ui.json           # UI components
+├── app/
+│   ├── frontend/              # React + Vite
+│   │   ├── src/
+│   │   │   ├── pages/
+│   │   │   ├── components/
+│   │   │   └── services/api.js
+│   │   └── package.json
+│   ├── backend/               # Express.js
+│   │   ├── routes/
+│   │   ├── middleware/
+│   │   └── server.js
+│   ├── database/              # PostgreSQL
+│   │   ├── init.sql
+│   │   ├── seed.sql
+│   │   └── Dockerfile
+│   └── data/                  # Real data (if loaded)
+│       └── products.db
+├── docker/
+│   └── docker-compose.yml
+├── env/                       # OpenEnv adapter
+└── .checkpoint.json           # Resume state
 ```
 
-## How It Works
-
-### CodeGeneratorAgent
-
-The core agent that generates code with thinking capabilities:
-
-```python
-class CodeGeneratorAgent(PlanningAgent):
-    """
-    Agent that generates code with:
-    - think(): Analyze task before acting
-    - plan_generation(): Create step-by-step plan
-    - generate_file(): Generate with syntax verification
-    - reflect_on_generation(): Check for issues
-    - fix_issues(): Analyze and fix problems
-    """
-```
-
-### GeneratorOrchestrator
-
-Coordinates multiple phases:
-
-```python
-class GeneratorOrchestrator(PlanningAgent):
-    PHASES = ["design", "backend", "frontend", "openenv", "docker"]
-    
-    async def generate_environment(self, name, description, domain_type):
-        for phase in self.PHASES:
-            result = await self._run_phase(phase)
-            # Each phase: THINK → PLAN → GENERATE → REFLECT → FIX
-```
-
-## Based On
+## Built On
 
 Built on the AgentForge framework (`utils/`):
 - `BaseAgent` - Agent lifecycle management
-- `PlanningAgent` - Planning and reasoning capabilities  
-- `ReActEngine` - THINK-ACTION-OBSERVATION loop
+- `MessageBus` - Inter-agent communication
+- `LLM` - Multi-provider LLM client
 - `ToolRegistry` - Tool management
-- `LLM` - LLM client wrapper
+- `PromptManager` - Jinja2 prompt templates
