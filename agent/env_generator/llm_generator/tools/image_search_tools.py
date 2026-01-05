@@ -1,7 +1,12 @@
 """
-Image Search Tools - Search and download images from the web
+Image Tools - Search, download, and capture images
 
-Enables agents to find reference images, icons, and UI components online.
+Available tools:
+- search_icons: Find icons and SVGs from Iconify
+- search_photos: Find photos and UI screenshots via Google
+- search_logos: Find company/brand logos
+- save_image: Download any image URL to workspace
+- capture_webpage: Take screenshot of live webpage
 """
 
 import asyncio
@@ -19,30 +24,30 @@ from utils.tool import BaseTool, ToolResult, create_tool_param, ToolCategory
 from workspace import Workspace
 
 
-class SearchImageTool(BaseTool):
-    """Search for icons and UI components using Iconify API."""
+# =============================================================================
+# 1. ICON SEARCH - Iconify API for icons and SVGs
+# =============================================================================
+
+class IconSearchTool(BaseTool):
+    """Search for icons and SVGs using Iconify API (100+ icon sets)."""
     
-    NAME = "search_image"
+    NAME = "search_icons"
     
-    DESCRIPTION = """Search for icons and UI components.
+    DESCRIPTION = """Search for icons and SVGs.
 
-Returns a list of image URLs that can be downloaded using download_image.
+Find icons from 100+ icon sets including Material Design, FontAwesome, Heroicons, etc.
 
-**For icons and SVGs - use this tool:**
-    search_image "menu icon"
-    search_image "notification bell icon"
-    search_image "dashboard icon"
-    search_image "search magnifying glass"
+Examples:
+    search_icons "hamburger menu"
+    search_icons "shopping cart"
+    search_icons "notification bell"
+    search_icons "user avatar"
+    search_icons "arrow right"
 
-**For photos and screenshots - use google_image_search instead:**
-    google_image_search "food delivery app screenshot"
-    google_image_search "restaurant website design"
+Returns SVG URLs that can be saved with save_image tool.
 
-Sources searched:
-- Iconify (icons and SVGs from 100+ icon sets)
-- UI component patterns
-
-Note: For stock photos, use google_image_search which provides better results.
+Note: For photos/screenshots, use search_photos instead.
+Note: For company logos, use search_logos instead.
 """
     
     def __init__(self, workspace: Workspace = None):
@@ -63,24 +68,24 @@ Note: For stock photos, use google_image_search which provides better results.
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Search query for images"
+                        "description": "Icon to search for (e.g., 'shopping cart', 'menu', 'user')"
                     },
-                    "image_type": {
+                    "style": {
                         "type": "string",
-                        "enum": ["photo", "icon", "ui", "any"],
-                        "description": "Type of image to search for (default: any)"
+                        "enum": ["any", "outline", "filled", "rounded"],
+                        "description": "Icon style preference (default: any)"
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Maximum number of results (default: 10)"
+                        "description": "Max results (default: 10)"
                     }
                 },
                 "required": ["query"]
             }
         )
     
-    async def execute(self, query: str, image_type: str = "any", limit: int = 10) -> ToolResult:
-        """Search for images"""
+    async def execute(self, query: str, style: str = "any", limit: int = 10) -> ToolResult:
+        """Search Iconify for icons"""
         try:
             import aiohttp
             import ssl
@@ -88,291 +93,98 @@ Note: For stock photos, use google_image_search which provides better results.
         except ImportError:
             return ToolResult(
                 success=False,
-                error_message="aiohttp not installed. Run: pip install aiohttp certifi"
+                error_message="Missing dependency. Run: pip install aiohttp certifi"
             )
         
-        results = []
-        
         try:
-            # Create SSL context to handle certificate issues on macOS
             ssl_context = ssl.create_default_context(cafile=certifi.where())
             connector = aiohttp.TCPConnector(ssl=ssl_context)
+            
             async with aiohttp.ClientSession(connector=connector) as session:
-                # Search based on image type
-                if image_type in ["icon", "any"]:
-                    icon_results = await self._search_iconify(session, query, limit)
-                    results.extend(icon_results)
+                # Build query with style preference
+                search_query = query
+                if style != "any":
+                    search_query = f"{query} {style}"
                 
-                # Note: For photos, use google_image_search tool instead
-                # Unsplash Source API was deprecated in 2023
+                encoded_query = urllib.parse.quote(search_query)
+                url = f"https://api.iconify.design/search?query={encoded_query}&limit={limit}"
                 
-                if image_type in ["ui", "any"]:
-                    ui_results = await self._search_ui_patterns(session, query, limit)
-                    results.extend(ui_results)
-            
-            # Deduplicate and limit
-            seen_urls = set()
-            unique_results = []
-            for r in results:
-                if r["url"] not in seen_urls:
-                    seen_urls.add(r["url"])
-                    unique_results.append(r)
-                    if len(unique_results) >= limit:
-                        break
-            
-            if not unique_results:
-                return ToolResult(
-                    success=True,
-                    data={
-                        "query": query,
-                        "results": [],
-                        "count": 0,
-                        "message": f"No images found for '{query}'. Try different keywords."
-                    }
-                )
-            
-            return ToolResult(
-                success=True,
-                data={
-                    "query": query,
-                    "results": unique_results,
-                    "count": len(unique_results),
-                    "message": f"Found {len(unique_results)} images for '{query}'"
-                }
-            )
-            
-        except Exception as e:
-            self._logger.error(f"Image search failed: {e}")
-            return ToolResult(success=False, error_message=f"Search failed: {e}")
-    
-    async def _search_iconify(self, session, query: str, limit: int) -> List[Dict]:
-        """Search Iconify API for icons"""
-        results = []
-        try:
-            # Iconify search API
-            encoded_query = urllib.parse.quote(query)
-            url = f"https://api.iconify.design/search?query={encoded_query}&limit={limit}"
-            
-            async with session.get(url, timeout=10) as resp:
-                if resp.status == 200:
+                async with session.get(url, timeout=10) as resp:
+                    if resp.status != 200:
+                        return ToolResult(success=False, error_message=f"Iconify API error: HTTP {resp.status}")
+                    
                     data = await resp.json()
                     icons = data.get("icons", [])
                     
+                    if not icons:
+                        return ToolResult(
+                            success=True,
+                            data={
+                                "query": query,
+                                "results": [],
+                                "count": 0,
+                                "hint": f"No icons found for '{query}'. Try simpler keywords like 'cart', 'menu', 'user'."
+                            }
+                        )
+                    
+                    results = []
                     for icon in icons[:limit]:
-                        # icon format: "prefix:name"
                         parts = icon.split(":")
                         if len(parts) == 2:
                             prefix, name = parts
-                            svg_url = f"https://api.iconify.design/{prefix}/{name}.svg"
                             results.append({
-                                "url": svg_url,
-                                "title": f"{prefix}:{name}",
-                                "source": "iconify",
-                                "type": "icon",
+                                "name": f"{prefix}:{name}",
+                                "url": f"https://api.iconify.design/{prefix}/{name}.svg",
+                                "preview": f"https://api.iconify.design/{prefix}/{name}.svg?width=64",
+                                "set": prefix,
                                 "format": "svg"
                             })
-        except Exception as e:
-            self._logger.debug(f"Iconify search failed: {e}")
-        
-        return results
-    
-    
-    async def _search_ui_patterns(self, session, query: str, limit: int) -> List[Dict]:
-        """Search for UI patterns and components"""
-        results = []
-        
-        # Provide curated UI resource links based on common queries
-        ui_resources = {
-            "button": [
-                {"url": "https://api.iconify.design/mdi/button-cursor.svg", "title": "Button Icon", "format": "svg"},
-            ],
-            "navbar": [
-                {"url": "https://api.iconify.design/mdi/menu.svg", "title": "Menu Icon", "format": "svg"},
-            ],
-            "dashboard": [
-                {"url": "https://api.iconify.design/mdi/view-dashboard.svg", "title": "Dashboard Icon", "format": "svg"},
-            ],
-            "notification": [
-                {"url": "https://api.iconify.design/mdi/bell.svg", "title": "Notification Bell", "format": "svg"},
-            ],
-            "search": [
-                {"url": "https://api.iconify.design/mdi/magnify.svg", "title": "Search Icon", "format": "svg"},
-            ],
-            "settings": [
-                {"url": "https://api.iconify.design/mdi/cog.svg", "title": "Settings Icon", "format": "svg"},
-            ],
-            "user": [
-                {"url": "https://api.iconify.design/mdi/account.svg", "title": "User Icon", "format": "svg"},
-            ],
-            "avatar": [
-                {"url": "https://api.iconify.design/mdi/account-circle.svg", "title": "Avatar Icon", "format": "svg"},
-            ],
-        }
-        
-        # Check if query matches any UI patterns
-        query_lower = query.lower()
-        for keyword, resources in ui_resources.items():
-            if keyword in query_lower:
-                for res in resources:
-                    results.append({
-                        **res,
-                        "source": "ui_patterns",
-                        "type": "ui"
-                    })
-        
-        return results[:limit]
-
-
-class DownloadImageTool(BaseTool):
-    """Download an image from URL to the workspace."""
-    
-    NAME = "download_image"
-    
-    DESCRIPTION = """Download an image from a URL to your workspace.
-
-Use this after search_image, google_image_search, or logo_search to download images.
-
-Examples:
-    download_image "https://example.com/image.png" "design/reference.png"
-    download_image "https://api.iconify.design/mdi/home.svg" "assets/icons/home.svg"
-    download_image "https://picsum.photos/800/600" "images/background.jpg"
-
-The image will be saved to the specified path in your workspace.
-
-Tip: Use picsum.photos for placeholder images:
-    download_image "https://picsum.photos/seed/food1/800/600" "images/food.jpg"
-"""
-    
-    def __init__(self, workspace: Workspace = None):
-        super().__init__(name=self.NAME, category=ToolCategory.FILE)
-        self.workspace = workspace or Workspace(Path.cwd())
-        self._logger = logging.getLogger(__name__)
-    
-    @property
-    def tool_definition(self):
-        return self.get_tool_param()
-    
-    def get_tool_param(self):
-        return create_tool_param(
-            name=self.NAME,
-            description=self.DESCRIPTION,
-            parameters={
-                "type": "object",
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "URL of the image to download"
-                    },
-                    "destination": {
-                        "type": "string",
-                        "description": "Destination path in workspace (e.g., 'images/icon.svg')"
-                    }
-                },
-                "required": ["url", "destination"]
-            }
-        )
-    
-    async def execute(self, url: str, destination: str) -> ToolResult:
-        """Download image from URL"""
-        try:
-            import aiohttp
-            import ssl
-            import certifi
-        except ImportError:
-            return ToolResult(
-                success=False,
-                error_message="aiohttp not installed. Run: pip install aiohttp certifi"
-            )
-        
-        # Resolve destination path
-        try:
-            dest_path = self.workspace.resolve(destination)
-        except Exception as e:
-            return ToolResult(success=False, error_message=f"Invalid destination: {e}")
-        
-        # Create parent directory
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        try:
-            # Create SSL context to handle certificate issues on macOS
-            ssl_context = ssl.create_default_context(cafile=certifi.where())
-            connector = aiohttp.TCPConnector(ssl=ssl_context)
-            async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.get(url, timeout=30, allow_redirects=True) as resp:
-                    if resp.status != 200:
-                        return ToolResult(
-                            success=False,
-                            error_message=f"Download failed: HTTP {resp.status}"
-                        )
-                    
-                    content_type = resp.headers.get("Content-Type", "")
-                    
-                    # Validate it's an image
-                    if not any(t in content_type.lower() for t in ["image", "svg", "octet-stream"]):
-                        self._logger.warning(f"Content-Type may not be image: {content_type}")
-                    
-                    # Read content
-                    content = await resp.read()
-                    
-                    # Check file size (max 50MB)
-                    if len(content) > 50 * 1024 * 1024:
-                        return ToolResult(
-                            success=False,
-                            error_message=f"Image too large: {len(content) / 1024 / 1024:.1f}MB. Maximum: 50MB"
-                        )
-                    
-                    # Write to file
-                    dest_path.write_bytes(content)
-                    
-                    size = len(content)
-                    size_display = f"{size / 1024:.1f}KB" if size < 1024*1024 else f"{size / 1024 / 1024:.1f}MB"
                     
                     return ToolResult(
                         success=True,
                         data={
-                            "url": url,
-                            "destination": str(dest_path.relative_to(self.workspace.root)),
-                            "size": size_display,
-                            "content_type": content_type,
-                            "message": f"Downloaded to {dest_path.relative_to(self.workspace.root)} ({size_display})"
+                            "query": query,
+                            "results": results,
+                            "count": len(results),
+                            "hint": "Use save_image to download: save_image <url> <path>"
                         }
                     )
                     
         except asyncio.TimeoutError:
-            return ToolResult(success=False, error_message="Download timed out (30s)")
+            return ToolResult(success=False, error_message="Search timed out (10s)")
         except Exception as e:
-            self._logger.error(f"Download failed: {e}")
-            return ToolResult(success=False, error_message=f"Download failed: {e}")
+            self._logger.error(f"Icon search failed: {e}")
+            return ToolResult(success=False, error_message=f"Search failed: {e}")
 
 
-class GoogleImageSearchTool(BaseTool):
-    """Search for images using Google Custom Search API.
-    
-    This provides more comprehensive web image search results including
-    UI screenshots, webpage designs, and real-world application references.
-    """
-    
-    NAME = "google_image_search"
-    
-    DESCRIPTION = """Search for images using Google Custom Search API.
+# =============================================================================
+# 2. PHOTO SEARCH - Google Custom Search API for photos and screenshots
+# =============================================================================
 
-This is the most powerful image search - finds real website screenshots, 
-UI designs, and application references from across the web.
+class PhotoSearchTool(BaseTool):
+    """Search for photos and UI screenshots using Google Custom Search."""
+    
+    NAME = "search_photos"
+    
+    DESCRIPTION = """Search for photos, screenshots, and UI designs.
+
+The most powerful image search - finds real photos, app screenshots, and UI references.
 
 Examples:
-    google_image_search "jira board screenshot"
-    google_image_search "atlassian confluence page design"
-    google_image_search "slack message interface"
-    google_image_search "github pull request UI"
-    google_image_search "notion dashboard design"
+    search_photos "food delivery app screenshot"
+    search_photos "restaurant website design"
+    search_photos "mobile app checkout flow"
+    search_photos "dashboard UI dark mode"
+    search_photos "login page modern design"
 
 Best for:
-- Finding real-world UI/UX references
-- Website and app screenshots
-- Design system examples
-- Competitor analysis
+- Real-world UI/UX references
+- App and website screenshots
+- Design inspiration
+- Stock photos
 
 Requires GOOGLE_API_KEY and GOOGLE_CX environment variables.
+Use search_icons for icons, search_logos for company logos.
 """
     
     def __init__(self, workspace: Workspace = None, api_key: str = None, cx: str = None):
@@ -380,11 +192,9 @@ Requires GOOGLE_API_KEY and GOOGLE_CX environment variables.
         self.workspace = workspace or Workspace(Path.cwd())
         self._logger = logging.getLogger(__name__)
         
-        # API credentials from params or environment
-        # Note: GOOGLE_IMAGE_API_KEY is preferred to avoid confusion with Gemini API key
         import os
         self.api_key = api_key or os.environ.get("GOOGLE_IMAGE_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
-        self.cx = cx or os.environ.get("GOOGLE_CX", "")  # Custom Search Engine ID from https://programmablesearchengine.google.com/
+        self.cx = cx or os.environ.get("GOOGLE_CX", "")
     
     @property
     def tool_definition(self):
@@ -399,40 +209,29 @@ Requires GOOGLE_API_KEY and GOOGLE_CX environment variables.
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Search query for images (be specific, e.g., 'jira board screenshot')"
+                        "description": "What to search for (be specific, e.g., 'uber eats app home screen')"
                     },
-                    "num_results": {
+                    "limit": {
                         "type": "integer",
-                        "description": "Number of results to return (default: 10, max: 10)"
+                        "description": "Max results (default: 10, max: 10)"
                     },
                     "size": {
                         "type": "string",
-                        "enum": ["large", "medium", "small", "any"],
-                        "description": "Preferred image size (default: any)"
-                    },
-                    "file_type": {
-                        "type": "string",
-                        "enum": ["png", "jpg", "gif", "any"],
-                        "description": "Preferred file type (default: any)"
+                        "enum": ["any", "large", "medium", "small"],
+                        "description": "Image size preference (default: any)"
                     }
                 },
                 "required": ["query"]
             }
         )
     
-    async def execute(
-        self, 
-        query: str, 
-        num_results: int = 10, 
-        size: str = "any",
-        file_type: str = "any"
-    ) -> ToolResult:
-        """Search for images using Google Custom Search API"""
+    async def execute(self, query: str, limit: int = 10, size: str = "any") -> ToolResult:
+        """Search Google for photos"""
         
         if not self.api_key or not self.cx:
             return ToolResult(
                 success=False,
-                error_message="Google Image Search not configured. Set GOOGLE_IMAGE_API_KEY (or GOOGLE_API_KEY) and GOOGLE_CX environment variables. Note: GOOGLE_CX is your Custom Search Engine ID from https://programmablesearchengine.google.com/"
+                error_message="Google API not configured. Set GOOGLE_API_KEY and GOOGLE_CX environment variables.\nGet credentials at: https://programmablesearchengine.google.com/"
             )
         
         try:
@@ -442,55 +241,40 @@ Requires GOOGLE_API_KEY and GOOGLE_CX environment variables.
         except ImportError:
             return ToolResult(
                 success=False,
-                error_message="aiohttp not installed. Run: pip install aiohttp certifi"
+                error_message="Missing dependency. Run: pip install aiohttp certifi"
             )
         
-        # Build API URL
-        base_url = "https://www.googleapis.com/customsearch/v1"
+        # Build API request
         params = {
             "key": self.api_key,
             "cx": self.cx,
             "q": query,
             "searchType": "image",
-            "num": min(num_results, 10),  # Max 10 per request
+            "num": min(limit, 10),
         }
         
-        # Add size filter
         if size != "any":
             size_map = {"large": "huge", "medium": "medium", "small": "icon"}
             params["imgSize"] = size_map.get(size, "")
         
-        # Add file type filter
-        if file_type != "any":
-            params["fileType"] = file_type
-        
         try:
-            # Create SSL context to handle certificate issues on macOS
             ssl_context = ssl.create_default_context(cafile=certifi.where())
             connector = aiohttp.TCPConnector(ssl=ssl_context)
+            
             async with aiohttp.ClientSession(connector=connector) as session:
-                url = f"{base_url}?{urllib.parse.urlencode(params)}"
+                url = f"https://www.googleapis.com/customsearch/v1?{urllib.parse.urlencode(params)}"
                 
                 async with session.get(url, timeout=15) as resp:
                     if resp.status == 403:
-                        return ToolResult(
-                            success=False,
-                            error_message="Google API access denied. Check your API key and quota."
-                        )
+                        return ToolResult(success=False, error_message="API access denied. Check API key and quota.")
                     elif resp.status == 400:
-                        return ToolResult(
-                            success=False,
-                            error_message="Invalid request. Check your Custom Search Engine ID (cx)."
-                        )
+                        return ToolResult(success=False, error_message="Invalid request. Check GOOGLE_CX value.")
                     elif resp.status != 200:
-                        return ToolResult(
-                            success=False,
-                            error_message=f"Google API error: HTTP {resp.status}"
-                        )
+                        return ToolResult(success=False, error_message=f"API error: HTTP {resp.status}")
                     
                     data = await resp.json()
-                    
                     items = data.get("items", [])
+                    
                     if not items:
                         return ToolResult(
                             success=True,
@@ -498,7 +282,7 @@ Requires GOOGLE_API_KEY and GOOGLE_CX environment variables.
                                 "query": query,
                                 "results": [],
                                 "count": 0,
-                                "message": f"No images found for '{query}'. Try different keywords."
+                                "hint": f"No photos found for '{query}'. Try different keywords."
                             }
                         )
                     
@@ -507,14 +291,11 @@ Requires GOOGLE_API_KEY and GOOGLE_CX environment variables.
                         image = item.get("image", {})
                         results.append({
                             "url": item.get("link", ""),
-                            "title": item.get("title", ""),
-                            "context_url": image.get("contextLink", ""),  # The webpage containing this image
+                            "title": item.get("title", "")[:60],
+                            "source_page": image.get("contextLink", ""),
                             "thumbnail": image.get("thumbnailLink", ""),
-                            "width": image.get("width", 0),
-                            "height": image.get("height", 0),
-                            "size_bytes": image.get("byteSize", 0),
-                            "mime_type": item.get("mime", ""),
-                            "source": "google",
+                            "size": f"{image.get('width', 0)}x{image.get('height', 0)}",
+                            "format": item.get("mime", "").split("/")[-1] or "unknown"
                         })
                     
                     return ToolResult(
@@ -523,174 +304,44 @@ Requires GOOGLE_API_KEY and GOOGLE_CX environment variables.
                             "query": query,
                             "results": results,
                             "count": len(results),
-                            "message": f"Found {len(results)} images for '{query}'"
+                            "hint": "Use save_image to download: save_image <url> <path>"
                         }
                     )
                     
         except asyncio.TimeoutError:
             return ToolResult(success=False, error_message="Search timed out (15s)")
         except Exception as e:
-            self._logger.error(f"Google image search failed: {e}")
+            self._logger.error(f"Photo search failed: {e}")
             return ToolResult(success=False, error_message=f"Search failed: {e}")
 
 
-class WebScreenshotTool(BaseTool):
-    """Take a screenshot of a webpage for reference.
-    
-    Uses Playwright to capture live webpage screenshots that can be used
-    as design references.
-    """
-    
-    NAME = "web_screenshot"
-    
-    DESCRIPTION = """Take a screenshot of a live webpage for design reference.
-
-Examples:
-    web_screenshot "https://www.atlassian.com/software/jira"
-    web_screenshot "https://github.com" "screenshots/github_home.png"
-    web_screenshot "https://slack.com" "design/slack_ref.png" full_page=true
-
-This captures the current state of a webpage, which is useful for:
-- Getting up-to-date design references
-- Capturing specific pages that aren't in screenshot library
-- Creating comparison references
-
-Requires Playwright to be installed.
-"""
-    
-    def __init__(self, workspace: Workspace = None):
-        super().__init__(name=self.NAME, category=ToolCategory.FILE)
-        self.workspace = workspace or Workspace(Path.cwd())
-        self._logger = logging.getLogger(__name__)
-    
-    @property
-    def tool_definition(self):
-        return self.get_tool_param()
-    
-    def get_tool_param(self):
-        return create_tool_param(
-            name=self.NAME,
-            description=self.DESCRIPTION,
-            parameters={
-                "type": "object",
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "URL of the webpage to screenshot"
-                    },
-                    "destination": {
-                        "type": "string",
-                        "description": "Destination path (default: screenshots/<domain>.png)"
-                    },
-                    "full_page": {
-                        "type": "boolean",
-                        "description": "Capture full page or just viewport (default: false)"
-                    },
-                    "width": {
-                        "type": "integer",
-                        "description": "Viewport width (default: 1280)"
-                    },
-                    "height": {
-                        "type": "integer",
-                        "description": "Viewport height (default: 800)"
-                    }
-                },
-                "required": ["url"]
-            }
-        )
-    
-    async def execute(
-        self, 
-        url: str, 
-        destination: str = None,
-        full_page: bool = False,
-        width: int = 1280,
-        height: int = 800
-    ) -> ToolResult:
-        """Take screenshot of a webpage"""
-        
-        try:
-            from playwright.async_api import async_playwright
-        except ImportError:
-            return ToolResult(
-                success=False,
-                error_message="Playwright not installed. Run: pip install playwright && playwright install"
-            )
-        
-        # Determine destination path
-        if destination:
-            dest_path = self.workspace.resolve(destination)
-        else:
-            # Extract domain for default filename
-            from urllib.parse import urlparse
-            domain = urlparse(url).netloc.replace("www.", "").replace(".", "_")
-            dest_path = self.workspace.root / "screenshots" / f"{domain}.png"
-        
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        try:
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True)
-                context = await browser.new_context(
-                    viewport={"width": width, "height": height}
-                )
-                page = await context.new_page()
-                
-                # Navigate and wait for content
-                await page.goto(url, wait_until="networkidle", timeout=30000)
-                
-                # Take screenshot
-                await page.screenshot(
-                    path=str(dest_path),
-                    full_page=full_page
-                )
-                
-                await browser.close()
-                
-                file_size = dest_path.stat().st_size
-                size_display = f"{file_size / 1024:.1f}KB" if file_size < 1024*1024 else f"{file_size / 1024 / 1024:.1f}MB"
-                
-                return ToolResult(
-                    success=True,
-                    data={
-                        "url": url,
-                        "destination": str(dest_path.relative_to(self.workspace.root)),
-                        "size": size_display,
-                        "dimensions": f"{width}x{height}" if not full_page else "full page",
-                        "message": f"Screenshot saved: {dest_path.relative_to(self.workspace.root)} ({size_display})"
-                    }
-                )
-                
-        except Exception as e:
-            self._logger.error(f"Screenshot failed: {e}")
-            return ToolResult(success=False, error_message=f"Screenshot failed: {e}")
-
+# =============================================================================
+# 3. LOGO SEARCH - Company and brand logos
+# =============================================================================
 
 class LogoSearchTool(BaseTool):
-    """Search for company logos using multiple sources.
+    """Search for company and brand logos."""
     
-    Uses Clearbit for search and Logo.dev/Uplead for logo images.
-    """
+    NAME = "search_logos"
     
-    NAME = "logo_search"
-    
-    DESCRIPTION = """Search for company/brand logos.
+    DESCRIPTION = """Search for company and brand logos.
 
-Get high-quality logos by company name or domain. Great for:
-- Adding brand logos to your UI
-- Creating professional landing pages
-- Building company directories
+Find high-quality logos by company name or domain.
 
 Examples:
-    logo_search "apple"           # Search by company name
-    logo_search "nike.com"        # Search by domain
-    logo_search "stripe"          # Fintech logo
-    logo_search "airbnb"          # Travel logo
+    search_logos "apple"
+    search_logos "google"
+    search_logos "stripe"
+    search_logos "airbnb"
+    search_logos "doordash"
 
-Returns logo URLs that can be downloaded with download_image.
+Best for:
+- Brand logos for UI
+- Company directories
+- Partner/integration pages
 
-If LOGO_DEV_TOKEN is set, uses Logo.dev API for higher quality logos.
-Otherwise uses free alternatives (Uplead, Google favicon).
+Uses Logo.dev (if LOGO_DEV_TOKEN set) or free alternatives.
+Use search_icons for icons, search_photos for photos.
 """
     
     def __init__(self, workspace: Workspace = None, api_token: str = None):
@@ -714,19 +365,19 @@ Otherwise uses free alternatives (Uplead, Google favicon).
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Company name or domain to search for (e.g., 'apple', 'google.com', 'stripe')"
+                        "description": "Company name or domain (e.g., 'apple', 'google.com')"
                     },
-                    "limit": {
+                    "size": {
                         "type": "integer",
-                        "description": "Maximum number of results (default: 5)"
+                        "description": "Logo size in pixels (default: 256)"
                     }
                 },
                 "required": ["query"]
             }
         )
     
-    async def execute(self, query: str, limit: int = 5) -> ToolResult:
-        """Search for company logo"""
+    async def execute(self, query: str, size: int = 256) -> ToolResult:
+        """Search for company logos"""
         try:
             import aiohttp
             import ssl
@@ -734,149 +385,378 @@ Otherwise uses free alternatives (Uplead, Google favicon).
         except ImportError:
             return ToolResult(
                 success=False,
-                error_message="aiohttp not installed. Run: pip install aiohttp certifi"
+                error_message="Missing dependency. Run: pip install aiohttp certifi"
             )
-        
-        results = []
         
         try:
             ssl_context = ssl.create_default_context(cafile=certifi.where())
             connector = aiohttp.TCPConnector(ssl=ssl_context)
             
             async with aiohttp.ClientSession(connector=connector) as session:
-                # Step 1: Use Clearbit Autocomplete to find company domains
+                # Step 1: Find company domain via Clearbit
                 search_url = f"https://autocomplete.clearbit.com/v1/companies/suggest?query={urllib.parse.quote(query)}"
                 
                 companies = []
                 try:
                     async with session.get(search_url, timeout=10) as resp:
                         if resp.status == 200:
-                            data = await resp.json()
-                            companies = data[:limit]
+                            companies = await resp.json()
                 except Exception as e:
-                    self._logger.debug(f"Clearbit search failed: {e}")
+                    self._logger.debug(f"Clearbit lookup failed: {e}")
                 
-                # If no results from search, try direct domain
+                # Fallback: construct domain from query
                 if not companies:
                     domain = query.lower().strip()
                     if "." not in domain:
                         domain = f"{domain}.com"
-                    domain = domain.replace("https://", "").replace("http://", "").replace("www.", "")
-                    domain = domain.split("/")[0]
-                    companies = [{"name": query, "domain": domain}]
+                    domain = domain.replace("https://", "").replace("http://", "").replace("www.", "").split("/")[0]
+                    companies = [{"name": query.title(), "domain": domain}]
                 
-                # Step 2: Get logos for each company
-                for company in companies:
-                    domain = company.get("domain", "")
-                    name = company.get("name", domain)
-                    
-                    if not domain:
-                        continue
-                    
-                    # Try multiple logo sources
-                    logo_sources = []
-                    
-                    # Source 1: Logo.dev (if token available)
-                    if self.api_token:
-                        logo_sources.append({
-                            "url": f"https://img.logo.dev/{domain}?token={self.api_token}&size=256&format=png",
+                # Step 2: Get logo for first match
+                company = companies[0]
+                domain = company.get("domain", "")
+                name = company.get("name", domain)
+                
+                if not domain:
+                    return ToolResult(
+                        success=True,
+                        data={"query": query, "results": [], "count": 0, "hint": "Company not found. Try exact domain (e.g., 'apple.com')."}
+                    )
+                
+                # Try logo sources in order of quality
+                results = []
+                sources_tried = []
+                
+                # Source 1: Logo.dev (best quality, needs token)
+                if self.api_token:
+                    logo_url = f"https://img.logo.dev/{domain}?token={self.api_token}&size={size}&format=png"
+                    if await self._check_url(session, logo_url, use_get=True):
+                        results.append({
+                            "url": logo_url,
+                            "company": name,
+                            "domain": domain,
                             "source": "logo.dev",
-                            "quality": "high"
+                            "quality": "high",
+                            "size": f"{size}x{size}"
                         })
-                    
-                    # Source 2: Uplead (free, no auth needed)
-                    logo_sources.append({
-                        "url": f"https://logo.uplead.com/{domain}",
-                        "source": "uplead",
-                        "quality": "medium"
-                    })
-                    
-                    # Source 3: Google favicon (always works, lower quality)
-                    logo_sources.append({
-                        "url": f"https://www.google.com/s2/favicons?domain={domain}&sz=128",
+                    sources_tried.append("logo.dev")
+                
+                # Source 2: Uplead (free, medium quality)
+                if not results:
+                    uplead_url = f"https://logo.uplead.com/{domain}"
+                    if await self._check_url(session, uplead_url):
+                        results.append({
+                            "url": uplead_url,
+                            "company": name,
+                            "domain": domain,
+                            "source": "uplead",
+                            "quality": "medium"
+                        })
+                    sources_tried.append("uplead")
+                
+                # Source 3: Google Favicon (always works, lower quality)
+                if not results:
+                    favicon_url = f"https://www.google.com/s2/favicons?domain={domain}&sz=128"
+                    results.append({
+                        "url": favicon_url,
+                        "company": name,
+                        "domain": domain,
                         "source": "google_favicon",
-                        "quality": "low"
+                        "quality": "low",
+                        "note": "Favicon only - for better quality, set LOGO_DEV_TOKEN"
                     })
-                    
-                    # Source 4: DuckDuckGo icon
-                    logo_sources.append({
-                        "url": f"https://icons.duckduckgo.com/ip3/{domain}.ico",
-                        "source": "duckduckgo",
-                        "quality": "low"
-                    })
-                    
-                    # Test each source and add working ones
-                    for source_info in logo_sources:
-                        url = source_info["url"]
-                        try:
-                            # Use GET with stream=True for Logo.dev (doesn't support HEAD)
-                            # For others, try HEAD first then fall back to GET
-                            method = "get" if "logo.dev" in url else "head"
-                            
-                            async with session.request(method, url, timeout=5, allow_redirects=True) as resp:
-                                if resp.status == 200:
-                                    content_type = resp.headers.get("Content-Type", "")
-                                    # Accept images, or special cases
-                                    is_image = (
-                                        "image" in content_type or 
-                                        "octet" in content_type or 
-                                        "x-msdos" in content_type or  # Uplead returns this
-                                        url.endswith(".ico") or
-                                        "logo.uplead.com" in url or
-                                        "logo.dev" in url or  # Logo.dev always returns images
-                                        "favicons" in url
-                                    )
-                                    if is_image:
-                                        results.append({
-                                            "url": url,
-                                            "domain": domain,
-                                            "title": f"{name} logo ({source_info['quality']})",
-                                            "company_name": name,
-                                            "source": source_info["source"],
-                                            "quality": source_info["quality"],
-                                            "type": "logo"
-                                        })
-                                        # Only add first working source per company for cleaner results
-                                        break
-                        except:
-                            continue
-            
-            if not results:
+                    sources_tried.append("google_favicon")
+                
                 return ToolResult(
                     success=True,
                     data={
                         "query": query,
-                        "results": [],
-                        "count": 0,
-                        "message": f"No logo found for '{query}'. Try the exact domain (e.g., 'apple.com')."
+                        "results": results,
+                        "count": len(results),
+                        "primary_url": results[0]["url"] if results else None,
+                        "hint": "Use save_image to download: save_image <url> <path>"
                     }
                 )
-            
-            return ToolResult(
-                success=True,
-                data={
-                    "query": query,
-                    "results": results,
-                    "count": len(results),
-                    "message": f"Found {len(results)} logos for '{query}'. Use download_image to save.",
-                    "primary_url": results[0]["url"] if results else None
-                }
-            )
-            
+                
         except asyncio.TimeoutError:
-            return ToolResult(success=False, error_message="Logo search timed out")
+            return ToolResult(success=False, error_message="Search timed out")
         except Exception as e:
             self._logger.error(f"Logo search failed: {e}")
-            return ToolResult(success=False, error_message=f"Logo search failed: {e}")
+            return ToolResult(success=False, error_message=f"Search failed: {e}")
+    
+    async def _check_url(self, session, url: str, use_get: bool = False) -> bool:
+        """Check if URL returns a valid image"""
+        try:
+            method = "get" if use_get else "head"
+            async with session.request(method, url, timeout=5, allow_redirects=True) as resp:
+                if resp.status == 200:
+                    ct = resp.headers.get("Content-Type", "")
+                    return "image" in ct or "octet" in ct or "logo" in url
+        except:
+            pass
+        return False
 
 
-def create_image_search_tools(workspace: Workspace = None, google_api_key: str = None, google_cx: str = None, logo_dev_token: str = None) -> List[BaseTool]:
-    """Create all image search tools"""
+# =============================================================================
+# 4. SAVE IMAGE - Download images to workspace
+# =============================================================================
+
+class SaveImageTool(BaseTool):
+    """Download an image from URL to workspace."""
+    
+    NAME = "save_image"
+    
+    DESCRIPTION = """Download an image from URL to your workspace.
+
+Use after search_icons, search_photos, or search_logos to save images.
+
+Examples:
+    save_image "https://api.iconify.design/mdi/home.svg" "assets/icons/home.svg"
+    save_image "https://example.com/photo.jpg" "images/hero.jpg"
+    save_image "https://picsum.photos/800/600" "images/placeholder.jpg"
+
+Tip: Use picsum.photos for placeholder images:
+    save_image "https://picsum.photos/seed/unique123/800/600" "images/bg.jpg"
+"""
+    
+    def __init__(self, workspace: Workspace = None):
+        super().__init__(name=self.NAME, category=ToolCategory.FILE)
+        self.workspace = workspace or Workspace(Path.cwd())
+        self._logger = logging.getLogger(__name__)
+    
+    @property
+    def tool_definition(self):
+        return self.get_tool_param()
+    
+    def get_tool_param(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "Image URL to download"
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Where to save (e.g., 'images/logo.png', 'assets/icon.svg')"
+                    }
+                },
+                "required": ["url", "path"]
+            }
+        )
+    
+    async def execute(self, url: str, path: str) -> ToolResult:
+        """Download image to workspace"""
+        try:
+            import aiohttp
+            import ssl
+            import certifi
+        except ImportError:
+            return ToolResult(
+                success=False,
+                error_message="Missing dependency. Run: pip install aiohttp certifi"
+            )
+        
+        # Resolve path
+        try:
+            dest = self.workspace.resolve(path)
+        except Exception as e:
+            return ToolResult(success=False, error_message=f"Invalid path: {e}")
+        
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            
+            async with aiohttp.ClientSession(connector=connector) as session:
+                async with session.get(url, timeout=30, allow_redirects=True) as resp:
+                    if resp.status != 200:
+                        return ToolResult(success=False, error_message=f"Download failed: HTTP {resp.status}")
+                    
+                    content = await resp.read()
+                    
+                    # Check size (max 50MB)
+                    if len(content) > 50 * 1024 * 1024:
+                        return ToolResult(success=False, error_message=f"Image too large ({len(content) / 1024 / 1024:.1f}MB > 50MB)")
+                    
+                    dest.write_bytes(content)
+                    
+                    size_kb = len(content) / 1024
+                    size_str = f"{size_kb:.1f}KB" if size_kb < 1024 else f"{size_kb/1024:.1f}MB"
+                    
+                    return ToolResult(
+                        success=True,
+                        data={
+                            "saved_to": str(dest.relative_to(self.workspace.root)),
+                            "size": size_str,
+                            "url": url
+                        }
+                    )
+                    
+        except asyncio.TimeoutError:
+            return ToolResult(success=False, error_message="Download timed out (30s)")
+        except Exception as e:
+            self._logger.error(f"Download failed: {e}")
+            return ToolResult(success=False, error_message=f"Download failed: {e}")
+
+
+# =============================================================================
+# 5. CAPTURE WEBPAGE - Screenshot live webpages
+# =============================================================================
+
+class CaptureWebpageTool(BaseTool):
+    """Take screenshot of a live webpage."""
+    
+    NAME = "capture_webpage"
+    
+    DESCRIPTION = """Take a screenshot of a live webpage for design reference.
+
+Captures the current state of any webpage using Playwright.
+
+Examples:
+    capture_webpage "https://doordash.com"
+    capture_webpage "https://github.com" "screenshots/github.png"
+    capture_webpage "https://stripe.com" "design/stripe_ref.png" full_page=true
+
+Best for:
+- Up-to-date design references
+- Competitor analysis
+- Before/after comparisons
+
+Requires Playwright: pip install playwright && playwright install
+"""
+    
+    def __init__(self, workspace: Workspace = None):
+        super().__init__(name=self.NAME, category=ToolCategory.FILE)
+        self.workspace = workspace or Workspace(Path.cwd())
+        self._logger = logging.getLogger(__name__)
+    
+    @property
+    def tool_definition(self):
+        return self.get_tool_param()
+    
+    def get_tool_param(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "Webpage URL to capture"
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Where to save (default: screenshots/<domain>.png)"
+                    },
+                    "full_page": {
+                        "type": "boolean",
+                        "description": "Capture full scrollable page (default: false)"
+                    },
+                    "width": {
+                        "type": "integer",
+                        "description": "Viewport width (default: 1280)"
+                    },
+                    "height": {
+                        "type": "integer",
+                        "description": "Viewport height (default: 800)"
+                    }
+                },
+                "required": ["url"]
+            }
+        )
+    
+    async def execute(
+        self, 
+        url: str, 
+        path: str = None,
+        full_page: bool = False,
+        width: int = 1280,
+        height: int = 800
+    ) -> ToolResult:
+        """Capture webpage screenshot"""
+        
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError:
+            return ToolResult(
+                success=False,
+                error_message="Playwright not installed. Run: pip install playwright && playwright install"
+            )
+        
+        # Determine save path
+        if path:
+            dest = self.workspace.resolve(path)
+        else:
+            from urllib.parse import urlparse
+            domain = urlparse(url).netloc.replace("www.", "").replace(".", "_")
+            dest = self.workspace.root / "screenshots" / f"{domain}.png"
+        
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                context = await browser.new_context(viewport={"width": width, "height": height})
+                page = await context.new_page()
+                
+                await page.goto(url, wait_until="networkidle", timeout=30000)
+                await page.screenshot(path=str(dest), full_page=full_page)
+                await browser.close()
+                
+                size = dest.stat().st_size
+                size_str = f"{size/1024:.1f}KB" if size < 1024*1024 else f"{size/1024/1024:.1f}MB"
+                
+                return ToolResult(
+                    success=True,
+                    data={
+                        "saved_to": str(dest.relative_to(self.workspace.root)),
+                        "url": url,
+                        "size": size_str,
+                        "dimensions": f"{width}x{height}" if not full_page else "full page"
+                    }
+                )
+                
+        except Exception as e:
+            self._logger.error(f"Screenshot failed: {e}")
+            return ToolResult(success=False, error_message=f"Screenshot failed: {e}")
+
+
+# =============================================================================
+# FACTORY FUNCTION - Create all image tools
+# =============================================================================
+
+def create_image_search_tools(
+    workspace: Workspace = None, 
+    google_api_key: str = None, 
+    google_cx: str = None, 
+    logo_dev_token: str = None
+) -> List[BaseTool]:
+    """Create all image tools.
+    
+    Returns:
+        List of tools: [search_icons, search_photos, search_logos, save_image, capture_webpage]
+    """
     return [
-        SearchImageTool(workspace=workspace),
-        DownloadImageTool(workspace=workspace),
-        GoogleImageSearchTool(workspace=workspace, api_key=google_api_key, cx=google_cx),
-        WebScreenshotTool(workspace=workspace),
+        IconSearchTool(workspace=workspace),
+        PhotoSearchTool(workspace=workspace, api_key=google_api_key, cx=google_cx),
         LogoSearchTool(workspace=workspace, api_token=logo_dev_token),
+        SaveImageTool(workspace=workspace),
+        CaptureWebpageTool(workspace=workspace),
     ]
 
+
+# =============================================================================
+# BACKWARD COMPATIBILITY - Aliases for old tool names
+# =============================================================================
+
+# Aliases so old code still works
+SearchImageTool = IconSearchTool
+GoogleImageSearchTool = PhotoSearchTool
+DownloadImageTool = SaveImageTool
+WebScreenshotTool = CaptureWebpageTool
