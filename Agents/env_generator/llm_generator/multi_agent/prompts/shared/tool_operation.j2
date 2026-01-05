@@ -1,0 +1,105 @@
+{# Shared: Tool-Based Operation Rules #}
+
+{% macro tool_operation_rules() %}
+## CRITICAL: Tool-Based Operation
+
+- ALL your actions MUST be through tool calls. Do NOT output plain text responses.
+- Your response should ALWAYS contain at least one tool call. Never respond with just text.
+
+### Think Tool - USE FREQUENTLY! (After Every Major Action)
+
+**The `think(thought)` tool is your reasoning engine. Use it CONSTANTLY:**
+
+1. **After every tool result**: Reflect on what you learned and plan next move
+2. **Before complex decisions**: Analyze options before choosing
+3. **When debugging**: Think through the problem systematically
+4. **After errors**: Understand what went wrong before retrying
+5. **Every 2-3 actions**: Pause to assess progress and adjust strategy
+
+**Example workflow:**
+```python
+# Step 1: Read design spec
+view("design/spec.api.json")
+
+# Step 2: THINK about what you learned and plan next
+think("Analyzed spec.api.json: 12 endpoints total. Auth uses JWT Bearer tokens. Response format is {items: [...]} for lists. Next: create plan covering all routes.")
+
+# Step 3: Create plan
+plan(action="create", items=["Create auth.js", "Create flights.js", ...])
+
+# Step 4: Write first file
+write_file("app/backend/src/routes/auth.js", content)
+
+# Step 5: THINK about progress and next move
+think("Completed auth.js with login/register/me endpoints. Lint passed. Next: implement flights.js - need to use depart_at column from spec, not depart_time.")
+
+# Step 6: Continue with next file...
+```
+
+### Think Patterns (Copy These!)
+
+```python
+# After reading specs
+think("Key findings from specs: [summarize]. This means I need to: [list actions]")
+
+# After writing a file
+think("Completed [file]. [Any issues?] Next step: [what to do next]")
+
+# When something fails
+think("Error: [describe]. Possible causes: 1) ... 2) ... Most likely: [reason]. Fix: [approach]")
+
+# Before finishing
+think("Progress check: [X] items done, [Y] remaining. All tests passing? Ready to finish? [assessment]")
+
+# When stuck
+think("Stuck on [problem]. Let me break this down: [analysis]. Options: 1) ... 2) ... Best approach: [choice]")
+```
+
+### Other Tool Rules
+
+- For planning: Use the `plan(action, items)` tool to create and track your task list.
+- For any analysis or decision-making, call `think()` first, then take action with appropriate tools.
+
+### File Operation Issues (PREVENT DATA LOSS!)
+
+**1. File Truncation After write_file**
+**Problem**: File appears truncated mid-line after write_file.
+**Cause**: Content generation was cut off or tool timeout.
+**Solution**: ALWAYS `view()` the file after `write_file()` to verify completeness:
+```python
+write_file("app/backend/src/routes/auth.js", content)
+view("app/backend/src/routes/auth.js")  # Verify file is complete!
+lint("app/backend/src/routes/auth.js")   # Check for syntax errors
+```
+**If truncated**: Rewrite the entire file, don't try to append.
+
+**2. str_replace_editor Failures**
+**Problem**: `old_str not found exactly` or `Partial match at line X`
+**Causes**:
+- Whitespace mismatch (spaces vs tabs, trailing spaces)
+- Content changed by another operation
+- Line endings differ (\n vs \r\n)
+
+**Solution**:
+```python
+# Step 1: View the file first to see EXACT current content
+view("path/to/file.js", view_range=[20, 40])
+
+# Step 2: Copy the EXACT text including whitespace
+# Step 3: If still fails, use write_file to replace entire file
+```
+
+**3. Large File Edits**
+**Problem**: Editing large files (>500 lines) is error-prone.
+**Solution**: 
+- Use `view(file, view_range=[start, end])` to see specific sections
+- Make targeted edits with exact context
+- For major rewrites, use `write_file()` instead of `str_replace_editor()`
+
+**4. Always Lint After File Operations**
+```python
+write_file("file.js", content)
+lint("file.js")  # ALWAYS check for syntax errors immediately!
+```
+{% endmacro %}
+

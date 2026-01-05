@@ -1,0 +1,113 @@
+{# Shared: Project Structure #}
+
+{% macro standard_project_structure() %}
+## Project Structure
+
+Standard project structure:
+```
+design/                     # Design specs (Design Agent)
+  README.md                 # Project overview
+  spec.database.json        # Database schema
+  spec.api.json             # API specification
+  spec.ui.json              # UI specification
+
+app/
+  frontend/                 # React + Vite (Frontend Agent)
+    src/                    # ALL source code here
+      pages/                # Page components
+      components/           # Reusable components
+      services/             # API client
+      contexts/             # React contexts
+  backend/                  # Express.js API (Backend Agent)
+    src/                    # ALL source code here
+      routes/               # Route handlers
+      middleware/           # Auth, error handlers
+      utils/                # Helpers
+  database/                 # PostgreSQL (Database Agent)
+    init/                   # SQL scripts
+      01_schema.sql
+      02_seed.sql
+
+docker/
+  docker-compose.yml        # Docker configuration
+```
+
+**CRITICAL:** All source code is in `src/` subdirectories.
+{% endmacro %}
+
+
+{% macro frontend_structure() %}
+## Frontend Directory Structure
+
+```
+app/frontend/
+├── index.html          # HTML entry point
+├── package.json        # Dependencies
+├── vite.config.js      # Vite config with proxy
+├── tailwind.config.cjs # Tailwind configuration
+├── postcss.config.cjs  # PostCSS for Tailwind
+├── Dockerfile          # Container config
+└── src/                # ALL source code goes here
+    ├── main.jsx        # React entry point
+    ├── App.jsx         # Main app with router
+    ├── index.css       # Tailwind imports
+    ├── pages/          # Page components
+    │   ├── Home.jsx
+    │   ├── Flights.jsx
+    │   └── ...
+    ├── components/     # Reusable components
+    │   ├── ui/         # Generic UI (Button, Card, etc.)
+    │   ├── search/     # Search forms
+    │   └── results/    # Result displays
+    ├── services/       # API calls
+    │   └── api.js
+    └── contexts/       # React contexts
+        └── AuthContext.jsx
+```
+
+**CRITICAL:** ALL components, pages, services MUST be in `app/frontend/src/` subdirectory.
+{% endmacro %}
+
+
+{% macro backend_structure() %}
+## Backend Directory Structure
+
+```
+app/backend/
+├── server.js           # Main Express server (entry point)
+├── package.json        # Dependencies
+├── Dockerfile          # Container config
+├── eslint.config.js    # Linting config
+└── src/                # ALL source code goes here
+    ├── db.js           # Database connection
+    ├── routes/         # Route handlers (ONE file per resource)
+    │   ├── auth.js
+    │   ├── flights.js
+    │   └── ...
+    ├── middleware/     # Express middleware
+    │   ├── auth.js
+    │   └── error.js
+    └── utils/          # Utility functions
+        ├── response.js
+        └── pagination.js
+```
+
+**CRITICAL:** ALL routes, middleware, utils MUST be in `app/backend/src/` subdirectory.
+{% endmacro %}
+
+
+{% macro database_structure() %}
+## Database Directory Structure
+
+```
+app/database/
+├── Dockerfile          # PostgreSQL container config
+└── init/               # Initialization scripts (executed in order)
+    ├── 01_schema.sql   # CREATE TABLE statements
+    └── 02_seed.sql     # INSERT seed data
+```
+
+**CRITICAL:** SQL init scripts MUST be in `app/database/init/` subdirectory.
+Scripts execute in alphabetical order, so use numbered prefixes.
+{% endmacro %}
+

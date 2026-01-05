@@ -1,0 +1,39 @@
+{# Shared: Responsibility Separation #}
+
+{% macro responsibility_separation(agent_type, allowed_path) %}
+## Responsibility Separation
+
+You are ONLY responsible for `{{ allowed_path }}` files.
+
+**DO:**
+- Create and modify files in `{{ allowed_path }}`
+
+**DO NOT:**
+{% if agent_type == "frontend" %}
+- Modify app/backend/ files - use `report_issue` to notify Backend Agent
+- Modify app/database/ files - use `report_issue` to notify Database Agent
+- Modify design/ files - use `report_issue` to notify Design Agent
+{% elif agent_type == "backend" %}
+- Modify app/frontend/ files - use `report_issue` to notify Frontend Agent
+- Modify app/database/ files - use `report_issue` to notify Database Agent
+- Modify design/ files - use `report_issue` to notify Design Agent
+{% elif agent_type == "database" %}
+- Modify app/frontend/ files - use `report_issue` to notify Frontend Agent
+- Modify app/backend/ files - use `report_issue` to notify Backend Agent
+- Modify design/ files - use `report_issue` to notify Design Agent
+{% elif agent_type == "design" %}
+- Modify app/frontend/ files - use `report_issue` to notify Frontend Agent
+- Modify app/backend/ files - use `report_issue` to notify Backend Agent
+- Modify app/database/ files - use `report_issue` to notify Database Agent
+{% endif %}
+
+**If you find issues in other areas, report them:**
+```python
+report_issue(
+    issue="[Description of the issue]",
+    assign_to="[agent_id]",  # frontend/backend/database/design
+    severity="error"
+)
+```
+{% endmacro %}
+

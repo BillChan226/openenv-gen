@@ -1,0 +1,140 @@
+{# Shared: Communication Tools and Patterns #}
+
+{% macro communication_tools() %}
+## Communication Tools
+
+### Sending Messages
+- `send_message(to_agent, content, msg_type, priority)` - Send to specific agent
+- `broadcast(message)` - Send to all agents
+- `ask_agent(agent_id, question)` - Ask and wait for answer
+- `report_issue(issue, assign_to, severity)` - Report bugs to responsible agent
+
+### Receiving Messages
+- `check_inbox()` - Check for messages from other agents
+
+### Message Status Tracking (NEW!)
+- `get_message_status(message_id)` - Check if your message was delivered/read/responded
+- `get_pending_replies()` - Get all messages awaiting response (find overdue ones!)
+- `acknowledge_message(message_id, note)` - ACK receipt of a message (as recipient)
+- `mark_processing(message_id, estimated_minutes)` - Tell sender you're working on it
+
+### Message Types
+
+| Type | Purpose |
+|------|---------|
+| `task_ready` | **START** an agent's work loop (use to kickoff agents) |
+| `info` | General information |
+| `update` | Status updates |
+| `complete` | Completion notification |
+| `warning` | Warnings |
+| `issue` | Bug reports / issues |
+
+### Priority Levels
+
+| Priority | When to Use |
+|----------|-------------|
+| `urgent` | Needs IMMEDIATE attention (bugs, blockers) |
+| `high` | Important, process ASAP (questions, issues, completion) |
+| `normal` | Standard priority (default) |
+| `low` | FYI info, not urgent |
+{% endmacro %}
+
+
+{% macro starting_agents() %}
+### ⚠️ CRITICAL: Starting Other Agents
+
+**To START an agent's work loop, you MUST use `msg_type="task_ready"`:**
+```python
+send_message(to_agent="design", content="...", msg_type="task_ready", priority="high")
+```
+
+**DO NOT use `msg_type="info"` or `msg_type="update"` to start agents!** Those are for updates only.
+Only `task_ready` triggers an agent to start working!
+{% endmacro %}
+
+
+{% macro communication_examples() %}
+### Communication Examples
+
+```python
+# Start an agent's work loop
+send_message(
+    to_agent="design", 
+    content="Requirements ready. Please create specs.",
+    msg_type="task_ready",
+    priority="high"
+)
+
+# Ask a question
+ask_agent(agent_id="backend", question="What is the response format for GET /api/flights?")
+
+# Send update
+send_message(to_agent="frontend", content="API routes are ready", msg_type="update")
+
+# Report an issue
+report_issue(
+    issue="Login returns 500 error",
+    assign_to="backend",
+    severity="critical"
+)
+
+# Broadcast to all
+broadcast(message="Design phase complete. All specs in /design/")
+
+# Check messages
+check_inbox()
+```
+{% endmacro %}
+
+
+{% macro message_tracking() %}
+### Message Status Tracking (RECOMMENDED!)
+
+Use these tools to track if your messages were received and processed:
+
+**1. Check status of a sent message:**
+```python
+# After sending an important message:
+result = send_message(to_agent="frontend", content="Fix cart bug", msg_type="issue", priority="urgent")
+msg_id = result["message_id"]
+
+# Later, check if they received it:
+status = get_message_status(message_id=msg_id)
+# Returns: {"status": "delivered/read/processing/responded", "is_overdue": True/False}
+```
+
+**2. Get all pending replies:**
+```python
+# Check all messages awaiting response:
+pending = get_pending_replies()
+# Returns: {"pending": [...], "overdue_count": 2}
+
+# If overdue, follow up:
+for msg in pending["pending"]:
+    if msg["is_overdue"]:
+        send_message(
+            to_agent=msg["to"], 
+            content=f"Please respond to my earlier message ({msg['type']})",
+            priority="high"
+        )
+```
+
+**3. Acknowledge receipt (as recipient):**
+```python
+# When you receive an important message, acknowledge it:
+acknowledge_message(message_id=msg_id, note="Working on it now")
+```
+
+**4. Mark that you're processing (as recipient):**
+```python
+# Let sender know you're actively working on their issue:
+mark_processing(message_id=msg_id, estimated_minutes=10, status_note="Investigating root cause")
+```
+
+**Why use these tools?**
+- Sender knows if message was delivered/read
+- Prevents duplicate messages
+- Helps identify unresponsive agents
+- Improves coordination and reduces wait time
+{% endmacro %}
+

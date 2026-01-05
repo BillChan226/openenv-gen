@@ -1,0 +1,552 @@
+{# User Agent: Comprehensive Testing Guidelines #}
+
+{% macro pre_testing_checklist() %}
+## Critical Pre-Testing Checklist
+
+### Phase 0: Docker Configuration Validation (MUST DO FIRST!)
+
+IMPORTANT: Many test failures are caused by Docker configuration issues, not code bugs!
+
+1. **Validate docker-compose.yml** - Use `docker_validate()` to check:
+   - Build context paths are correct (common issue: `./app/X` should be `../app/X`)
+   - Dockerfiles exist in each context
+   - Source files are in the correct locations
+
+2. **If docker_validate shows issues:**
+   - If `WRONG_RELATIVE_PATH`: Use `docker_validate(fix=True)` to auto-fix
+   - Rebuild with `docker_build(no_cache=True)`
+   - Restart with `docker_up(force_recreate=True)`
+
+3. **Verify containers have correct code** - Use `docker_inspect_image(service="frontend")`:
+   - Check `is_placeholder` - if True, Docker built stale code!
+   - Check `found_paths` vs `missing_paths`
+   - Look at `file_samples` for actual code snippets
+{% endmacro %}
+
+
+{% macro environment_verification() %}
+### Environment Verification
+
+1. `docker_status()` - Verify all services are running
+2. `docker_logs(service="backend")` - Check for startup errors
+3. `test_api(method="GET", url="http://localhost:8000/health")` - API alive?
+4. `browser_navigate(url="http://localhost:3001")` - Frontend loads?
+{% endmacro %}
+
+
+{% macro api_testing_comprehensive() %}
+## API Testing (COMPREHENSIVE - Test EVERY Endpoint!)
+
+### Testing Strategy
+
+For EACH endpoint in `spec.api.json`, you MUST test:
+
+1. **Happy Path** - Normal successful request
+2. **Error Cases** - Invalid input, missing auth, not found
+3. **Edge Cases** - Empty lists, pagination boundaries
+
+### API Test Plan Template
+
+```python
+# Step 1: Test Health & Base Connectivity
+test_api(method="GET", url="http://localhost:3001/health")
+test_api(method="GET", url="http://localhost:3001/api")
+
+# Step 2: Authentication Flow (CRITICAL!)
+# 2.1 Register new user
+test_api(
+    method="POST", 
+    url="http://localhost:3001/api/auth/register",
+    body={"email": "test@test.com", "password": "Test123!", "full_name": "Test User"}
+)
+
+# 2.2 Login and get token
+login_result = test_api(
+    method="POST",
+    url="http://localhost:3001/api/auth/login",
+    body={"email": "test@test.com", "password": "Test123!"}
+)
+# Extract token from login_result for authenticated requests
+
+# 2.3 Get profile with token
+test_api(
+    method="GET",
+    url="http://localhost:3001/api/auth/me",
+    headers={"Authorization": "Bearer <token>"}
+)
+
+# Step 3: CRUD Operations for Each Entity
+# For flights:
+test_api(method="GET", url="http://localhost:3001/api/flights")  # List
+test_api(method="GET", url="http://localhost:3001/api/flights?origin=NYC&destination=LAX")  # Search
+test_api(method="GET", url="http://localhost:3001/api/flights/<id>")  # Get one
+
+# For hotels:
+test_api(method="GET", url="http://localhost:3001/api/hotels")
+test_api(method="GET", url="http://localhost:3001/api/hotels?location=NYC&check_in=2025-01-15")
+test_api(method="GET", url="http://localhost:3001/api/hotels/<id>")
+
+# For cars:
+test_api(method="GET", url="http://localhost:3001/api/cars")
+test_api(method="GET", url="http://localhost:3001/api/cars/<id>")
+
+# Step 4: Cart Operations (Authenticated)
+test_api(method="GET", url=".../api/cart", headers=auth_headers)  # Get cart
+test_api(method="POST", url=".../api/cart/items", body={"item_type": "flight", "item_id": "..."}, headers=auth_headers)  # Add to cart
+test_api(method="PATCH", url=".../api/cart/items/<id>", body={"quantity": 2}, headers=auth_headers)  # Update
+test_api(method="DELETE", url=".../api/cart/items/<id>", headers=auth_headers)  # Remove
+
+# Step 5: Checkout & Orders (Authenticated)
+test_api(method="POST", url=".../api/orders", body={"payment_method_id": "..."}, headers=auth_headers)
+test_api(method="GET", url=".../api/orders", headers=auth_headers)  # List user orders
+test_api(method="GET", url=".../api/orders/<id>", headers=auth_headers)  # Order details
+
+# Step 6: Favorites (Authenticated)
+test_api(method="GET", url=".../api/favorites", headers=auth_headers)
+test_api(method="POST", url=".../api/favorites", body={"item_type": "hotel", "item_id": "..."}, headers=auth_headers)
+test_api(method="DELETE", url=".../api/favorites/<id>", headers=auth_headers)
+```
+
+### API Response Validation Checklist
+
+For each API response, verify:
+- [ ] Status code is correct (200, 201, 400, 401, 404, 500)
+- [ ] Response format matches spec (e.g., `{items: [...], total: N}` for lists)
+- [ ] Required fields are present
+- [ ] Data types are correct (strings, numbers, dates)
+- [ ] Relationships are properly populated
+- [ ] Error responses have clear messages
+
+### Common API Issues to Watch For
+
+| Symptom | Likely Cause | Report To |
+|---------|--------------|-----------|
+| 500 Internal Error | SQL column mismatch, undefined variable | backend |
+| 401 Unauthorized | Token validation bug, missing middleware | backend |
+| 404 Not Found | Route not mounted, wrong path | backend |
+| Empty response | Missing return statement, query error | backend |
+| Wrong data format | Response wrapper mismatch (`items` vs `data`) | backend |
+{% endmacro %}
+
+
+{% macro frontend_e2e_testing() %}
+## Frontend E2E Testing (EVERY User Action!)
+
+### Testing Philosophy
+
+Test the application as a REAL USER would use it. Every button, every link, every form - if a user can interact with it, you must test it.
+
+### User Journey Test Plan
+
+**CRITICAL: Take screenshots at EVERY major step for verification!**
+
+```python
+# ============================================
+# USER JOURNEY 1: Guest Browsing
+# ============================================
+
+# 1.1 Landing Page
+browser_navigate(url="http://localhost:8002")
+browser_screenshot(save_path="screenshots/01_landing_page.png")
+view_image(path="screenshots/01_landing_page.png")
+think(thought="Analyze landing page: Is hero section visible? Navigation clear? Search prominent?")
+
+# 1.2 Search Flights (without login)
+browser_click(selector="[data-testid='search-flights']")  # or appropriate selector
+browser_fill(selector="[name='origin']", value="New York")
+browser_fill(selector="[name='destination']", value="Los Angeles")
+browser_fill(selector="[name='departure_date']", value="2025-02-01")
+browser_click(selector="[type='submit']")
+browser_screenshot(save_path="screenshots/02_flight_search_results.png")
+view_image(path="screenshots/02_flight_search_results.png")
+think(thought="Verify: Are flight results displayed? Price visible? Book button present?")
+
+# 1.3 View Flight Details
+browser_click(selector=".flight-card:first-child")  # Click first flight
+browser_screenshot(save_path="screenshots/03_flight_details.png")
+view_image(path="screenshots/03_flight_details.png")
+think(thought="Check: Full flight info shown? Can add to cart? Back button works?")
+
+# 1.4 Search Hotels
+browser_navigate(url="http://localhost:8002/hotels")
+browser_fill(selector="[name='location']", value="Los Angeles")
+browser_fill(selector="[name='check_in']", value="2025-02-01")
+browser_fill(selector="[name='check_out']", value="2025-02-05")
+browser_click(selector="[type='submit']")
+browser_screenshot(save_path="screenshots/04_hotel_search_results.png")
+view_image(path="screenshots/04_hotel_search_results.png")
+
+# 1.5 View Hotel Details
+browser_click(selector=".hotel-card:first-child")
+browser_screenshot(save_path="screenshots/05_hotel_details.png")
+view_image(path="screenshots/05_hotel_details.png")
+think(thought="Verify: Photos carousel? Amenities? Room selection? Price per night?")
+
+# ============================================
+# USER JOURNEY 2: Registration & Login
+# ============================================
+
+# 2.1 Navigate to Register
+browser_click(selector="[data-testid='register-link']")
+browser_screenshot(save_path="screenshots/06_register_page.png")
+
+# 2.2 Fill Registration Form
+browser_fill(selector="[name='full_name']", value="Test User")
+browser_fill(selector="[name='email']", value="testuser@example.com")
+browser_fill(selector="[name='password']", value="SecurePass123!")
+browser_fill(selector="[name='confirm_password']", value="SecurePass123!")
+browser_click(selector="[type='submit']")
+browser_screenshot(save_path="screenshots/07_after_register.png")
+view_image(path="screenshots/07_after_register.png")
+think(thought="Did registration succeed? Redirected to login or auto-logged in?")
+
+# 2.3 Login Flow
+browser_navigate(url="http://localhost:8002/login")
+browser_fill(selector="[name='email']", value="testuser@example.com")
+browser_fill(selector="[name='password']", value="SecurePass123!")
+browser_click(selector="[type='submit']")
+browser_screenshot(save_path="screenshots/08_after_login.png")
+view_image(path="screenshots/08_after_login.png")
+think(thought="Login successful? User name shown in header? Cart icon visible?")
+
+# ============================================
+# USER JOURNEY 3: Authenticated User Actions
+# ============================================
+
+# 3.1 Add to Cart
+browser_navigate(url="http://localhost:8002/flights")
+browser_click(selector=".flight-card:first-child .add-to-cart")
+browser_screenshot(save_path="screenshots/09_added_to_cart.png")
+think(thought="Cart updated? Notification shown? Cart count incremented?")
+
+# 3.2 View Cart
+browser_click(selector="[data-testid='cart-icon']")
+browser_screenshot(save_path="screenshots/10_cart_page.png")
+view_image(path="screenshots/10_cart_page.png")
+think(thought="Cart items displayed? Quantity editable? Total calculated? Checkout button?")
+
+# 3.3 Update Quantity
+browser_click(selector=".quantity-increase")
+browser_screenshot(save_path="screenshots/11_cart_quantity_updated.png")
+think(thought="Quantity increased? Total price updated?")
+
+# 3.4 Proceed to Checkout
+browser_click(selector="[data-testid='checkout-button']")
+browser_screenshot(save_path="screenshots/12_checkout_page.png")
+view_image(path="screenshots/12_checkout_page.png")
+think(thought="Order summary shown? Payment form present? Total correct?")
+
+# 3.5 Complete Checkout
+browser_fill(selector="[name='card_number']", value="4111111111111111")
+browser_fill(selector="[name='expiry']", value="12/25")
+browser_fill(selector="[name='cvv']", value="123")
+browser_click(selector="[type='submit']")
+browser_screenshot(save_path="screenshots/13_order_confirmation.png")
+view_image(path="screenshots/13_order_confirmation.png")
+think(thought="Order confirmed? Confirmation number shown? Can view in trips?")
+
+# 3.6 View Trips/Bookings
+browser_navigate(url="http://localhost:8002/trips")
+browser_screenshot(save_path="screenshots/14_trips_page.png")
+view_image(path="screenshots/14_trips_page.png")
+think(thought="Booking visible? Status correct? Details accessible?")
+
+# 3.7 View Profile
+browser_navigate(url="http://localhost:8002/profile")
+browser_screenshot(save_path="screenshots/15_profile_page.png")
+
+# 3.8 Add to Favorites
+browser_navigate(url="http://localhost:8002/hotels")
+browser_click(selector=".hotel-card:first-child .favorite-button")
+browser_navigate(url="http://localhost:8002/favorites")
+browser_screenshot(save_path="screenshots/16_favorites_page.png")
+
+# ============================================
+# USER JOURNEY 4: Error States & Edge Cases
+# ============================================
+
+# 4.1 Invalid Login
+browser_navigate(url="http://localhost:8002/login")
+browser_fill(selector="[name='email']", value="wrong@email.com")
+browser_fill(selector="[name='password']", value="wrongpassword")
+browser_click(selector="[type='submit']")
+browser_screenshot(save_path="screenshots/17_login_error.png")
+think(thought="Error message displayed? Form not cleared? Can retry?")
+
+# 4.2 Empty Search Results
+browser_navigate(url="http://localhost:8002/flights?origin=XXX&destination=YYY")
+browser_screenshot(save_path="screenshots/18_empty_results.png")
+think(thought="Empty state shown gracefully? Suggestions offered?")
+
+# 4.3 Protected Route without Login (logout first if logged in)
+browser_navigate(url="http://localhost:8002/cart")
+browser_screenshot(save_path="screenshots/19_protected_redirect.png")
+think(thought="Redirected to login? Error message shown?")
+```
+
+### Screenshot Analysis Checklist
+
+After each screenshot, analyze with `view_image()` and verify:
+
+**Layout & Structure:**
+- [ ] Page has proper header/footer
+- [ ] Navigation is visible and accessible
+- [ ] Content is not cut off or overflowing
+- [ ] Mobile-responsive indicators (if applicable)
+
+**Visual Quality:**
+- [ ] Text is readable (font size, contrast)
+- [ ] Images load correctly (no broken images)
+- [ ] Icons are visible and meaningful
+- [ ] Colors match brand/design specs
+
+**Functionality Indicators:**
+- [ ] Buttons look clickable (hover states)
+- [ ] Form fields are clearly labeled
+- [ ] Error states are visible when applicable
+- [ ] Loading states appear during async operations
+
+**User Experience:**
+- [ ] Call-to-action is prominent
+- [ ] User knows what to do next
+- [ ] Feedback is provided for actions
+- [ ] Navigation breadcrumbs if deep in hierarchy
+{% endmacro %}
+
+
+{% macro ui_design_comparison() %}
+## UI Design Comparison (Match Reference Images!)
+
+### Reference Image Analysis
+
+If reference images were provided (in /screenshot/ folder), you MUST compare:
+
+```python
+# Step 1: List reference images
+glob(pattern="*.png", path="screenshot/")
+
+# Step 2: For each reference, take corresponding screenshot and compare
+# Example: If there's screenshot/Search-Hotel.png
+
+# View the reference
+view_image(path="screenshot/Search-Hotel.png")
+think(thought="Analyzing reference: Layout structure? Color scheme? Component placement? Typography?")
+
+# Navigate to corresponding page in app
+browser_navigate(url="http://localhost:8002/hotels")
+browser_screenshot(save_path="screenshots/compare_hotel_search.png")
+
+# View the generated app screenshot
+view_image(path="screenshots/compare_hotel_search.png")
+
+# Compare and analyze
+think(thought="""
+DESIGN COMPARISON ANALYSIS:
+
+Reference Image (screenshot/Search-Hotel.png):
+- Layout: [describe layout]
+- Colors: [describe color scheme]
+- Typography: [describe fonts]
+- Key components: [list main UI elements]
+
+Generated App Screenshot:
+- Layout: [describe current layout]
+- Colors: [describe current colors]
+- Typography: [describe current fonts]
+- Key components: [list current UI elements]
+
+SIMILARITY SCORE: X/10
+
+GAPS IDENTIFIED:
+1. [Gap 1 - e.g., "Missing hero image"]
+2. [Gap 2 - e.g., "Search form layout differs"]
+3. [Gap 3 - e.g., "Color scheme not matching"]
+
+IMPROVEMENT RECOMMENDATIONS:
+1. [Improvement 1]
+2. [Improvement 2]
+3. [Improvement 3]
+""")
+
+# If significant gaps found, report to frontend
+if similarity_low or major_gaps:
+    report_issue(
+        issue="UI does not match design reference. Key gaps: [list gaps]. See screenshots/compare_*.png",
+        assign_to="frontend",
+        severity="warning",
+        context="Compare with screenshot/Search-Hotel.png - need closer visual alignment"
+    )
+```
+
+### Design Evaluation Criteria
+
+| Aspect | Weight | Check Points |
+|--------|--------|--------------|
+| Layout Structure | 25% | Grid system, component placement, spacing |
+| Color Scheme | 20% | Primary/secondary colors, backgrounds, accents |
+| Typography | 15% | Font family, sizes, weights, hierarchy |
+| Component Design | 20% | Buttons, cards, inputs, icons style |
+| Overall Polish | 20% | Shadows, borders, animations, consistency |
+
+### UI Improvement Suggestions Template
+
+When analyzing screenshots, provide actionable feedback:
+
+```python
+think(thought="""
+UI QUALITY ASSESSMENT:
+
+STRENGTHS:
+- Clean navigation bar
+- Good use of whitespace
+- Consistent button styling
+
+AREAS FOR IMPROVEMENT:
+
+1. VISUAL HIERARCHY
+   Issue: All text same size, hard to scan
+   Suggestion: Make headings larger, add font weight variation
+
+2. COLOR USAGE
+   Issue: Too many colors, feels busy
+   Suggestion: Stick to 2-3 accent colors max
+
+3. SPACING
+   Issue: Elements too close together
+   Suggestion: Increase padding in cards, margins between sections
+
+4. CALL-TO-ACTION
+   Issue: "Book Now" button not prominent enough
+   Suggestion: Make it larger, use contrasting color
+
+5. EMPTY STATES
+   Issue: No illustration for empty search results
+   Suggestion: Add friendly illustration + helpful text
+
+PRIORITY FIXES (report_issue for these):
+- [Critical] Search button not visible on mobile
+- [High] Hotel images not loading
+- [Medium] Footer links misaligned
+""")
+```
+{% endmacro %}
+
+
+{% macro ui_validation() %}
+### UI Content Validation
+
+WARNING: A running frontend does not mean it has the RIGHT code!
+
+1. Take screenshot: `browser_screenshot(save_path="screenshots/home-check.png")`
+2. Check for placeholder text like:
+   - "Frontend scaffold is running"
+   - "Implement pages/components as needed"
+   - Generic "Welcome" with no actual UI
+
+3. If placeholder detected:
+   - Report issue with `report_issue(issue="Frontend shows placeholder - Docker build used wrong context path", assign_to="backend", severity="critical")`
+   - This is a DOCKER issue, not a frontend code issue!
+{% endmacro %}
+
+
+{% macro feature_testing() %}
+### Feature Testing Summary
+
+After confirming non-placeholder content:
+
+1. **API Testing** - Use `api_testing_comprehensive()` checklist
+2. **E2E Testing** - Use `frontend_e2e_testing()` user journeys
+3. **Design Comparison** - Use `ui_design_comparison()` analysis
+4. **Take screenshots** of each major page with `browser_screenshot()`
+5. **Review every screenshot** with `view_image()` and analyze quality
+6. **Report issues** with correct `assign_to` agent
+{% endmacro %}
+
+
+{% macro issue_reporting() %}
+## Issue Reporting
+
+When you find a bug, use `report_issue()` with **assign_to** to specify which agent should fix it:
+
+| Issue Type | assign_to | Examples |
+|------------|-----------|----------|
+| Frontend/UI bugs | `"frontend"` | Missing pages, React errors, CSS issues, Vite build errors |
+| Backend/API bugs | `"backend"` | API 500 errors, route bugs, middleware issues |
+| Database bugs | `"database"` | SQL errors, schema issues, seed data problems |
+| Design/Spec bugs | `"design"` | Wrong API spec, missing schema definition |
+
+**Example:**
+```python
+report_issue(
+    issue="App.jsx imports pages that don't exist in src/pages/",
+    assign_to="frontend",
+    severity="critical"
+)
+
+report_issue(
+    issue="GET /api/flights returns 500 - column 'depart_time' does not exist",
+    assign_to="backend",
+    severity="error",
+    context="Should use 'depart_at' instead of 'depart_time'"
+)
+
+report_issue(
+    issue="Hotel card design differs from reference - missing star ratings and price badge",
+    assign_to="frontend",
+    severity="warning",
+    context="Compare screenshots/hotel_card.png with screenshot/Search-Hotel.png"
+)
+```
+
+**Do NOT let one agent fix another agent's code!** Report the issue with correct `assign_to`.
+{% endmacro %}
+
+
+{% macro final_testing_checklist() %}
+## Final Testing Checklist (Before deliver_project())
+
+### API Checklist
+- [ ] Health endpoint returns 200
+- [ ] Auth register works
+- [ ] Auth login works and returns token
+- [ ] Auth /me returns user profile with valid token
+- [ ] All CRUD endpoints work for each entity (flights, hotels, cars, packages)
+- [ ] Search/filter endpoints return correct results
+- [ ] Cart operations work (get, add, update, remove)
+- [ ] Checkout creates order successfully
+- [ ] Orders/Trips list returns user's bookings
+- [ ] Favorites CRUD works
+- [ ] Error responses are properly formatted
+
+### Frontend Checklist
+- [ ] All pages from spec.ui.json are accessible
+- [ ] Navigation works (all links functional)
+- [ ] Auth flow works (register → login → logout)
+- [ ] Search forms submit and display results
+- [ ] Detail pages show full information
+- [ ] Cart page shows items and totals
+- [ ] Checkout flow completes successfully
+- [ ] Profile page displays user info
+- [ ] Favorites can be added/removed
+- [ ] Responsive design (if applicable)
+- [ ] No console errors
+- [ ] No broken images
+
+### Design Quality Checklist
+- [ ] UI matches reference images (if provided) - similarity > 7/10
+- [ ] Visual hierarchy is clear
+- [ ] Color scheme is consistent
+- [ ] Typography is readable
+- [ ] Buttons/CTAs are prominent
+- [ ] Empty states are handled gracefully
+- [ ] Loading states are shown
+- [ ] Error states are user-friendly
+
+### Integration Checklist
+- [ ] Frontend successfully calls backend APIs
+- [ ] Auth tokens are passed correctly
+- [ ] Data displays correctly from API responses
+- [ ] Forms submit to correct endpoints
+- [ ] Real-time updates work (if applicable)
+{% endmacro %}
+

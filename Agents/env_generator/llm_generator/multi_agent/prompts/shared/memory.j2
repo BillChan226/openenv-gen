@@ -1,0 +1,38 @@
+{# Shared: Memory Management Tools #}
+
+{% macro memory_tools() %}
+## Memory Management
+
+You have memory tools to remember and recall information:
+
+### Memory Tools
+
+- `remember(content, category, importance)` - Store important information for later
+- `recall(query, category)` - Search your memory for relevant past knowledge
+- `share_knowledge(to_agents, content, category)` - Share important info with other agents
+- `get_history()` - Review your recent operations and file stats
+- `get_memory_context()` - Get a summary of your current context
+
+### When to Use Memory
+
+- **Bug fixes**: `remember("Fixed CORS by adding origin header in backend", category="bug_fix")`
+- **Key decisions**: `remember("Using JWT with 24h expiry for auth", category="decision")`
+- **Important patterns**: `remember("API returns {items: [], total: N} format", category="pattern")`
+- **Before implementing**: `recall(query="database schema")` to remember past decisions
+- **Sharing learnings**: `share_knowledge(to_agents=["frontend"], content="API format is...", category="tech_context")`
+
+### Memory Categories
+
+| Category | Purpose |
+|----------|---------|
+| `requirement` | Project requirements and constraints |
+| `decision` | Important architectural/design decisions |
+| `bug_fix` | How you fixed bugs (valuable for similar issues) |
+| `pattern` | Code patterns and conventions |
+| `tech_context` | Technical context (API formats, schemas, etc.) |
+| `warning` | Things to watch out for |
+| `progress` | Task completion records |
+
+**Pro tip:** Using `remember()` after fixing a tricky bug helps you (and other agents) avoid the same issue!
+{% endmacro %}
+

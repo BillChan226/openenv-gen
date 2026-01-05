@@ -1,0 +1,76 @@
+{# Shared: Available Agents List #}
+
+{% macro agents_list() %}
+## Available Agents
+
+| Agent | ID | Responsibility |
+|-------|-----|----------------|
+| UserAgent | `user` | Project coordinator, testing, QA |
+| DesignAgent | `design` | Creates UI/API/Database specifications |
+| DatabaseAgent | `database` | Creates SQL schemas and seed data |
+| BackendAgent | `backend` | Creates Express.js API |
+| FrontendAgent | `frontend` | Creates React UI |
+| TaskAgent | `task` | Creates benchmark tasks, trajectories, judges |
+{% endmacro %}
+
+
+{% macro agents_for_design() %}
+## Collaborating Agents
+
+| Agent | Responsibility | When to Contact |
+|-------|----------------|-----------------|
+| UserAgent | Coordinator, Testing | Sends you requirements |
+| FrontendAgent | React UI implementation | Notify when design ready |
+| BackendAgent | Express API implementation | Notify when design ready |
+| DatabaseAgent | PostgreSQL implementation | Notify when design ready |
+{% endmacro %}
+
+
+{% macro agents_for_frontend() %}
+## Collaborating Agents
+
+| Agent | Responsibility | When to Contact |
+|-------|----------------|-----------------|
+| DesignAgent | Design specs, UI/API/DB specifications | Unclear requirements, need design clarification |
+| BackendAgent | Express API, routes, middleware | API format questions, endpoint availability |
+| DatabaseAgent | PostgreSQL schema, seed data | Data model questions |
+| UserAgent | Testing, Docker, verification | Report completion, ask for testing |
+{% endmacro %}
+
+
+{% macro agents_for_backend() %}
+## Collaborating Agents
+
+| Agent | Responsibility | When to Contact |
+|-------|----------------|-----------------|
+| DesignAgent | Design specs, API specification | Unclear API requirements, endpoint design |
+| FrontendAgent | React UI, API client | Response format questions, CORS issues |
+| DatabaseAgent | PostgreSQL schema, seed data | Table structure, column names, data types |
+| UserAgent | Testing, Docker, verification | Report completion, ask for API testing |
+{% endmacro %}
+
+
+{% macro agents_for_database() %}
+## Collaborating Agents
+
+| Agent | Responsibility | When to Contact |
+|-------|----------------|-----------------|
+| DesignAgent | Design specs, database schema design | Schema clarification, data type questions |
+| BackendAgent | Express API, SQL queries | Column naming, query requirements |
+| FrontendAgent | React UI | Data format questions |
+| UserAgent | Testing, Docker, verification | Report completion, ask for DB testing |
+{% endmacro %}
+
+
+{% macro agents_for_user() %}
+## Collaborating Agents
+
+| Agent | Responsibility | When to Contact |
+|-------|----------------|-----------------|
+| DesignAgent | Design specs | Spec clarification questions |
+| FrontendAgent | React UI | Frontend bugs, missing pages, UI issues |
+| BackendAgent | Express API | API bugs, route errors, 500 errors |
+| DatabaseAgent | PostgreSQL | SQL errors, schema issues, seed data bugs |
+| TaskAgent | Benchmark tasks | After all tests pass, to generate task_config.json |
+{% endmacro %}
+

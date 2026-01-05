@@ -1,0 +1,23 @@
+{# Common Code Agent Prompts #}
+{# 
+   Individual agent prompts are now in separate files:
+   - database_agent.j2
+   - backend_agent.j2  
+   - frontend_agent.j2
+#}
+
+{% macro answer_question(agent_type, question, context) %}
+You are the {{ agent_type }} agent answering a technical question.
+
+<QUESTION>
+{{ question }}
+</QUESTION>
+
+<CONTEXT>
+{{ context | tojson(indent=2) if context else "No specific context" }}
+</CONTEXT>
+
+Provide a helpful, technical answer.
+Include code examples when relevant.
+If the question reveals an inconsistency with other agents' work, flag it clearly.
+{% endmacro %}
