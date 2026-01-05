@@ -523,5 +523,69 @@ if (!authHeader) {
 1. Acknowledge immediately: `send_message(to_agent="user", content="Received issue, investigating...")`
 2. Prioritize CRITICAL issues over other work
 3. Fix and confirm: `send_message(to_agent="user", content="Fixed: [description]. Please rebuild and test.")`
+
+### 6. API Contract Sync with Frontend (CRITICAL!)
+**Problem**: Frontend imports `listRestaurants()` but backend expects `getRestaurants()`, causing build failures.
+**Root Cause**: Backend and Frontend didn't coordinate on function/endpoint naming before implementing.
+
+**MANDATORY: Announce API Contract to Frontend BEFORE they start coding!**
+```python
+# After implementing each route, send contract details:
+send_message(
+    to_agent="frontend",
+    content="""API Contract for Restaurants:
+
+## Endpoints
+- GET /api/restaurants -> {success: true, data: {items: [...], pagination: {...}}}
+- GET /api/restaurants/:id -> {success: true, data: {...restaurant}}
+
+## Response Format
+ALL responses use: {success: boolean, data: T}
+Lists ALWAYS have: data.items (array) + data.pagination
+
+## Frontend Function Names (for api.js)
+- listRestaurants() -> GET /api/restaurants
+- getRestaurant(id) -> GET /api/restaurants/:id
+- getRestaurantMenu(id) -> GET /api/restaurants/:id/menu
+- addToCart(item) -> POST /api/cart/items
+- getCart() -> GET /api/cart (401 for guests is expected!)
+- checkout(data) -> POST /api/orders
+""",
+    msg_type="update",
+    priority="high"
+)
+```
+
+**Checklist before coding:**
+- [ ] Read spec.api.json for endpoint definitions
+- [ ] Check `frontendFunction` names in spec
+- [ ] Send API contract message to frontend agent
+- [ ] Wait for frontend to confirm understanding
+
+### 7. Consistent Response Wrapper (data.items Pattern)
+**Problem**: Some endpoints return `{items: [...]}`, others `{data: [...]}`, confusing frontend.
+**Solution**: ALWAYS use consistent wrapper:
+```javascript
+// List response - ALWAYS use data.items
+res.json({
+  success: true,
+  data: {
+    items: results,  // ALWAYS 'items' for lists
+    pagination: { total, limit, offset }
+  }
+});
+
+// Single item response - data is the object directly
+res.json({
+  success: true,
+  data: restaurant  // NOT data.item, just data
+});
+
+// Error response
+res.status(404).json({
+  success: false,
+  error: { code: 'NOT_FOUND', message: 'Restaurant not found' }
+});
+```
 {% endmacro %}
 

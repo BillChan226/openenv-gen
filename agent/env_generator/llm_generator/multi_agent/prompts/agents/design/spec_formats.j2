@@ -62,17 +62,14 @@
     "conventions": {
         "base_url": "/api",
         "auth_method": "JWT Bearer",
-        "list_response_wrapper": "items",
-        "single_response_wrapper": "item",
-        "error_format": {
-            "error": {
-                "code": "ERROR_CODE",
-                "message": "Human readable message"
-            }
+        "response_wrapper": {
+            "success_format": {"success": true, "data": "T"},
+            "error_format": {"success": false, "error": {"code": "ERROR_CODE", "message": "string"}}
         },
+        "list_response": "data.items (always an array)",
         "pagination": {
-            "query_params": ["page", "pageSize"],
-            "response_fields": ["total", "page", "pageSize"]
+            "query_params": ["limit", "offset"],
+            "response_fields": ["pagination.total", "pagination.limit", "pagination.offset"]
         }
     },
     "auth": {
@@ -81,52 +78,88 @@
                 "path": "/auth/register",
                 "method": "POST",
                 "auth_required": false,
+                "frontendFunction": "registerUser",
                 "request": {
                     "body": {"email": "string", "password": "string", "name": "string"}
                 },
                 "response": {
-                    "200": {"user": "User", "token": "string"},
-                    "400": "Validation error"
-                },
-                "response_key": "user"
+                    "200": {"success": true, "data": {"user": "User", "token": "string"}},
+                    "400": {"success": false, "error": {"message": "Validation error"}}
+                }
             }
         ]
     },
     "endpoints": [
         {
-            "path": "/resource",
-            "method": "GET|POST|PUT|PATCH|DELETE",
-            "summary": "What this endpoint does",
-            "auth_required": true,
+            "path": "/restaurants",
+            "method": "GET",
+            "summary": "List restaurants",
+            "auth_required": false,
+            "frontendFunction": "listRestaurants",
             "request": {
-                "params": {"id": "UUID"},
-                "query": {"search": "string", "page": "number"},
-                "body": {"field": "type"}
+                "query": {"search": "string", "category": "string", "limit": "number", "offset": "number"}
             },
             "response": {
-                "200": {"items": "[Resource]", "total": "number"},
-                "400": "Validation error",
-                "404": "Not found"
+                "200": {"success": true, "data": {"items": "[Restaurant]", "pagination": "Pagination"}}
+            }
+        },
+        {
+            "path": "/restaurants/:id",
+            "method": "GET",
+            "summary": "Get single restaurant",
+            "auth_required": false,
+            "frontendFunction": "getRestaurant",
+            "request": {
+                "params": {"id": "UUID"}
             },
-            "response_key": "items"
+            "response": {
+                "200": {"success": true, "data": "Restaurant"},
+                "404": {"success": false, "error": {"code": "NOT_FOUND"}}
+            }
         }
     ],
+    "frontendApiContract": {
+        "_comment": "Frontend api.js MUST export these exact function names",
+        "functions": {
+            "listRestaurants": "GET /api/restaurants -> data.items",
+            "getRestaurant": "GET /api/restaurants/:id -> data",
+            "getRestaurantMenu": "GET /api/restaurants/:id/menu -> data.items",
+            "addToCart": "POST /api/cart/items -> data",
+            "getCart": "GET /api/cart -> data (401 for guests is expected, return empty)",
+            "checkout": "POST /api/checkout -> data.order"
+        }
+    },
     "schemas": {
-        "User": {
+        "Restaurant": {
             "id": "UUID",
-            "email": "string",
             "name": "string",
-            "created_at": "datetime"
+            "rating": "number",
+            "delivery_time_min": "number"
         }
     }
 }
 ```
 
-### CRITICAL Guidelines
-1. **response_key is MANDATORY** - Specifies how frontend extracts data
-2. **Consistency** - ALL list endpoints MUST use the SAME wrapper
-3. **HTTP Methods:** GET (retrieve), POST (create), PATCH (update), DELETE (remove)
-4. **Auth endpoints required:** /auth/register, /auth/login, /auth/me, /auth/logout
+### CRITICAL Guidelines - FRONTEND/BACKEND ALIGNMENT
+
+1. **frontendFunction is MANDATORY** - Exact function name frontend api.js exports
+2. **frontendApiContract section** - Summary of ALL functions frontend MUST implement
+3. **Response wrapper consistency** - ALL endpoints use `{success, data}` format
+4. **List responses** - ALWAYS `data.items` (never `data` directly for lists)
+5. **Error handling** - Guest accessing protected routes returns 401 with proper format
+6. **HTTP Methods:** GET (retrieve), POST (create), PATCH (update), DELETE (remove)
+7. **Auth endpoints required:** /auth/register, /auth/login, /auth/me, /auth/logout
+
+### API Contract Checklist (MUST INCLUDE)
+
+For EACH endpoint, document:
+- [ ] Exact path with parameters (e.g., `/restaurants/:id`)
+- [ ] HTTP method
+- [ ] `frontendFunction` name (e.g., `getRestaurant`)
+- [ ] Request format (params, query, body)
+- [ ] Success response format (including wrapper)
+- [ ] Error responses (401, 404, 500)
+- [ ] Whether auth is required
 {% endmacro %}
 
 
@@ -156,37 +189,86 @@
     },
     "pages": [
         {
+            "path": "/",
+            "fileName": "HomePage.jsx",
+            "auth_required": false,
+            "layout": "main",
+            "components": ["CategoryPills", "RestaurantGrid"],
+            "api_calls": [
+                {
+                    "apiFunction": "listRestaurants",
+                    "endpoint": "/api/restaurants",
+                    "method": "GET",
+                    "responseExtract": "data.items"
+                }
+            ]
+        },
+        {
+            "path": "/restaurants/:id",
+            "fileName": "RestaurantPage.jsx",
+            "auth_required": false,
+            "components": ["RestaurantHeader", "MenuList"],
+            "api_calls": [
+                {
+                    "apiFunction": "getRestaurant",
+                    "endpoint": "/api/restaurants/:id",
+                    "responseExtract": "data"
+                },
+                {
+                    "apiFunction": "getRestaurantMenu",
+                    "endpoint": "/api/restaurants/:id/menu",
+                    "responseExtract": "data.items"
+                }
+            ]
+        },
+        {
             "path": "/login",
-            "name": "Login",
+            "fileName": "LoginPage.jsx",
             "auth_required": false,
             "layout": "minimal",
-            "components": ["LoginForm"],
-            "api_calls": [
-                {"endpoint": "/auth/login", "method": "POST", "response_key": "token"}
-            ]
+            "components": ["LoginForm"]
         }
     ],
     "components": [
         {
-            "name": "ComponentName",
-            "type": "layout|form|display|navigation",
-            "props": [
-                {"name": "propName", "type": "string", "required": true}
-            ],
+            "name": "RestaurantGrid",
+            "type": "display",
             "api_integration": {
-                "endpoint": "/api/resource",
-                "response_key": "items"
+                "apiFunction": "listRestaurants",
+                "responseExtract": "data.items",
+                "dataShape": "[{id, name, rating, image_url, delivery_time_min}]"
             },
             "states": ["default", "loading", "error", "empty"]
         }
-    ]
+    ],
+    "pageFileNaming": {
+        "_comment": "CRITICAL: Use consistent Page suffix naming",
+        "pattern": "{Name}Page.jsx",
+        "examples": [
+            "HomePage.jsx (NOT Home.jsx)",
+            "RestaurantPage.jsx (NOT Store.jsx or Restaurant.jsx)",
+            "LoginPage.jsx (NOT Login.jsx)",
+            "CheckoutPage.jsx (NOT Checkout.jsx)"
+        ]
+    }
 }
 ```
 
+### CRITICAL: Naming Consistency
+
+**Page File Names:**
+- ALWAYS use `{Name}Page.jsx` pattern
+- Examples: `HomePage.jsx`, `RestaurantPage.jsx`, `CheckoutPage.jsx`
+- NEVER: `Home.jsx`, `Store.jsx`, `Checkout.jsx`
+
+**API Function Names:**
+- MUST match `frontendFunction` in spec.api.json exactly
+- Document `apiFunction` for each page's data fetching
+
 ### CRITICAL: API Integration
-For EVERY component that fetches data:
-1. Specify which `endpoint` it calls
-2. Specify `response_key` to extract data (MUST match spec.api.json)
-3. Document any data transformations
+For EVERY component/page that fetches data:
+1. Specify `apiFunction` name (MUST match spec.api.json frontendFunction)
+2. Specify `responseExtract` path (e.g., `data.items`, `data`)
+3. This ensures frontend knows exactly what to call and how to unwrap responses
 {% endmacro %}
 

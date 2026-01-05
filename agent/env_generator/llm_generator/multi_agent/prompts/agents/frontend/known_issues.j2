@@ -470,5 +470,74 @@ docker_build(service="backend", no_cache=True)
 docker_up(force_recreate=True)
 ```
 **CRITICAL**: If behavior still wrong after rebuild, check if `npm run build` actually runs in Dockerfile (not just copying old dist/).
+
+### 29. API Function Name Mismatch (MOST COMMON BUG!)
+**Problem**: Page imports `listRestaurants` but api.js exports `getRestaurants` or vice versa.
+**Symptom**: Build fails with `"listRestaurants" is not exported by "src/services/api.js"`.
+**Root Cause**: Frontend and Backend didn't coordinate on function names before implementing.
+
+**Prevention (CRITICAL - DO THIS FIRST!):**
+```python
+# BEFORE writing api.js, ask backend for exact function names:
+ask_agent(
+    agent_id="backend",
+    question="What are the exact function names I should export in api.js for: listing restaurants, getting single restaurant, cart operations?"
+)
+```
+
+**Solution if already broken:**
+```javascript
+// In api.js - provide ALL common aliases
+export async function listRestaurants(params) {
+  return api.get('/restaurants', { params });
+}
+// Add aliases for common naming variations
+export const getRestaurants = listRestaurants;
+export const fetchRestaurants = listRestaurants;
+export const searchRestaurants = listRestaurants;
+```
+
+**Checklist for api.js:**
+- [ ] Check spec.api.json for `frontendFunction` names
+- [ ] Ask backend what function names they expect
+- [ ] Export BOTH the primary function AND common aliases
+- [ ] Ensure response unwrapping matches backend format (`response.data.data.items` vs `response.data.items`)
+
+### 30. Response Wrapper Mismatch
+**Problem**: Backend returns `{success: true, data: {items: [...]}}` but frontend expects `{items: [...]}`.
+**Symptom**: UI shows empty list, console shows `Cannot read property 'map' of undefined`.
+
+**Solution - Consistent Unwrapping:**
+```javascript
+// api.js - unwrap responses consistently
+const api = axios.create({ baseURL: '/api' });
+
+// Response interceptor to unwrap {success, data} format
+api.interceptors.response.use(
+  response => response.data?.data ?? response.data,  // Unwrap nested data
+  error => {
+    const errorData = error.response?.data?.error || { message: error.message };
+    return Promise.reject(errorData);
+  }
+);
+
+// Now components can use data directly:
+// const restaurants = await listRestaurants(); // Already unwrapped to {items: [...]}
+```
+
+### 31. Page File Name Inconsistency
+**Problem**: spec.ui.json says `HomePage.jsx` but frontend creates `Home.jsx`.
+**Symptom**: Routes work but automated tests fail, or import statements break.
+
+**Solution - Follow Naming Convention:**
+```
+ALWAYS use {Name}Page.jsx pattern:
+- HomePage.jsx (NOT Home.jsx)
+- RestaurantPage.jsx (NOT Store.jsx, Restaurant.jsx)
+- CheckoutPage.jsx (NOT Checkout.jsx)
+- LoginPage.jsx (NOT Login.jsx)
+```
+
+**Check spec.ui.json before creating pages!**
 {% endmacro %}
 

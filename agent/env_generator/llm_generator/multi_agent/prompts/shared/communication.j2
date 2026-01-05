@@ -138,3 +138,113 @@ mark_processing(message_id=msg_id, estimated_minutes=10, status_note="Investigat
 - Improves coordination and reduces wait time
 {% endmacro %}
 
+
+{% macro api_contract_sync() %}
+## API Contract Synchronization (CRITICAL!)
+
+**PROBLEM:** Frontend and Backend frequently have API mismatches:
+- Different function/endpoint names (`listRestaurants` vs `getRestaurants`)
+- Different response formats (`{data: items}` vs `{items: [...]}`)
+- Different file/page names (`Home.jsx` vs `HomePage.jsx`)
+- Missing exports in api.js
+
+**SOLUTION:** Before implementing, Backend and Frontend MUST agree on API contract!
+
+### Backend Agent: MUST Announce API Details
+
+After implementing each endpoint, send a detailed message:
+
+```python
+send_message(
+    to_agent="frontend",
+    content="""API Contract for Restaurants:
+
+## Endpoints
+- GET /api/restaurants -> {success: true, data: {items: [...], pagination: {...}}}
+- GET /api/restaurants/:id -> {success: true, data: {...restaurant}}
+- GET /api/restaurants/:id/menu -> {success: true, data: {items: [...menu_items]}}
+
+## Response Format
+All responses wrapped: {success: bool, data: {...}, error?: {...}}
+Lists always in: data.items (NOT data directly)
+
+## Auth
+Protected endpoints return 401 with {success: false, error: {message: "..."}}
+Guest endpoints work without token
+
+## Function Names (for frontend api.js)
+- listRestaurants() -> GET /api/restaurants
+- getRestaurant(id) -> GET /api/restaurants/:id
+- getRestaurantMenu(id) -> GET /api/restaurants/:id/menu
+
+## Error Codes
+- 409 CART_RESTAURANT_MISMATCH: Cart from different restaurant
+""",
+    msg_type="update",
+    priority="high"
+)
+```
+
+### Frontend Agent: MUST Confirm Before Implementing
+
+```python
+# BEFORE writing api.js, ASK backend:
+ask_agent(
+    agent_id="backend",
+    question="""Please confirm API contract:
+1. What is the exact endpoint path for listing restaurants?
+2. What is the response wrapper format?
+3. What function name should I use in api.js?
+4. How should I handle 401 for unauthenticated users?"""
+)
+
+# WAIT for answer before implementing!
+check_inbox(from_agent="backend")
+```
+
+### Design Agent: MUST Define Consistent Names
+
+In spec.api.json, ALWAYS include:
+
+```json
+{
+  "endpoints": {
+    "/api/restaurants": {
+      "method": "GET",
+      "frontendFunctionName": "listRestaurants",
+      "responseFormat": "{success, data: {items, pagination}}"
+    }
+  },
+  "conventions": {
+    "responseWrapper": "{success: boolean, data: T}",
+    "listFormat": "data.items array",
+    "errorFormat": "{success: false, error: {message, code}}"
+  }
+}
+```
+
+In spec.ui.json, ALWAYS use consistent page names:
+
+```json
+{
+  "pages": {
+    "HomePage.jsx": {"route": "/", "imports": ["listRestaurants"]},
+    "RestaurantPage.jsx": {"route": "/restaurants/:id", "imports": ["getRestaurant"]}
+  }
+}
+```
+
+### Checklist Before Implementing
+
+**Backend before coding:**
+- [ ] Read spec.api.json for endpoint definitions
+- [ ] Announce response format to frontend via send_message
+- [ ] Document function names frontend should use
+
+**Frontend before coding:**
+- [ ] Ask backend for exact API contract
+- [ ] Wait for confirmation on response format
+- [ ] Use EXACT function names from spec/backend message
+- [ ] Create api.js exports matching agreed names
+{% endmacro %}
+
