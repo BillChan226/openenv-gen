@@ -10,9 +10,27 @@ Allows generation to be resumed after interruption by:
 import json
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import shutil
+
+
+class CheckpointJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder for checkpoint data."""
+    def default(self, obj):
+        if hasattr(obj, 'to_dict'):
+            return obj.to_dict()
+        if hasattr(obj, '__dict__'):
+            return {k: v for k, v in obj.__dict__.items() if not k.startswith('_')}
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        if isinstance(obj, Enum):
+            return obj.value
+        try:
+            return str(obj)
+        except Exception:
+            return f"<non-serializable: {type(obj).__name__}>"
 
 
 @dataclass
@@ -153,9 +171,9 @@ class CheckpointManager:
             backup_path = self.checkpoint_path.with_suffix(".json.bak")
             shutil.copy(self.checkpoint_path, backup_path)
         
-        # Write new checkpoint
+        # Write new checkpoint with safe encoder
         with open(self.checkpoint_path, "w") as f:
-            json.dump(self.checkpoint.to_dict(), f, indent=2)
+            json.dump(self.checkpoint.to_dict(), f, indent=2, cls=CheckpointJSONEncoder)
     
     def load(self) -> bool:
         """

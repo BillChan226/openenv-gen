@@ -43,7 +43,7 @@ class BashSession:
     
     DEFAULT_TIMEOUT = 30
     POLL_INTERVAL = 0.1
-    MAX_OUTPUT_SIZE = 50000
+    MAX_OUTPUT_SIZE = 100000  # Increased for large outputs
     
     def __init__(self, work_dir: str = None, timeout: int = None):
         self.work_dir = Path(work_dir) if work_dir else Path.cwd()

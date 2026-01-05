@@ -445,6 +445,39 @@ class LLMSummarizingCondenser:
         """Get number of condensations performed."""
         return self._condensation_count
 
+    async def update_summary(self, events: list[MemoryItem]) -> str:
+        """
+        Force update summary with recent events (regardless of count).
+        
+        Used at end of tasks to ensure next task has context.
+        
+        Args:
+            events: Recent events to include in summary
+            
+        Returns:
+            Updated summary
+        """
+        if not events:
+            return self._summary
+        
+        # Format recent events
+        recent_text = "\n".join(
+            self._truncate(str(e.content)) for e in events[-20:]  # Last 20 events
+        )
+        
+        # Generate updated summary using LLM
+        prompt = CONDENSER_PROMPT.format(
+            previous_summary=self._summary or "No previous summary.",
+            events=recent_text,
+        )
+        
+        try:
+            new_summary = await self.llm_func(prompt)
+            self._summary = new_summary
+            return new_summary
+        except Exception:
+            return self._summary
+
 
 # ===== Unified Agent Memory =====
 
@@ -550,6 +583,30 @@ class AgentMemory:
             self.short_term._buffer.append(event)
             self.short_term._index[event.id] = event
         
+        return True
+    
+    async def update_summary(self, min_events: int = 5) -> bool:
+        """
+        Update condenser summary with recent events.
+        
+        Call at end of tasks to ensure next task has context, even if
+        not enough events to trigger full condensation.
+        
+        Args:
+            min_events: Minimum events needed to trigger update
+            
+        Returns:
+            True if summary was updated
+        """
+        if not self.condenser:
+            return False
+        
+        events = self.short_term.to_list()
+        if len(events) < min_events:
+            return False
+        
+        # Force update summary with recent events
+        await self.condenser.update_summary(events)
         return True
     
     def get_context_string(self, max_items: int = 10) -> str:

@@ -33,9 +33,15 @@ from ._base import (
 from .reasoning_tools import ThinkTool, PlanTool, VerifyPlanTool
 from .agent_interaction_tools import (
     ReadMemoryBankTool,
-    RequestReviewTool,
-    AskUserAgentTool,
     FinishTool,
+)
+from .communication_tools import (
+    SendMessageTool,
+    AskAgentTool,
+    BroadcastTool,
+    CheckInboxTool,
+    ListAgentsTool,
+    SubscribeMessagesTool,
 )
 
 
@@ -281,7 +287,7 @@ def function():
                 file_path.write_text(content, encoding='utf-8')
                 return ToolResult(
                     success=True,
-                    data={"action": "create", "info": f"Created new file: {file_path}"}
+                    data={"action": "create", "info": f"Created new file: {path}"}
                 )
             except Exception as e:
                 return ToolResult(success=False, error_message=f"Create failed: {e}")
@@ -335,7 +341,7 @@ def function():
                     "action": "edit",
                     "range": [start + 1, end],
                     "lines_changed": len(new_lines),
-                    "info": f"Edited {file_path} (lines {start+1}-{end})"
+                    "info": f"Edited {path} (lines {start+1}-{end})"
                 }
             )
         except Exception as e:
@@ -522,7 +528,9 @@ Returns errors with line numbers and suggestions.
                     ['ruff', 'check', '--output-format=json', str(file_path)],
                     capture_output=True,
                     text=True,
-                    timeout=30
+                    timeout=30,
+                    encoding='utf-8',
+                    errors='replace',
                 )
                 
                 errors = []
@@ -666,7 +674,9 @@ export default [
                     capture_output=True,
                     text=True,
                     timeout=120,
-                    cwd=project_dir
+                    cwd=project_dir,
+                    encoding='utf-8',
+                    errors='replace',
                 )
                 
                 errors = []
@@ -721,7 +731,9 @@ export default [
                     [node_path, '--check', str(file_path)],
                     capture_output=True,
                     text=True,
-                    timeout=10
+                    timeout=10,
+                    encoding='utf-8',
+                    errors='replace',
                 )
                 if result.returncode != 0:
                     error_msg = result.stderr.strip() if result.stderr else "Syntax error"
@@ -750,7 +762,9 @@ export default [
                     ['sqlfluff', 'lint', '--format=json', str(file_path)],
                     capture_output=True,
                     text=True,
-                    timeout=30
+                    timeout=30,
+                    encoding='utf-8',
+                    errors='replace',
                 )
                 
                 errors = []
@@ -826,12 +840,19 @@ __all__ = [
     
     # Re-exported from agent_interaction_tools.py
     "ReadMemoryBankTool",
-    "RequestReviewTool",
-    "AskUserAgentTool",
     "FinishTool",
+    
+    # Re-exported from communication_tools.py
+    "SendMessageTool",
+    "AskAgentTool",
+    "BroadcastTool",
+    "CheckInboxTool",
+    "ListAgentsTool",
+    "SubscribeMessagesTool",
 ]
 
 
 # NOTE: ThinkTool, PlanTool, VerifyPlanTool are in reasoning_tools.py
-# NOTE: ReadMemoryBankTool, RequestReviewTool, AskUserAgentTool, FinishTool are in agent_interaction_tools.py
+# NOTE: ReadMemoryBankTool, FinishTool are in agent_interaction_tools.py
+# NOTE: SendMessageTool, AskAgentTool, etc. are in communication_tools.py
 # They are re-exported here for backward compatibility.

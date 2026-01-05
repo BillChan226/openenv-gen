@@ -31,6 +31,91 @@ from utils.tool import BaseTool, ToolResult, create_tool_param, ToolCategory
 from workspace import Workspace
 
 
+# ===== Environment State Cache =====
+
+class EnvironmentStateCache:
+    """
+    Caches environment state to avoid repeated failed checks.
+    
+    Example:
+    - Docker daemon unavailable: don't retry docker_build for 5 minutes
+    - Port occupied: remember which ports are in use
+    - Missing tools: remember which CLI tools aren't installed
+    """
+    
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._state = {}
+            cls._instance._failure_counts = {}
+            cls._instance._last_check = {}
+        return cls._instance
+    
+    def record_failure(self, key: str, error: str, cooldown_seconds: int = 300):
+        """Record a failure with cooldown before retry."""
+        self._state[key] = {"available": False, "error": error}
+        self._failure_counts[key] = self._failure_counts.get(key, 0) + 1
+        self._last_check[key] = datetime.now()
+    
+    def record_success(self, key: str):
+        """Record that something is available."""
+        self._state[key] = {"available": True, "error": None}
+        self._failure_counts[key] = 0
+        self._last_check[key] = datetime.now()
+    
+    def should_skip(self, key: str, cooldown_seconds: int = 300) -> tuple:
+        """
+        Check if we should skip this operation.
+        
+        Returns:
+            (should_skip: bool, reason: str or None)
+        """
+        if key not in self._state:
+            return False, None
+        
+        state = self._state[key]
+        if state["available"]:
+            return False, None
+        
+        # Check if cooldown has passed
+        last_check = self._last_check.get(key)
+        if last_check:
+            elapsed = (datetime.now() - last_check).total_seconds()
+            if elapsed < cooldown_seconds:
+                failures = self._failure_counts.get(key, 0)
+                return True, f"Skipped: {state['error']} (failed {failures}x, retry in {int(cooldown_seconds - elapsed)}s)"
+        
+        return False, None
+    
+    def get_status(self) -> dict:
+        """Get current environment status."""
+        return {
+            k: {
+                "available": v["available"],
+                "error": v.get("error"),
+                "failures": self._failure_counts.get(k, 0)
+            }
+            for k, v in self._state.items()
+        }
+    
+    def reset(self, key: str = None):
+        """Reset state (for testing or manual refresh)."""
+        if key:
+            self._state.pop(key, None)
+            self._failure_counts.pop(key, None)
+            self._last_check.pop(key, None)
+        else:
+            self._state.clear()
+            self._failure_counts.clear()
+            self._last_check.clear()
+
+
+# Global instance
+env_cache = EnvironmentStateCache()
+
+
 # ===== Process Types =====
 
 class ProcessType(Enum):
@@ -356,7 +441,9 @@ class ProcessManager:
                 ["lsof", "-ti", f":{port}"],
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
+                encoding='utf-8',
+                errors='replace',
             )
             
             if result.returncode != 0 or not result.stdout.strip():
@@ -637,12 +724,61 @@ Examples:
     execute_bash("npm install", cwd="app/backend")
     execute_bash("docker compose build")
 
-IMPORTANT: For servers or long-running processes, use run_background() instead!
-    run_background("node server.js", port=3000, name="api")
+DO NOT USE execute_bash FOR:
+1. **Server commands** - Will block forever!
+   - node server.js, npm start, npm run dev, python app.py
+   - node -e "require('./server')", node -e "const app=require('./app')"
+   - uvicorn, gunicorn, flask run, http-server
+   
+2. **Long-running/watch processes** - Will timeout!
+   - npm run watch, nodemon, tsc --watch, tail -f
+   - docker compose up (without -d)
+
+═══════════════════════════════════════════════════════════════════
+USE THESE TOOLS INSTEAD FOR SERVERS & LONG-RUNNING PROCESSES:
+═══════════════════════════════════════════════════════════════════
+
+1. **run_background(command, cwd, name, port, wait_seconds, timeout)**
+   Start a command in background with process tracking.
+   
+   Examples:
+     run_background("npm start", port=3000, name="api", cwd="app/backend")
+     run_background("npm run dev", port=5173, name="frontend", cwd="app/frontend")
+     run_background("npm run build", name="build", cwd="app/frontend")
+
+2. **list_processes()**
+   List all tracked background processes with status.
+
+3. **get_process_output(process, lines=100)**
+   Get stdout/stderr logs from a background process.
+   
+   Examples:
+     get_process_output("api")           # By name
+     get_process_output(12345, lines=50) # By PID, last 50 lines
+
+4. **stop_process(process, force=False)**
+   Stop a background process (SIGTERM, or SIGKILL if force=True).
+   
+   Examples:
+     stop_process("api")              # Graceful stop
+     stop_process("api", force=True)  # Force kill
+
+5. **interrupt_process(process)**
+   Send Ctrl+C (SIGINT) to a process for graceful shutdown.
+
+6. **wait_for_process(process, timeout=300)**
+   Wait for a background process to complete and get exit code.
+   
+   Example:
+     run_background("npm run build", name="build", cwd="app/frontend")
+     wait_for_process("build")  # Wait for build to finish
+
+7. **find_free_port(preferred=[], range_start=8000, range_end=8999)**
+   Find an available TCP port to avoid conflicts.
 """
     
     DEFAULT_TIMEOUT = 1200
-    MAX_OUTPUT_LENGTH = 50000
+    MAX_OUTPUT_LENGTH = 100000  # Increased for large outputs
     
     def __init__(self, work_dir: str = None, workspace: Workspace = None):
         super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
@@ -729,11 +865,18 @@ IMPORTANT: For servers or long-running processes, use run_background() instead!
         # Detect commands that should use run_background
         # 1. Server commands (need port)
         server_patterns = [
-            (r'\bnode\b.*\b(server|app|index)\.js', "node-server"),
+            # node -e "..." with require('./server') or require('./app') anywhere in the string
+            # Matches: node -e "require('./server')", node -e "const app=require('./server');..."
+            (r'\bnode\s+-e\s+["\'].*require\s*\(\s*["\']\.?/?\.?/?server', "node-server"),
+            (r'\bnode\s+-e\s+["\'].*require\s*\(\s*["\']\.?/?\.?/?app', "node-server"),
+            # node server.js - direct file execution
+            # Exclude: node -e/-p (inline scripts), node -c/--check (syntax check)
+            (r'\bnode\b(?!\s+(-[epc]|--check)\b).*\b(server|app|index)\.js\b', "node-server"),
             (r'\bnpm\s+(start|run\s+(dev|start|serve))\b', "npm-server"),
             (r'\byarn\s+(start|dev|serve)\b', "yarn-server"),
             (r'\bpnpm\s+(start|dev|serve)\b', "pnpm-server"),
-            (r'\bpython\b.*\b(app|main|server|run)\.py', "python-server"),
+            # python app.py - but NOT python -c (inline scripts)
+            (r'\bpython\b(?!\s+-c\b).*\b(app|main|server|run)\.py\b', "python-server"),
             (r'\bpython\s+-m\s+(http\.server|flask|uvicorn|gunicorn)', "python-server"),
             (r'\buvicorn\b', "uvicorn"),
             (r'\bgunicorn\b', "gunicorn"),
@@ -752,7 +895,27 @@ IMPORTANT: For servers or long-running processes, use run_background() instead!
             (r'\bwatch\b', "watch"),
         ]
         
+        # 3. Commands that are better done with dedicated tools (likely to timeout)
+        use_tool_patterns = [
+            # ANY eslint command - use lint() tool instead (handles config, faster, better timeout)
+            (r'\b(npx\s+)?eslint\b', "lint", "Use lint(path) tool instead of running eslint directly. Example: lint('app/backend/server.js')"),
+            # npm install without --prefer-offline or on large projects
+            (r'\bnpm\s+install\b(?!.*--prefer-offline)', "install_dependencies", "Consider using install_dependencies() tool instead for better timeout handling."),
+        ]
+        
         import re as regex_module
+        
+        # Check for commands that should use dedicated tools
+        for pattern, tool_name, suggestion in use_tool_patterns:
+            if regex_module.search(pattern, command, regex_module.IGNORECASE):
+                return ToolResult(
+                    success=False,
+                    error_message=f"SLOW COMMAND WARNING: This command may timeout!\n\n"
+                                  f"Command: {command}\n\n"
+                                  f"Suggestion: {suggestion}\n\n"
+                                  f"If you really need to run this, use a longer timeout:\n"
+                                  f"  execute_bash(\"{command}\", timeout=3600)"
+                )
         
         # Check server patterns
         for pattern, name in server_patterns:
@@ -804,6 +967,8 @@ IMPORTANT: For servers or long-running processes, use run_background() instead!
                     timeout=timeout,
                     cwd=str(work_dir),
                     env={**os.environ, "PYTHONUNBUFFERED": "1"},
+                    encoding='utf-8',
+                    errors='replace',  # Handle non-UTF8 characters gracefully
                 )
             else:
                 result = subprocess.run(
@@ -814,6 +979,8 @@ IMPORTANT: For servers or long-running processes, use run_background() instead!
                     timeout=timeout,
                     cwd=str(work_dir),
                     env={**os.environ, "PYTHONUNBUFFERED": "1"},
+                    encoding='utf-8',
+                    errors='replace',  # Handle non-UTF8 characters gracefully
                 )
             
             output = result.stdout + result.stderr
@@ -980,7 +1147,7 @@ Examples:
                 pass
         
         output = "\n".join(output_parts) if output_parts else "(no output)"
-        output += f"\n[Jupyter cwd: {self.workspace.root}]"
+        output += "\n[Jupyter cwd: ./ (workspace root)]"
         
         return ToolResult(
             success=not error,
@@ -998,6 +1165,8 @@ Examples:
                     capture_output=True,
                     text=True,
                     timeout=120,
+                    encoding='utf-8',
+                    errors='replace',
                 )
                 return ToolResult(
                     success=result.returncode == 0,
@@ -1024,7 +1193,8 @@ Examples:
                 return ToolResult(success=False, error_message=f"cd error: {e}")
         
         elif line.startswith("%pwd"):
-            return ToolResult(success=True, data=str(self.workspace.root))
+            # Return "./" to indicate workspace root - never expose absolute paths
+            return ToolResult(success=True, data="./ (workspace root)")
         
         elif line.startswith("%env"):
             rest = line[4:].strip()
@@ -1926,6 +2096,8 @@ Automatically detects:
                     text=True,
                     timeout=300,
                     cwd=str(project_dir),
+                    encoding='utf-8',
+                    errors='replace',
                 )
                 results.append(f"pip install: {'OK' if result.returncode == 0 else 'FAILED'}")
                 if result.returncode != 0:
@@ -1943,6 +2115,8 @@ Automatically detects:
                     text=True,
                     timeout=300,
                     cwd=str(project_dir),
+                    encoding='utf-8',
+                    errors='replace',
                 )
                 results.append(f"pip install -e .: {'OK' if result.returncode == 0 else 'FAILED'}")
             except Exception as e:
@@ -1958,6 +2132,8 @@ Automatically detects:
                     text=True,
                     timeout=300,
                     cwd=str(project_dir),
+                    encoding='utf-8',
+                    errors='replace',
                 )
                 results.append(f"npm install: {'OK' if result.returncode == 0 else 'FAILED'}")
             except Exception as e:

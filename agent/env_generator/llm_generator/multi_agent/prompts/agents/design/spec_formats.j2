@@ -1,0 +1,192 @@
+{# Design Agent: Specification Formats #}
+
+{% macro database_spec_format() %}
+## spec.database.json Format
+
+```json
+{
+    "tables": [
+        {
+            "name": "table_name",
+            "description": "What this table stores",
+            "columns": [
+                {
+                    "name": "id",
+                    "type": "UUID",
+                    "constraints": ["PRIMARY KEY", "DEFAULT gen_random_uuid()"],
+                    "description": "Unique identifier"
+                },
+                {
+                    "name": "created_at",
+                    "type": "TIMESTAMP WITH TIME ZONE",
+                    "constraints": ["NOT NULL", "DEFAULT NOW()"]
+                }
+            ],
+            "indexes": ["column_name"],
+            "unique_constraints": [["col1", "col2"]]
+        }
+    ],
+    "relationships": [
+        {
+            "from_table": "table1",
+            "from_column": "column",
+            "to_table": "table2",
+            "to_column": "id",
+            "type": "many-to-one",
+            "on_delete": "CASCADE|SET NULL|RESTRICT"
+        }
+    ],
+    "seed_data": {
+        "table_name": [
+            {"column1": "value1", "column2": "value2"}
+        ]
+    }
+}
+```
+
+### Guidelines
+1. **Use UUIDs** for primary keys with `gen_random_uuid()`
+2. **Add timestamps** - created_at, updated_at for all tables
+3. **Include indexes** for frequently queried columns
+4. **Define relationships** with proper foreign keys
+5. **Provide seed data** - at least 5-10 records per table for testing
+6. **Test users** - Include test users with bcrypt-hashed passwords
+{% endmacro %}
+
+
+{% macro api_spec_format() %}
+## spec.api.json Format
+
+```json
+{
+    "conventions": {
+        "base_url": "/api",
+        "auth_method": "JWT Bearer",
+        "list_response_wrapper": "items",
+        "single_response_wrapper": "item",
+        "error_format": {
+            "error": {
+                "code": "ERROR_CODE",
+                "message": "Human readable message"
+            }
+        },
+        "pagination": {
+            "query_params": ["page", "pageSize"],
+            "response_fields": ["total", "page", "pageSize"]
+        }
+    },
+    "auth": {
+        "endpoints": [
+            {
+                "path": "/auth/register",
+                "method": "POST",
+                "auth_required": false,
+                "request": {
+                    "body": {"email": "string", "password": "string", "name": "string"}
+                },
+                "response": {
+                    "200": {"user": "User", "token": "string"},
+                    "400": "Validation error"
+                },
+                "response_key": "user"
+            }
+        ]
+    },
+    "endpoints": [
+        {
+            "path": "/resource",
+            "method": "GET|POST|PUT|PATCH|DELETE",
+            "summary": "What this endpoint does",
+            "auth_required": true,
+            "request": {
+                "params": {"id": "UUID"},
+                "query": {"search": "string", "page": "number"},
+                "body": {"field": "type"}
+            },
+            "response": {
+                "200": {"items": "[Resource]", "total": "number"},
+                "400": "Validation error",
+                "404": "Not found"
+            },
+            "response_key": "items"
+        }
+    ],
+    "schemas": {
+        "User": {
+            "id": "UUID",
+            "email": "string",
+            "name": "string",
+            "created_at": "datetime"
+        }
+    }
+}
+```
+
+### CRITICAL Guidelines
+1. **response_key is MANDATORY** - Specifies how frontend extracts data
+2. **Consistency** - ALL list endpoints MUST use the SAME wrapper
+3. **HTTP Methods:** GET (retrieve), POST (create), PATCH (update), DELETE (remove)
+4. **Auth endpoints required:** /auth/register, /auth/login, /auth/me, /auth/logout
+{% endmacro %}
+
+
+{% macro ui_spec_format() %}
+## spec.ui.json Format
+
+```json
+{
+    "theme": {
+        "mode": "dark|light",
+        "colors": {
+            "primary": "#hex",
+            "secondary": "#hex",
+            "background": "#hex",
+            "text": "#hex"
+        },
+        "typography": {
+            "fontFamily": "font-stack",
+            "headingFont": "font-name"
+        }
+    },
+    "layout": {
+        "type": "sidebar|topnav",
+        "sidebarWidth": "250px",
+        "headerHeight": "64px",
+        "maxContentWidth": "1200px"
+    },
+    "pages": [
+        {
+            "path": "/login",
+            "name": "Login",
+            "auth_required": false,
+            "layout": "minimal",
+            "components": ["LoginForm"],
+            "api_calls": [
+                {"endpoint": "/auth/login", "method": "POST", "response_key": "token"}
+            ]
+        }
+    ],
+    "components": [
+        {
+            "name": "ComponentName",
+            "type": "layout|form|display|navigation",
+            "props": [
+                {"name": "propName", "type": "string", "required": true}
+            ],
+            "api_integration": {
+                "endpoint": "/api/resource",
+                "response_key": "items"
+            },
+            "states": ["default", "loading", "error", "empty"]
+        }
+    ]
+}
+```
+
+### CRITICAL: API Integration
+For EVERY component that fetches data:
+1. Specify which `endpoint` it calls
+2. Specify `response_key` to extract data (MUST match spec.api.json)
+3. Document any data transformations
+{% endmacro %}
+

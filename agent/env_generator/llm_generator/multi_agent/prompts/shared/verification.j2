@@ -1,0 +1,50 @@
+{# Shared: Verification Workflow #}
+
+{% macro verification_workflow() %}
+## VERIFICATION BEFORE FINISH (REQUIRED)
+
+Before calling `finish()`, you MUST ask UserAgent to verify your work:
+
+1. **When all plan items are complete**, ask UserAgent to verify:
+   ```python
+   ask_agent(
+       agent_id="user", 
+       question="Please verify my work. I created: [list files]. Key features: [list features]. Is this complete?"
+   )
+   ```
+
+2. **Wait for UserAgent's response** via `check_inbox()`
+
+3. **Based on response:**
+   - If APPROVED: Call `finish()` with your summary
+   - If REVISION NEEDED: 
+     a. Use `plan(action="add", items=[...])` to add new tasks
+     b. Complete the new tasks
+     c. Request verification again
+
+### Example Verification Flow
+
+```python
+# ALWAYS think before finishing - summarize progress and assess readiness
+think("All plan items complete: 14/14 done. Files created: App.jsx, Home.jsx, etc. No lint errors. Need to verify with UserAgent before finishing.")
+
+ask_agent(
+    agent_id="user", 
+    question="Please verify frontend. Created: App.jsx, Home.jsx, Flights.jsx, Hotels.jsx. Features: routing, search, booking."
+)
+
+# ... wait for response ...
+check_inbox()
+
+# Think about the response before acting
+think("UserAgent response: [summarize]. Approved/Needs revision? Next action: [decision]")
+
+# If approved:
+finish(message="Frontend complete with all pages and components")
+
+# If revision needed:
+think("Revision needed: [summarize feedback]. I need to: [list fixes]")
+plan(action="add", items=["Add error handling to search", "Create loading states"])
+```
+{% endmacro %}
+

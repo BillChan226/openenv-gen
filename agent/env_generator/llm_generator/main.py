@@ -14,7 +14,68 @@ import asyncio
 import logging
 import os
 import sys
+import json
+from datetime import datetime
+from enum import Enum
 from pathlib import Path
+
+# ===== Global JSON Patch to Handle Non-Serializable Objects =====
+# This ensures all json.dumps calls in the entire application handle
+# Message objects and other non-serializable types gracefully.
+# IMPORTANT: Only applies to data serialization, NOT to API requests.
+
+_original_json_dumps = json.dumps
+_in_api_call = False  # Flag to detect nested calls
+
+def _safe_json_dumps(obj, **kwargs):
+    """Patched json.dumps that handles non-serializable objects."""
+    global _in_api_call
+    
+    # If already using default handler (likely API call), don't interfere
+    if 'default' in kwargs and kwargs['default'] is not None:
+        return _original_json_dumps(obj, **kwargs)
+    
+    def default_handler(o):
+        # Check the type name to avoid importing the class
+        type_name = type(o).__name__
+        
+        # Skip Message and LLMResponse objects - let them serialize normally
+        # These are used in API calls and should keep their structure
+        if type_name in ('Message', 'LLMResponse'):
+            if hasattr(o, 'to_dict'):
+                return o.to_dict()
+        
+        # For other objects with to_dict, use it
+        if hasattr(o, 'to_dict'):
+            return o.to_dict()
+        
+        # Handle objects with __dict__ but avoid complex nested structures
+        if hasattr(o, '__dict__'):
+            # Only serialize simple objects, not complex nested ones
+            d = {}
+            for k, v in o.__dict__.items():
+                if not k.startswith('_'):
+                    if isinstance(v, (str, int, float, bool, type(None), list, dict)):
+                        d[k] = v
+                    else:
+                        d[k] = str(v)
+            return d
+        
+        if isinstance(o, datetime):
+            return o.isoformat()
+        if isinstance(o, Enum):
+            return o.value
+        
+        # Fallback to string representation
+        return str(o)
+    
+    kwargs['default'] = default_handler
+    return _original_json_dumps(obj, **kwargs)
+
+# Apply the monkey patch globally
+json.dumps = _safe_json_dumps
+
+# ===== End Global JSON Patch =====
 
 # Add paths for imports
 _agents_dir = Path(__file__).parent.parent.parent.absolute()
@@ -29,18 +90,32 @@ from utils.config import LLMConfig, LLMProvider
 from multi_agent import Orchestrator
 
 
-def setup_logging(verbose: bool = False):
-    """Setup logging configuration."""
+def setup_logging(verbose: bool = False, log_file: Path = None):
+    """Setup logging configuration.
+    
+    Args:
+        verbose: Enable debug logging
+        log_file: Optional path to log file. If provided, logs will be saved to file.
+    """
     level = logging.DEBUG if verbose else logging.INFO
     
     fmt = "%(asctime)s [%(levelname).1s] %(name)s: %(message)s"
     date_fmt = "%H:%M:%S"
     
+    handlers = [logging.StreamHandler()]
+    
+    # Add file handler if log_file specified
+    if log_file:
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler.setFormatter(logging.Formatter(fmt, date_fmt))
+        handlers.append(file_handler)
+    
     logging.basicConfig(
         level=level,
         format=fmt,
         datefmt=date_fmt,
-        handlers=[logging.StreamHandler()],
+        handlers=handlers,
     )
     
     # Suppress noisy loggers
@@ -61,11 +136,24 @@ async def main():
                        choices=["openai", "google", "anthropic", "azure", "local"])
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("--resume", action="store_true", help="Resume from checkpoint")
+    parser.add_argument("--reference-images", nargs="*", default=[], 
+                       help="Reference screenshot paths for design (e.g., screenshot/expedia.png)")
+    parser.add_argument("--reference-dir", default=None,
+                       help="Directory containing reference screenshots")
+    parser.add_argument("--log", action="store_true",
+                       help="Save logs to file (output_dir/logs/generation.log)")
     
     args = parser.parse_args()
     
-    setup_logging(args.verbose)
+    # Setup log file path if --log is specified
+    output_dir = Path(args.output) / args.name
+    log_file = output_dir / "logs" / f"generation_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log" if args.log else None
+    
+    setup_logging(args.verbose, log_file)
     logger = logging.getLogger("main")
+    
+    if log_file:
+        logger.info(f"Logging to file: {log_file}")
     
     # Get provider and API key
     provider_map = {
@@ -94,17 +182,32 @@ async def main():
         timeout=1800,
     )
     
-    output_dir = Path(args.output) / args.name
+    # output_dir already defined above for logging
     output_dir.mkdir(parents=True, exist_ok=True)
     
     logger.info(f"Starting multi-agent generation: {args.name}")
     logger.info(f"Output directory: {output_dir}")
     logger.info(f"Model: {args.model} ({args.provider})")
     
+    # Collect reference images
+    reference_images = list(args.reference_images)
+    if args.reference_dir:
+        ref_dir = Path(args.reference_dir)
+        if ref_dir.exists():
+            for ext in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
+                reference_images.extend([str(p) for p in ref_dir.glob(ext)])
+    
+    if reference_images:
+        logger.info(f"Reference images: {len(reference_images)} files")
+        for img in reference_images:
+            logger.info(f"  - {img}")
+    
     orchestrator = Orchestrator(
         llm_config=llm_config,
         output_dir=output_dir,
+        name=args.name,
         verbose=args.verbose,
+        reference_images=reference_images,
     )
     
     requirements = []

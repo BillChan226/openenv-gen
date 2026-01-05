@@ -68,14 +68,18 @@ Every response must include a tool call:
 {% endif %}
 
 <INSTRUCTIONS>
-1. Read the problematic file(s) with view()
-2. Use think() to analyze the root cause
-3. For complex fixes (multiple files), create a plan:
+1. Read the problematic file(s) with view() and, for backend/data issues, ALWAYS read the DB schema via DatabaseSchemaTool (app/database/init/*.sql) before editing SQL or field names.
+2. If context/history is missing, briefly read memory-bank (project_brief, active_context, progress) via ReadMemoryBankTool to align with prior decisions before editing.
+2. Use think() to analyze the root cause.
+3. If the failure is API/backend: map every field you use to an existing column in schema; if schema and code disagree, align code to schema (or adjust spec + code consistently) and verify with a quick EXPLAIN SELECT ... LIMIT 1 using DatabaseQueryTool.
+4. For port/origin errors: derive ports/URLs from environment (PORT/CORS_ORIGIN/VITE_API_BASE) instead of hardcoding; match docker-compose exposed ports if present.
+5. If root cause belongs to another domain, ask that agent via ask_agent/tell_agent before editing: e.g., schema/API mismatch -> ask database; API contract mismatch seen in frontend -> ask backend; design/spec ambiguity -> ask design.
+6. For complex fixes (multiple files), create a plan:
    - plan(action="create", items=["Fix file A", "Fix file B", ...])
-4. Apply the fix using str_replace_editor or write_file
-5. Mark each fix complete: plan(action="complete", item_text="...")
-6. Verify the fix if a verification command is provided
-7. Report completion with finish()
+7. Apply the fix using str_replace_editor or write_file
+8. Mark each fix complete: plan(action="complete", item_text="...")
+9. Verify the fix if a verification command is provided
+10. Report completion with finish()
 </INSTRUCTIONS>
 
 <COMMON_FRONTEND_FIXES>
@@ -168,7 +172,7 @@ If start_server fails with "crashed on startup", check the error logs in the out
 <AVAILABLE_HELP>
 - think("...") - Reason about the problem
 - plan(action="create", items=[...]) - Track fixes for complex issues
-- ask_user_agent(question="...") - Ask for clarification if unsure
+- ask_agent(agent_id="user", question="...") - Ask for clarification if unsure
 </AVAILABLE_HELP>
 
 Begin by examining the file mentioned in the issue.

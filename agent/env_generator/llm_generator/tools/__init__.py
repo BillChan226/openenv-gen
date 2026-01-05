@@ -13,7 +13,7 @@ Image Search Tools:
 
 Code Tools:
     GrepTool, EditFileTool, LintTool, ThinkTool, PlanTool, VerifyPlanTool,
-    ReadMemoryBankTool, RequestReviewTool, AskUserAgentTool, FinishTool
+    ReadMemoryBankTool, FinishTool
 
 Analysis Tools:
     FindDefinitionTool, FindReferencesTool, GetSymbolsTool
@@ -91,16 +91,53 @@ from .code_tools import (
 # Reasoning Tools (think, plan)
 from .reasoning_tools import (
     ThinkTool,
+    GetTimeTool,
+    WaitTool,
     PlanTool,
     VerifyPlanTool,
 )
 
-# Agent Interaction Tools (memory, review, ask, finish)
+# Agent Interaction Tools (memory, finish, deliver)
 from .agent_interaction_tools import (
     ReadMemoryBankTool,
-    RequestReviewTool,
-    AskUserAgentTool,
     FinishTool,
+    DeliverProjectTool,
+)
+
+# Communication Tools (message-driven inter-agent communication)
+from .communication_tools import (
+    SendMessageTool,
+    AskAgentTool,
+    BroadcastTool,
+    CheckInboxTool,
+    ListAgentsTool,
+    SubscribeMessagesTool,
+    UnsubscribeMessagesTool,
+    PublishMessageTool,
+    # Message status tracking
+    GetMessageStatusTool,
+    GetPendingRepliesTool,
+    AcknowledgeMessageTool,
+    MarkProcessingTool,
+    create_communication_tools,
+)
+
+# Memory Tools (agent memory management)
+from .memory_tools import (
+    RememberTool,
+    RecallTool,
+    ShareKnowledgeTool,
+    GetOperationHistoryTool,
+    GetMemoryContextTool,
+    create_memory_tools,
+)
+
+# Progress Reporting Tools
+from .progress_tools import (
+    ReportProgressTool,
+    ReportCompletionTool,
+    ReportIssueTool,
+    GetProgressTool,
 )
 
 # Analysis Tools
@@ -162,6 +199,8 @@ from .docker_tools import (
     DockerLogsTool,
     DockerStatusTool,
     DockerRestartTool,
+    DockerValidateTool,
+    DockerInspectImageTool,
 )
 
 # Project Tools
@@ -214,11 +253,14 @@ except ImportError:
 # Vision Tools
 from .vision_tools import (
     create_vision_tools,
-    AnalyzeScreenshotTool,
+    AnalyzeImageTool,
     CompareWithScreenshotTool,
     ExtractComponentsTool,
+    ListReferenceImagesTool as VisionListReferenceImagesTool,
     DesignAnalysis,
 )
+# Alias for backward compatibility
+AnalyzeScreenshotTool = AnalyzeImageTool
 
 # Debug Tools
 from .debug_tools import (
@@ -238,6 +280,43 @@ from .reasoning_debugger import (
     IterativeDebugger,
     DebugDiagnosis,
     CodeChange,
+)
+
+# Database Tools
+from .database_tools import (
+    DatabaseQueryTool,
+    DatabaseSchemaTool,
+    DatabaseTestTool,
+    create_database_tools,
+)
+
+# Data Engine Tools (HuggingFace dataset discovery and loading)
+from .data_engine_tools import (
+    DiscoverDatasetsTool,
+    PreviewDatasetTool,
+    GenerateSeedSQLTool,
+    create_data_engine_tools,
+)
+
+# Log Tools
+from .log_tools import (
+    LogParser,
+    LogEntry,
+    LogParseTool,
+    LogAnalyzeTool,
+    LogSearchTool,
+    create_log_tools,
+)
+
+# Task Tools (for benchmark generation)
+from .task_tools import (
+    ExtractActionSpaceTool,
+    GenerateTaskTool,
+    GenerateTrajectoryTool,
+    GenerateJudgeTool,
+    ExportTaskConfigTool,
+    TestActionTool,
+    create_task_tools,
 )
 
 
@@ -292,12 +371,20 @@ def get_all_tools(
         EditFileTool(workspace=workspace),
         LintTool(workspace=workspace),
         ThinkTool(),
-        PlanTool(),
+        PlanTool(agent_id="default"),  # Use default for get_all_tools
         VerifyPlanTool(),
         ReadMemoryBankTool(workspace=workspace),
-        RequestReviewTool(),
-        AskUserAgentTool(),
-        FinishTool(),
+        FinishTool(agent_id="default"),  # Use default for get_all_tools
+        
+        # Communication tools (message-based inter-agent communication)
+        *create_communication_tools(),
+        
+        # Progress Reporting Tools
+        ReportProgressTool(),
+        ReportCompletionTool(),
+        ReportIssueTool(),
+        GetProgressTool(),
+        
         
         # Analysis tools
         *create_analysis_tools(workspace=workspace),
@@ -324,6 +411,15 @@ def get_all_tools(
         
         # Project tools
         *create_project_tools(workspace=workspace),
+        
+        # Database tools
+        *create_database_tools(workspace=workspace),
+        
+        # Data Engine tools (HuggingFace datasets)
+        *create_data_engine_tools(workspace=workspace),
+        
+        # Log tools
+        *create_log_tools(workspace=workspace),
     ]
     
     # Browser tools (optional, requires Playwright)
@@ -386,12 +482,44 @@ __all__ = [
     "EditFileTool",
     "LintTool",
     "ThinkTool",
+    "GetTimeTool",
+    "WaitTool",
     "PlanTool",
     "VerifyPlanTool",
     "ReadMemoryBankTool",
-    "RequestReviewTool",
-    "AskUserAgentTool",
     "FinishTool",
+    "DeliverProjectTool",
+    
+    # Communication Tools
+    "SendMessageTool",
+    "AskAgentTool",
+    "BroadcastTool",
+    "CheckInboxTool",
+    "ListAgentsTool",
+    "SubscribeMessagesTool",
+    "UnsubscribeMessagesTool",
+    "PublishMessageTool",
+    # Message status tracking
+    "GetMessageStatusTool",
+    "GetPendingRepliesTool",
+    "AcknowledgeMessageTool",
+    "MarkProcessingTool",
+    "create_communication_tools",
+    
+    # Memory Tools
+    "RememberTool",
+    "RecallTool",
+    "ShareKnowledgeTool",
+    "GetOperationHistoryTool",
+    "GetMemoryContextTool",
+    "create_memory_tools",
+    
+    # Progress Reporting Tools
+    "ReportProgressTool",
+    "ReportCompletionTool",
+    "ReportIssueTool",
+    "GetProgressTool",
+    
     
     # Analysis Tools
     "create_analysis_tools",
@@ -503,6 +631,35 @@ __all__ = [
     "IterativeDebugger",
     "DebugDiagnosis",
     "CodeChange",
+    
+    # Database Tools
+    "DatabaseQueryTool",
+    "DatabaseSchemaTool",
+    "DatabaseTestTool",
+    "create_database_tools",
+    
+    # Data Engine Tools
+    "DiscoverDatasetsTool",
+    "PreviewDatasetTool",
+    "GenerateSeedSQLTool",
+    "create_data_engine_tools",
+    
+    # Log Tools
+    "LogParser",
+    "LogEntry",
+    "LogParseTool",
+    "LogAnalyzeTool",
+    "LogSearchTool",
+    "create_log_tools",
+    
+    # Task Tools
+    "ExtractActionSpaceTool",
+    "GenerateTaskTool",
+    "GenerateTrajectoryTool",
+    "GenerateJudgeTool",
+    "ExportTaskConfigTool",
+    "TestActionTool",
+    "create_task_tools",
     
     # Helpers
     "get_all_tools",

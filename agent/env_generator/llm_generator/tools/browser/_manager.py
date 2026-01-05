@@ -48,7 +48,27 @@ class BrowserManager:
         if Path(path).is_absolute():
             resolved = Path(path)
         else:
-            resolved = self.workspace_root / path
+            # Strip workspace path prefix if LLM accidentally included it
+            # e.g., "generated/expedia/screenshots/x.png" -> "screenshots/x.png"
+            clean_path = path
+            workspace_name = self.workspace_root.name  # e.g., "expedia"
+            
+            # Check for patterns like "generated/expedia/..." or "expedia/..."
+            parts = Path(path).parts
+            for i, part in enumerate(parts):
+                if part == workspace_name:
+                    # Found workspace name, strip everything up to and including it
+                    clean_path = str(Path(*parts[i+1:])) if i+1 < len(parts) else ""
+                    self._logger.debug(f"Stripped workspace prefix: {path} -> {clean_path}")
+                    break
+                elif part == "generated":
+                    # "generated/projectname/..." - check next part
+                    if i+1 < len(parts) and parts[i+1] == workspace_name:
+                        clean_path = str(Path(*parts[i+2:])) if i+2 < len(parts) else ""
+                        self._logger.debug(f"Stripped generated prefix: {path} -> {clean_path}")
+                        break
+            
+            resolved = self.workspace_root / clean_path if clean_path else self.workspace_root
         
         # Ensure it's within workspace (security check)
         try:

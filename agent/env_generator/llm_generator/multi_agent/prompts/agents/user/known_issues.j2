@@ -1,0 +1,215 @@
+{# User Agent: Known Issues and Solutions #}
+
+{% macro common_issues() %}
+## Common Issues & Solutions
+
+| Symptom | Likely Cause | Solution |
+|---------|--------------|----------|
+| Frontend shows "placeholder" | docker-compose context path wrong | `docker_validate(fix=True)`, rebuild |
+| API returns 404 for all routes | Backend context path wrong | Same as above |
+| "Connection refused" | Service not started | `docker_up()` |
+| Old code running | Docker cache | `docker_build(no_cache=True)` |
+| Port conflict | Port already in use | Modify docker-compose.yml to use different port |
+| Environment variable missing | Missing env in docker-compose | Add to environment section |
+| "No such container" error | Docker residual/orphan containers | `docker_down(remove_orphans=True)` then `docker_up()` |
+| "duplicate key" in DB logs | SQL seed has duplicate data | Edit `02_seed.sql` - ensure unique emails/IDs |
+| "Cannot use import" in logs | ES Module vs CommonJS mismatch | Edit file: change `import x from 'y'` to `const x = require('y')` |
+| DB container exits immediately | SQL syntax error in init scripts | Check `docker_logs(service="db")`, fix SQL files |
+| Backend crashes on startup | Missing dependency or syntax error | Check `docker_logs(service="backend")`, fix code |
+| **Same error after code fix** | **Container not rebuilt!** | **CRITICAL: `docker_build(service="backend")` then `docker_up()`** |
+{% endmacro %}
+
+
+{% macro api_500_errors() %}
+## API 500 Errors - Database Column Mismatch (COMMON!)
+
+**Symptom:** `HTTP 500` with "column X does not exist" in backend logs
+
+**Root Cause:** Backend SQL uses column names that don't match the actual database schema.
+
+**How to Fix:**
+1. Check backend logs: `docker_logs(service="backend")`
+2. Identify the wrong column name
+3. Use `db_schema()` to see actual column names
+4. View the problematic route file
+5. Fix with `str_replace_editor()` to use correct column name
+
+**Common column name mismatches to look for:**
+- `depart_time` should be `depart_at`
+- `arrive_time` should be `arrive_at`
+- `nightly_price` should be `nightly_base_price_cents`
+- `daily_price` should be `base_price_per_day_cents`
+- `price` should be `price_cents` or similar with `_cents` suffix
+{% endmacro %}
+
+
+{% macro auth_401_errors() %}
+## Auth 401 Errors - Password Hash Mismatch
+
+**Symptom:** Login returns 401 even with correct credentials
+
+**Possible Causes:**
+1. Seed data has invalid bcrypt hash
+2. Auth route using wrong comparison
+3. Password column name mismatch
+
+**How to Fix:**
+1. Check seed SQL: `view("app/database/init/02_seed.sql")`
+2. Verify bcrypt hash format: must start with `$2a$10$` or `$2b$10$`
+3. Check auth route: `view("app/backend/src/routes/auth.js")`
+4. Verify it uses `bcrypt.compare(password, hash)`
+{% endmacro %}
+
+
+{% macro docker_known_issues() %}
+## KNOWN DOCKER BUILD ISSUES & SOLUTIONS (CRITICAL!)
+
+### 1. Backend: bcrypt/Native Module Build Failures
+**Symptom:** `npm install` fails with bcrypt compilation errors in Alpine.
+**Solution:** Dockerfile needs build dependencies:
+```dockerfile
+RUN apk add --no-cache python3 make g++
+RUN npm install --omit=dev --legacy-peer-deps
+```
+
+### 2. Backend: NPM Peer Dependency Conflicts
+**Symptom:** `ERESOLVE unable to resolve dependency tree`
+**Solution:** Use `--legacy-peer-deps` flag
+
+### 3. Frontend: Nginx Port Mismatch
+**Symptom:** Frontend container runs but nothing serves on mapped port.
+**Solution:** nginx must listen on same port as EXPOSE/compose mapping
+
+### 4. Database: PostgreSQL Version Incompatibility
+**Symptom:** `database files are incompatible with server`
+**Solution:** Remove volumes and restart:
+```python
+docker_down(volumes=True)
+docker_up()
+```
+
+### 5. Docker Daemon Not Available
+**Symptom:** `Cannot connect to Docker daemon`
+**Solution:** Wait and retry - this is an ENVIRONMENT issue:
+```python
+wait(60, reason="Docker daemon unavailable - waiting for recovery")
+```
+{% endmacro %}
+
+
+{% macro when_to_wait() %}
+## When to Use `wait()` vs Continue Working
+
+**Use `wait()`:**
+- Docker daemon unavailable (environment issue)
+- Waiting for other agents to fix reported issues
+- After docker rebuild, wait for services to stabilize
+- Waiting for long operations to complete
+
+**Continue working:**
+- Code issues you can fix yourself
+- Configuration issues in files you can edit
+- Test failures that need immediate re-test
+{% endmacro %}
+
+
+{% macro response_wrapper_mismatch() %}
+## UI Shows "Empty" But Backend Has Data (Response Wrapper Mismatch) - COMMON!
+
+**Symptom:**
+- Cart page shows "Your cart is empty"
+- But backend logs show `POST /cart/items 201` and `GET /cart 200`
+- API returns data but UI doesn't display it
+
+**Root Cause:** Backend and Frontend use different response wrapper formats:
+- Backend returns: `{ cart: { items: [...] } }` or `{ data: { items: [...] } }`
+- Frontend reads: `response.data.items` expecting items directly
+
+**Diagnosis Steps:**
+1. **Test API directly:**
+   ```python
+   test_api(method="GET", path="/api/cart", auth=True)
+   ```
+2. **Check response structure in result** - Look for wrapper keys like `cart`, `data`, `items`
+3. **Identify the mismatch:**
+   - If API returns `{ cart: { items: [...] } }` but frontend reads `response.data.items` → Bug!
+   - Frontend needs to read `response.data.cart.items` instead
+
+**How to Report:**
+```python
+report_issue(
+    assign_to="frontend",
+    title="Cart UI shows empty - response wrapper mismatch",
+    description="""
+    Backend GET /cart returns: { success: true, data: { cart: { items: [...] } } }
+    Frontend expects: response.data.items
+    Should read: response.data.cart.items or use unwrap utility
+    
+    Files to fix: src/services/api.js or src/contexts/CartContext.jsx
+    """,
+    priority="high"
+)
+```
+
+**Alternative - Report to Backend:**
+```python
+report_issue(
+    assign_to="backend",
+    title="Inconsistent response wrapper format",
+    description="""
+    /cart returns { cart: {...} } but /flights returns { items: [...] }
+    Please standardize: all endpoints should use { data: {...} } wrapper
+    """,
+    priority="high"
+)
+```
+
+**Quick Self-Fix (if urgent):**
+```python
+# Fix frontend api.js directly
+str_replace_editor(
+    command="str_replace",
+    path="app/frontend/src/services/api.js",
+    old_str="return response.data;",
+    new_str="return response.data?.cart || response.data?.data || response.data;"
+)
+```
+{% endmacro %}
+
+
+{% macro agent_response_timeout() %}
+## Agent Not Responding to Issues
+
+**Symptom:** You reported an issue but no response after multiple waits
+
+**Causes:**
+1. Agent is stuck in a long operation
+2. Agent's inbox is full
+3. Agent crashed or hit error
+
+**Solutions:**
+1. **Escalate with higher priority:**
+   ```python
+   send_message(
+       to_agent="frontend",
+       content="URGENT: Still waiting for cart wrapper fix. Please respond!",
+       msg_type="issue",
+       priority="high"
+   )
+   ```
+
+2. **Try alternative agent:**
+   ```python
+   report_issue(
+       assign_to="backend",
+       title="Need response format standardization",
+       description="Frontend hasn't responded. Backend: can you standardize all API responses to { data: {...} } format?",
+       priority="high"
+   )
+   ```
+
+3. **Fix it yourself (if capable):**
+   - If it's a simple frontend/backend fix, use `str_replace_editor` directly
+   - This is acceptable when agents are unresponsive and time is limited
+{% endmacro %}
+

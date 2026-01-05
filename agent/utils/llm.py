@@ -62,16 +62,43 @@ def _sanitize_message_content(content: Optional[Union[str, list]]) -> Optional[U
     if isinstance(content, str):
         return _redact_secrets(content)
     if isinstance(content, list):
-        sanitized_parts = []
-        for part in content:
-            if isinstance(part, dict) and part.get("type") == "text" and isinstance(part.get("text"), str):
-                new_part = dict(part)
-                new_part["text"] = _redact_secrets(new_part["text"])
-                sanitized_parts.append(new_part)
-            else:
-                sanitized_parts.append(part)
-        return sanitized_parts
-    return content
+        # Check if this is valid multimodal content (each item should have 'type')
+        all_valid_multimodal = all(
+            isinstance(part, dict) and 'type' in part 
+            for part in content
+        )
+        
+        if all_valid_multimodal:
+            # Valid multimodal - sanitize and keep as list
+            sanitized_parts = []
+            for part in content:
+                if part.get("type") == "text" and isinstance(part.get("text"), str):
+                    new_part = dict(part)
+                    new_part["text"] = _redact_secrets(new_part["text"])
+                    sanitized_parts.append(new_part)
+                else:
+                    sanitized_parts.append(part)
+            return sanitized_parts
+        else:
+            # Invalid multimodal format - convert to string
+            # This handles cases where content accidentally became a list
+            text_parts = []
+            for part in content:
+                if isinstance(part, str):
+                    text_parts.append(part)
+                elif isinstance(part, dict):
+                    if 'text' in part:
+                        text_parts.append(str(part['text']))
+                    elif 'content' in part:
+                        text_parts.append(str(part['content']))
+                    else:
+                        text_parts.append(str(part))
+                else:
+                    text_parts.append(str(part))
+            return _redact_secrets(" ".join(text_parts))
+    
+    # Non-string, non-list content - convert to string
+    return _redact_secrets(str(content))
 
 
 @dataclass
@@ -244,6 +271,51 @@ class BaseLLMClient(ABC):
         messages.append(Message.user(prompt))
         return await self.chat(messages, **kwargs)
     
+    def _is_rate_limit_error(self, error: Exception) -> bool:
+        """Check if error is a rate limit error"""
+        error_str = str(error).lower()
+        error_type = type(error).__name__.lower()
+        
+        # Common rate limit indicators
+        rate_limit_keywords = [
+            "rate_limit", "rate limit", "ratelimit",
+            "429", "too many requests",
+            "resource_exhausted", "resourceexhausted",
+            "quota", "exceeded",
+            "throttl",
+        ]
+        
+        for keyword in rate_limit_keywords:
+            if keyword in error_str or keyword in error_type:
+                return True
+        
+        # Check for HTTP 429 status code
+        if hasattr(error, 'status_code') and error.status_code == 429:
+            return True
+        if hasattr(error, 'code') and error.code == 429:
+            return True
+            
+        return False
+    
+    def _extract_retry_after(self, error: Exception) -> Optional[float]:
+        """Try to extract retry-after time from error"""
+        error_str = str(error)
+        
+        # Try to find retry-after in error message (e.g., "retry after 60 seconds")
+        import re
+        patterns = [
+            r'retry.?after[:\s]+(\d+)',
+            r'wait[:\s]+(\d+)',
+            r'(\d+)\s*seconds?',
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, error_str.lower())
+            if match:
+                return float(match.group(1))
+        
+        return None
+    
     async def _retry_with_backoff(
         self,
         func,
@@ -251,14 +323,21 @@ class BaseLLMClient(ABC):
         max_retries: int = None,
         **kwargs
     ) -> Any:
-        """Retry with exponential backoff"""
+        """Retry with exponential backoff and smart rate limit handling"""
         max_retries = max_retries or self.config.retry_attempts
         last_error = None
         
-        for attempt in range(max_retries):
+        # For rate limits, we may want more retries with longer delays
+        rate_limit_extra_retries = 3
+        rate_limit_base_delay = 30  # Start with 30 seconds for rate limits
+        
+        attempt = 0
+        total_attempts = max_retries
+        
+        while attempt < total_attempts:
             try:
                 attempt_start = datetime.now()
-                self._logger.debug(f"[LLM] Attempt {attempt + 1}/{max_retries} starting...")
+                self._logger.debug(f"[LLM] Attempt {attempt + 1}/{total_attempts} starting...")
                 result = await func(*args, **kwargs)
                 elapsed = (datetime.now() - attempt_start).total_seconds()
                 self._logger.info(f"[LLM] Attempt {attempt + 1} succeeded in {elapsed:.1f}s")
@@ -268,12 +347,41 @@ class BaseLLMClient(ABC):
                 last_error = e
                 error_type = type(e).__name__
                 error_msg = str(e)[:200]  # Truncate long errors
-                if attempt < max_retries - 1:
-                    delay = self.config.retry_delay * (2 ** attempt)
-                    self._logger.warning(f"[LLM] Attempt {attempt + 1} failed after {elapsed:.1f}s: [{error_type}] {error_msg}. Retrying in {delay}s...")
+                
+                is_rate_limit = self._is_rate_limit_error(e)
+                
+                if attempt < total_attempts - 1:
+                    if is_rate_limit:
+                        # For rate limits, use longer delays and add extra retries
+                        retry_after = self._extract_retry_after(e)
+                        if retry_after:
+                            delay = retry_after + 5  # Add 5 seconds buffer
+                        else:
+                            # Exponential backoff starting from rate_limit_base_delay
+                            delay = rate_limit_base_delay * (2 ** min(attempt, 3))  # Cap at 240s
+                        
+                        # Add extra retries for rate limits if we haven't already
+                        if attempt == max_retries - 1 and rate_limit_extra_retries > 0:
+                            total_attempts = max_retries + rate_limit_extra_retries
+                            self._logger.info(f"[LLM] Rate limit detected, extending retries to {total_attempts}")
+                        
+                        self._logger.warning(
+                            f"[LLM] Rate limit hit on attempt {attempt + 1}. "
+                            f"Sleeping {delay:.0f}s before retry... [{error_type}] {error_msg}"
+                        )
+                    else:
+                        # Normal exponential backoff for other errors
+                        delay = self.config.retry_delay * (2 ** attempt)
+                        self._logger.warning(
+                            f"[LLM] Attempt {attempt + 1} failed after {elapsed:.1f}s: "
+                            f"[{error_type}] {error_msg}. Retrying in {delay}s..."
+                        )
+                    
                     await asyncio.sleep(delay)
                 else:
-                    self._logger.error(f"[LLM] All {max_retries} attempts failed. Last error: [{error_type}] {error_msg}")
+                    self._logger.error(f"[LLM] All {total_attempts} attempts failed. Last error: [{error_type}] {error_msg}")
+                
+                attempt += 1
         
         raise last_error
 
@@ -709,35 +817,203 @@ class GoogleClient(BaseLLMClient):
     """
     Google Gemini Client
     
-    Uses OpenAI-compatible API endpoint provided by Google.
+    Uses the native google-generativeai SDK for full Gemini 3 support
+    including automatic thought_signature handling for function calls.
     Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.
+    
+    Install: pip install google-generativeai
     """
     
     def __init__(self, config: LLMConfig):
         super().__init__(config)
         self._client = None
+        self._model = None
     
     def _get_client(self):
-        """Lazy initialization of Google client via OpenAI-compatible API"""
+        """Lazy initialization of Google GenAI client"""
         if self._client is None:
             try:
-                from openai import AsyncOpenAI
+                from google import genai
+                from google.genai import types
             except ImportError:
-                raise ImportError("Please install openai: pip install openai")
+                raise ImportError("Please install google-generativeai: pip install google-generativeai")
             
             api_key = self.config.api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
             if not api_key:
                 raise ValueError("Google API key not found. Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.")
             
-            # Google's OpenAI-compatible endpoint
-            base_url = self.config.api_base or "https://generativelanguage.googleapis.com/v1beta/openai/"
-            
-            self._client = AsyncOpenAI(
-                api_key=api_key,
-                base_url=base_url,
-                timeout=self.config.timeout,
-            )
+            self._client = genai.Client(api_key=api_key)
+            self._types = types
         return self._client
+    
+    def _convert_openai_tools_to_google(self, tools: list[dict]) -> list:
+        """Convert OpenAI-style tool definitions to Google format"""
+        from google.genai import types
+        
+        def convert_schema(schema: dict) -> types.Schema:
+            """Recursively convert JSON schema to Google Schema"""
+            if not schema:
+                return types.Schema(type="STRING")
+            
+            # Handle type - can be string or list (e.g., ["string", "null"] for nullable)
+            raw_type = schema.get("type", "string")
+            if isinstance(raw_type, list):
+                # Take the first non-null type
+                schema_type = next((t for t in raw_type if t != "null"), "string").upper()
+            else:
+                schema_type = raw_type.upper()
+            type_map = {
+                "STRING": "STRING",
+                "NUMBER": "NUMBER", 
+                "INTEGER": "INTEGER",
+                "BOOLEAN": "BOOLEAN",
+                "ARRAY": "ARRAY",
+                "OBJECT": "OBJECT",
+            }
+            google_type = type_map.get(schema_type, "STRING")
+            
+            kwargs = {
+                "type": google_type,
+                "description": schema.get("description", ""),
+            }
+            
+            # Handle enum
+            if "enum" in schema:
+                kwargs["enum"] = schema["enum"]
+            
+            # Handle array items - Google requires this for ARRAY type
+            if google_type == "ARRAY":
+                items = schema.get("items", {"type": "string"})
+                kwargs["items"] = convert_schema(items)
+            
+            # Handle object properties
+            if google_type == "OBJECT" and "properties" in schema:
+                props = schema.get("properties", {})
+                kwargs["properties"] = {
+                    k: convert_schema(v) for k, v in props.items()
+                }
+                if "required" in schema:
+                    kwargs["required"] = schema["required"]
+            
+            return types.Schema(**kwargs)
+        
+        google_tools = []
+        function_declarations = []
+        
+        for tool in tools:
+            if tool.get("type") == "function":
+                func = tool.get("function", {})
+                params = func.get("parameters", {})
+                
+                # Convert parameters schema
+                param_schema = None
+                if params and params.get("properties"):
+                    param_schema = convert_schema(params)
+                
+                function_declarations.append(
+                    types.FunctionDeclaration(
+                        name=func.get("name", ""),
+                        description=func.get("description", ""),
+                        parameters=param_schema,
+                    )
+                )
+        
+        # Google prefers all functions in a single Tool
+        if function_declarations:
+            google_tools.append(types.Tool(function_declarations=function_declarations))
+        
+        return google_tools
+    
+    def _convert_messages_to_google(self, messages: list[Message]) -> tuple:
+        """Convert OpenAI-style messages to Google format
+        
+        Returns: (system_instruction, contents)
+        """
+        from google.genai import types
+        
+        system_instruction = None
+        contents = []
+        
+        for msg in messages:
+            if msg.role == "system":
+                system_instruction = msg.content if isinstance(msg.content, str) else str(msg.content)
+            elif msg.role == "user":
+                if isinstance(msg.content, list):
+                    # Multimodal content
+                    parts = []
+                    for part in msg.content:
+                        if part.get("type") == "text":
+                            parts.append(types.Part.from_text(text=part.get("text", "")))
+                        elif part.get("type") == "image_url":
+                            # Handle base64 images
+                            url = part.get("image_url", {}).get("url", "")
+                            if url.startswith("data:"):
+                                # Extract base64 data
+                                import base64
+                                # Format: data:image/png;base64,<data>
+                                header, data = url.split(",", 1)
+                                mime_type = header.split(":")[1].split(";")[0]
+                                parts.append(types.Part.from_bytes(
+                                    data=base64.b64decode(data),
+                                    mime_type=mime_type
+                                ))
+                    contents.append(types.Content(role="user", parts=parts))
+                else:
+                    contents.append(types.Content(
+                        role="user",
+                        parts=[types.Part.from_text(text=msg.content or "")]
+                    ))
+            elif msg.role == "assistant":
+                parts = []
+                if msg.content:
+                    parts.append(types.Part.from_text(text=msg.content))
+                if msg.tool_calls:
+                    for tc in msg.tool_calls:
+                        if hasattr(tc, 'function'):
+                            func = tc.function
+                            args = json.loads(func.arguments) if isinstance(func.arguments, str) else func.arguments
+                            thought_sig = getattr(tc, 'thought_signature', None)
+                            if thought_sig:
+                                # Create Part with thought_signature for Gemini 3
+                                parts.append(types.Part(
+                                    function_call=types.FunctionCall(name=func.name, args=args),
+                                    thought_signature=thought_sig
+                                ))
+                            else:
+                                parts.append(types.Part.from_function_call(
+                                    name=func.name,
+                                    args=args
+                                ))
+                        elif isinstance(tc, dict):
+                            func = tc.get("function", {})
+                            args = func.get("arguments", {})
+                            if isinstance(args, str):
+                                args = json.loads(args)
+                            thought_sig = tc.get("thought_signature")
+                            if thought_sig:
+                                # Create Part with thought_signature for Gemini 3
+                                parts.append(types.Part(
+                                    function_call=types.FunctionCall(name=func.get("name", ""), args=args),
+                                    thought_signature=thought_sig
+                                ))
+                            else:
+                                parts.append(types.Part.from_function_call(
+                                    name=func.get("name", ""),
+                                    args=args
+                                ))
+                if parts:
+                    contents.append(types.Content(role="model", parts=parts))
+            elif msg.role == "tool":
+                # Tool response
+                contents.append(types.Content(
+                    role="user",
+                    parts=[types.Part.from_function_response(
+                        name=msg.name or "tool",
+                        response={"result": msg.content}
+                    )]
+                ))
+        
+        return system_instruction, contents
     
     async def chat(
         self,
@@ -749,41 +1025,129 @@ class GoogleClient(BaseLLMClient):
         tools: Optional[list[dict]] = None,
         tool_choice: Optional[str] = None,
         **kwargs
-    ) -> Message:
-        """Send chat request to Gemini"""
+    ) -> LLMResponse:
+        """Send chat request to Gemini using native SDK"""
         client = self._get_client()
+        from google.genai import types
         
-        # Build request parameters
-        request_params = {
-            "model": self.config.model_name,
-            "messages": [m.to_dict() for m in messages],
-            "temperature": temperature if temperature is not None else self.config.temperature,
-            "max_tokens": max_tokens if max_tokens is not None else self.config.max_tokens,
-        }
+        # Always sanitize outgoing content
+        safe_messages: list[Message] = [
+            Message(role=m.role, content=_sanitize_message_content(m.content), name=m.name, function_call=m.function_call, tool_calls=m.tool_calls, tool_call_id=m.tool_call_id)
+            for m in messages
+        ]
+        
+        # Convert messages to Google format
+        system_instruction, contents = self._convert_messages_to_google(safe_messages)
+        
+        # Convert tools if provided
+        google_tools = None
+        if tools:
+            google_tools = self._convert_openai_tools_to_google(tools)
+        elif functions:
+            google_tools = self._convert_openai_tools_to_google([{"type": "function", "function": f} for f in functions])
+        
+        # Build generation config
+        gen_config = types.GenerateContentConfig(
+            temperature=temperature if temperature is not None else self.config.temperature,
+            max_output_tokens=max_tokens if max_tokens is not None else self.config.max_tokens,
+            system_instruction=system_instruction,
+            tools=google_tools,
+        )
         
         if stop:
-            request_params["stop"] = stop
+            gen_config.stop_sequences = stop
         
-        # Handle tools/functions
-        if tools:
-            request_params["tools"] = tools
-            if tool_choice:
-                request_params["tool_choice"] = tool_choice
-        elif functions:
-            # Convert legacy functions format to tools
-            request_params["tools"] = [{"type": "function", "function": f} for f in functions]
+        start_time = datetime.now()
+        
+        # Log request info
+        msg_count = len(safe_messages)
+        total_content_len = sum(len(str(m.content or "")) for m in safe_messages)
+        tool_count = len(tools) if tools else 0
+        self._logger.info(f"[LLM Request] model={self.config.model_name}, messages={msg_count}, content_chars={total_content_len}, tools={tool_count}")
+        
+        async def _call_with_progress():
+            """Wrapper that logs progress during long waits"""
+            warn_interval = 60
+            call_start = datetime.now()
+            
+            def _do_call():
+                return client.models.generate_content(
+                    model=self.config.model_name,
+                    contents=contents,
+                    config=gen_config,
+                )
+            
+            # Run sync call in thread pool
+            task = asyncio.get_event_loop().run_in_executor(None, _do_call)
+            
+            while True:
+                try:
+                    return await asyncio.wait_for(asyncio.shield(task), timeout=warn_interval)
+                except asyncio.TimeoutError:
+                    elapsed = (datetime.now() - call_start).total_seconds()
+                    self._logger.warning(f"[LLM] Still waiting for API response... elapsed={elapsed:.0f}s")
+                    if task.done():
+                        return task.result()
+                    continue
         
         async def _call():
-            response = await client.chat.completions.create(**request_params)
-            return response
+            return await _call_with_progress()
         
         response = await self._retry_with_backoff(_call)
-        choice = response.choices[0]
+        latency = (datetime.now() - start_time).total_seconds()
         
-        # Build response message
-        return Message.assistant(
-            content=choice.message.content or "",
-            tool_calls=choice.message.tool_calls
+        # Extract content and tool calls from response
+        content = ""
+        tool_calls = []
+        finish_reason = "stop"
+        
+        if response.candidates:
+            candidate = response.candidates[0]
+            finish_reason = str(candidate.finish_reason) if candidate.finish_reason else "stop"
+            
+            for part in candidate.content.parts:
+                if hasattr(part, 'text') and part.text:
+                    content += part.text
+                elif hasattr(part, 'function_call') and part.function_call:
+                    fc = part.function_call
+                    tc = {
+                        "id": f"call_{len(tool_calls)}",
+                        "type": "function",
+                        "function": {
+                            "name": fc.name,
+                            "arguments": json.dumps(dict(fc.args)) if fc.args else "{}",
+                        }
+                    }
+                    # Preserve thought_signature for Gemini 3 multi-turn function calling
+                    if hasattr(part, 'thought_signature') and part.thought_signature:
+                        tc["thought_signature"] = part.thought_signature
+                    tool_calls.append(tc)
+        
+        # Get usage stats
+        prompt_tokens = 0
+        completion_tokens = 0
+        if hasattr(response, 'usage_metadata') and response.usage_metadata:
+            prompt_tokens = getattr(response.usage_metadata, 'prompt_token_count', 0) or 0
+            completion_tokens = getattr(response.usage_metadata, 'candidates_token_count', 0) or 0
+        
+        has_tool_calls = bool(tool_calls)
+        if has_tool_calls:
+            finish_reason = "tool_calls"
+        
+        self._logger.info(f"[LLM Response] latency={latency:.1f}s, prompt_tokens={prompt_tokens}, completion_tokens={completion_tokens}, tool_calls={has_tool_calls}, finish={finish_reason}")
+        
+        return LLMResponse(
+            content=content,
+            model=self.config.model_name,
+            finish_reason=finish_reason,
+            usage={
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            },
+            tool_calls=tool_calls if tool_calls else None,
+            raw_response=response,
+            latency=latency,
         )
     
     async def chat_stream(
@@ -796,23 +1160,35 @@ class GoogleClient(BaseLLMClient):
     ) -> AsyncIterator[str]:
         """Stream chat response from Gemini"""
         client = self._get_client()
+        from google.genai import types
         
-        request_params = {
-            "model": self.config.model_name,
-            "messages": [m.to_dict() for m in messages],
-            "temperature": temperature or self.config.temperature,
-            "max_tokens": max_tokens or self.config.max_tokens,
-            "stream": True,
-        }
+        # Convert messages
+        system_instruction, contents = self._convert_messages_to_google(messages)
+        
+        gen_config = types.GenerateContentConfig(
+            temperature=temperature or self.config.temperature,
+            max_output_tokens=max_tokens or self.config.max_tokens,
+            system_instruction=system_instruction,
+        )
         
         if stop:
-            request_params["stop"] = stop
+            gen_config.stop_sequences = stop
         
-        stream = await client.chat.completions.create(**request_params)
+        def _stream():
+            return client.models.generate_content_stream(
+                model=self.config.model_name,
+                contents=contents,
+                config=gen_config,
+            )
         
-        async for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+        # Run in thread pool since SDK is sync
+        stream = await asyncio.get_event_loop().run_in_executor(None, _stream)
+        
+        for chunk in stream:
+            if chunk.candidates:
+                for part in chunk.candidates[0].content.parts:
+                    if hasattr(part, 'text') and part.text:
+                        yield part.text
 
 
 def create_llm_client(config: LLMConfig) -> BaseLLMClient:

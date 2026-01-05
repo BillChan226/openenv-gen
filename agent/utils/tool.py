@@ -283,7 +283,13 @@ class ToolRegistry:
         Returns:
             List of ChatCompletionToolParam dicts
         """
-        return [tool.tool_definition for tool in self._tools.values()]
+        result = []
+        for tool in self._tools.values():
+            td = getattr(tool, "tool_definition", None)
+            if td:
+                # tool_definition might be a method or a property
+                result.append(td() if callable(td) else td)
+        return result
     
     def to_openai_functions(self) -> list[dict]:
         """

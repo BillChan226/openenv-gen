@@ -1,0 +1,474 @@
+{# Frontend Agent: Known Issues and Solutions #}
+
+{% macro known_issues() %}
+## KNOWN ISSUES & SOLUTIONS (CRITICAL - Apply These!)
+
+### 1. JSX Prop Syntax for Arrays/Objects
+**Problem**: Using `prop=[...]` instead of `prop={[...]}` causes syntax errors.
+**Solution**: ALWAYS wrap arrays and objects in curly braces:
+```jsx
+// WRONG - Will cause syntax error!
+<Tabs tabs=['home', 'flights'] />
+
+// CORRECT - Arrays/objects wrapped in {}
+<Tabs tabs={['home', 'flights']} />
+{% raw %}<Component config={{ key: 'value' }} />{% endraw %}
+```
+
+### 2. Export Consistency (Named vs Default)
+**Problem**: Import mismatch - importing `{ Component }` but file uses `export default`.
+**Solution**: Support BOTH named and default exports:
+```jsx
+// In Button.jsx - support both import styles
+export function Button({ children, ...props }) {
+  return <button {...props}>{children}</button>;
+}
+export default Button;  // Also provide default export
+```
+
+### 3. Missing Dependencies in package.json
+**Problem**: Build fails with "Cannot find module 'xxx'"
+**Solution**: Before using ANY import, ensure it's in package.json:
+```json
+{
+  "dependencies": {
+    "date-fns": "^3.6.0",
+    "axios": "^1.6.7",
+    "clsx": "^2.1.0",
+    "lucide-react": "^0.344.0"
+  }
+}
+```
+**Checklist**: date-fns, axios, clsx, lucide-react, all @radix-ui packages you use.
+
+### 4. API Function Naming Consistency
+**Problem**: Page imports `getFlights` but api.js exports `searchFlights`.
+**Solution**: Provide both aliases in api.js:
+```javascript
+export async function searchFlights(params) { ... }
+export const getFlights = searchFlights;  // Alias
+export const fetchFlights = searchFlights;  // Another alias
+```
+
+### 5. Dockerfile Port Mismatch
+**Problem**: nginx serves on port 80 but docker-compose maps to 3000.
+**Solution**: Ensure EXPOSE matches compose mapping and nginx config.
+
+### 6. Radix UI Component Props
+**Problem**: Custom wrapper components don't pass all required props.
+**Solution**: When wrapping Radix components, accept and use all standard props.
+
+### 7. Build-Time vs Runtime Imports
+**Problem**: Importing from backend files or using Node.js modules in frontend.
+**Solution**: Frontend can ONLY import:
+- npm packages in package.json
+- Local files in src/ directory
+- NEVER import from backend/, database/, or use Node.js built-ins (fs, path, etc.)
+
+### 8. Export Statement Placement (CRITICAL!)
+**Problem**: Vite build fails with "Unexpected export" error.
+**Solution**: ALWAYS place exports at the TOP LEVEL of the file:
+```jsx
+// WRONG - export inside function causes parse error!
+function Button({ children }) {
+  return <button>{children}</button>;
+  export default Button;  // SYNTAX ERROR!
+}
+
+// CORRECT - exports at module level
+export function Button({ children }) {
+  return <button>{children}</button>;
+}
+export default Button;
+```
+
+### 9. Port Configuration Consistency
+**Problem**: Connection reset - nginx listens on different port than compose mapping.
+**Solution**: Ensure all three match:
+- docker-compose.yml ports
+- Dockerfile EXPOSE
+- nginx.conf listen
+
+### 10. Vite Proxy Target Must Match Backend
+**Problem**: API calls fail with 404 or connection refused.
+**Solution**: Vite proxy target must match backend's INTERNAL port:
+```javascript
+proxy: {
+  '/api': {
+    target: 'http://localhost:3000',  // Backend's PORT, not compose mapping!
+    changeOrigin: true
+  }
+}
+```
+Inside Docker, use service name: `target: 'http://backend:3000'`
+
+### 11. Missing Closing Braces in Components
+**Problem**: Build fails with cryptic syntax errors.
+**Solution**: Use `lint()` after every file write:
+```python
+write_file("app/frontend/src/components/Button.jsx", content)
+lint("app/frontend/src/components/Button.jsx")  # ALWAYS lint after write!
+```
+
+### 12. Production Dockerfile MUST Be Created (CRITICAL!)
+**Problem**: Docker build fails with "Cannot locate specified Dockerfile" or "frontend" service has no image.
+**Solution**: ALWAYS create a multi-stage Dockerfile for production builds:
+```dockerfile
+# app/frontend/Dockerfile
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 3000
+CMD ["nginx", "-g", "daemon off;"]
+```
+**IMPORTANT**: This file is REQUIRED for Docker deployment!
+
+### 13. nginx.conf Must Be Created
+**Problem**: Frontend container starts but returns 502 or can't serve files.
+**Solution**: Create nginx.conf alongside Dockerfile:
+```nginx
+# app/frontend/nginx.conf
+server {
+    listen 3000;
+    server_name localhost;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api {
+        proxy_pass http://backend:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+}
+```
+**Port 3000** inside container, docker-compose maps to **8000** externally.
+
+### 14. API Service Must Handle All Response Formats
+**Problem**: API functions exist but don't handle backend's actual response structure.
+**Solution**: Always extract data from response wrapper:
+```javascript
+// api.js - Handle both wrapped and unwrapped responses
+export async function getFlights(params) {
+  const response = await http.get('/api/flights', { params });
+  // Backend might return { items: [...] } or just [...]
+  return response.data.items || response.data;
+}
+```
+
+### 15. All Used API Functions Must Be Exported
+**Problem**: Build fails with `"xxx" is not exported by "src/services/api.js"`.
+**Common missing functions**: updateCartItem, applyPromoCode, checkoutCart, listTrips
+**Solution**: Export ALL functions that pages/components import:
+```javascript
+// api.js - Export everything
+export { getFlights, searchFlights, getFlightById };
+export { getHotels, searchHotels, getHotelById };
+export { getCars, searchCars, getCarById };
+export { getCart, addToCart, updateCartItem, removeFromCart, clearCart };
+export { checkoutCart, applyPromoCode };
+export { getTrips, listTrips, getTripById };
+```
+
+### 16. API Response Wrapper Unwrapping (CRITICAL - CAUSES EMPTY UI!)
+**Problem**: UI shows "empty" (e.g., Cart shows "Your cart is empty") even though backend returns data.
+**Root Cause**: Backend returns wrapped response but frontend expects different format:
+- Backend returns: `{ cart: { items: [...] } }` or `{ data: { items: [...] } }`
+- Frontend reads: `response.data` directly, expecting items array
+
+**Solution**: Create robust unwrap utility and use it everywhere:
+```javascript
+// utils/unwrap.js
+export function unwrapResponse(response) {
+  const data = response.data;
+  
+  // Handle various wrapper formats from backend
+  if (data?.data) return data.data;           // { data: {...} }
+  if (data?.items) return data.items;          // { items: [...] }
+  if (data?.cart) return data.cart;            // { cart: {...} }
+  if (data?.user) return data.user;            // { user: {...} }
+  if (data?.flight) return data.flight;        // { flight: {...} }
+  if (data?.hotel) return data.hotel;          // { hotel: {...} }
+  
+  // Check for single-key wrapper pattern
+  const keys = Object.keys(data || {});
+  if (keys.length === 1 && typeof data[keys[0]] === 'object') {
+    return data[keys[0]];  // Unwrap single-key wrapper
+  }
+  
+  return data;  // Return as-is if no wrapper detected
+}
+
+// In api.js - USE for every endpoint:
+export async function getCart() {
+  const response = await http.get('/api/cart');
+  return unwrapResponse(response);  // Returns { id, items: [...] }
+}
+```
+
+### 17. Cart Context Must Handle Backend Response Format
+**Problem**: `addToCart` succeeds (201) but cart UI doesn't update.
+**Root Cause**: CartContext doesn't unwrap backend's response correctly.
+**Solution**: Update CartContext to handle wrapped responses:
+```jsx
+// contexts/CartContext.jsx
+const fetchCart = async () => {
+  const response = await getCart();
+  // Backend might return { cart: { items } } or { items } or { data: { items } }
+  const cartData = response?.cart || response?.data || response;
+  setItems(cartData?.items || []);
+  setTotal(cartData?.total_cents || 0);
+};
+
+const addItem = async (item) => {
+  const response = await addToCart(item);
+  // After adding, fetch fresh cart state
+  await fetchCart();  // Re-fetch to ensure sync
+};
+```
+
+### 18. Debug API Response Mismatch
+**When cart/list shows empty but backend logs show 200:**
+1. Open browser DevTools → Network tab
+2. Find the API request (e.g., GET /api/cart)
+3. Check Response tab - look at actual JSON structure
+4. If response is `{ cart: { items: [...] } }` but code reads `response.data.items`, that's the bug
+5. Use `unwrapResponse()` utility to fix
+
+**Symptom checklist:**
+- [x] API returns 200 ✓
+- [x] Backend logs show data exists ✓
+- [x] UI shows "empty" or doesn't update ✗
+→ **This is a response wrapper mismatch issue!**
+
+### 19. Toast Notification Import
+**Problem**: Build fails with `toast.success is not a function` or `toast is not defined`.
+**Solution**: Ensure correct import and initialization:
+```jsx
+// Using react-hot-toast
+import { toast, Toaster } from 'react-hot-toast';
+
+// In App.jsx - add Toaster component
+function App() {
+  return (
+    <>
+      <Toaster position="top-right" />
+      <Routes>...</Routes>
+    </>
+  );
+}
+
+// Usage in components
+toast.success('Item added to cart!');
+toast.error('Failed to add item');
+```
+
+### 20. Respond Promptly to UserAgent Issues
+**Problem**: UserAgent reports issues but Frontend Agent doesn't respond, causing timeout.
+**Solution**: When you receive an issue from UserAgent:
+1. Immediately acknowledge with `send_message(to_agent="user", content="Received, investigating...")`
+2. Use `think()` to analyze the issue
+3. Fix the issue or explain why it can't be fixed
+4. Confirm completion: `send_message(to_agent="user", content="Fixed: [description]")`
+
+### 21. API Prefix Mismatch Between Frontend and Backend
+**Problem**: Frontend calls `/api/flights` but backend serves `/flights` (or vice versa).
+**Symptom**: 404 errors for all API calls.
+**Solution**: 
+1. Check with backend: `ask_agent(agent_id="backend", question="Do your routes use /api prefix or not?")`
+2. Update api.js baseURL accordingly:
+```javascript
+// If backend uses /api prefix:
+const API_BASE = '/api';
+export async function getFlights(params) {
+  return http.get(`${API_BASE}/flights`, { params });
+}
+
+// If backend has no prefix:
+export async function getFlights(params) {
+  return http.get('/flights', { params });
+}
+```
+3. Update Vite proxy and nginx.conf to match!
+
+### 22. Vite Dev Proxy vs Production Nginx Proxy
+**Problem**: API works in dev but fails in Docker.
+**Cause**: Different proxy configs for dev (Vite) vs prod (nginx).
+**Solution**: Keep BOTH in sync:
+```javascript
+// vite.config.js (dev proxy)
+export default {
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true
+      },
+      '/auth': {
+        target: 'http://localhost:3000',
+        changeOrigin: true
+      }
+    }
+  }
+}
+```
+```nginx
+# nginx.conf (production proxy)
+location /api {
+    proxy_pass http://backend:3000;
+}
+location /auth {
+    proxy_pass http://backend:3000;
+}
+```
+**CRITICAL**: If backend has NO /api prefix, proxy both `/api` AND individual routes like `/auth`, `/flights`, etc.
+
+### 23. ESLint "File ignored because no matching configuration"
+**Problem**: lint() returns "File ignored because no matching configuration was supplied"
+**Cause**: ESLint flat config doesn't cover the file type.
+**Solution**: Update eslint.config.js to include all file types:
+```javascript
+import js from '@eslint/js';
+import globals from 'globals';
+
+export default [
+  js.configs.recommended,
+  {
+    files: ['**/*.js', '**/*.jsx'],  // Add all relevant patterns
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...globals.browser,
+      },
+      parserOptions: {
+        ecmaFeatures: { jsx: true }
+      }
+    }
+  }
+];
+```
+
+### 24. axios vs fetch - Use Consistent HTTP Client
+**Problem**: Some files use axios, others use fetch, causing inconsistent error handling.
+**Solution**: Create one apiClient and use it everywhere:
+```javascript
+// services/apiClient.js
+import axios from 'axios';
+
+const apiClient = axios.create({
+  baseURL: '',  // Empty if using proxy
+  timeout: 10000,
+});
+
+// Add auth token interceptor
+apiClient.interceptors.request.use(config => {
+  const token = localStorage.getItem('token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+export default apiClient;
+
+// In api.js - use apiClient for ALL requests
+import http from './apiClient';
+export const getFlights = (params) => http.get('/api/flights', { params });
+```
+
+### 25. CartContext MUST Check Token Before API Calls (CRITICAL!)
+**Problem**: Guest users see 401 errors or app crashes because CartContext calls `/api/cart` without checking for auth token.
+**Symptom**: Console shows `GET /api/cart 401` immediately on page load for unauthenticated users.
+**Solution**: Guard all authenticated API calls in CartContext:
+```jsx
+// contexts/CartContext.jsx
+const refreshCart = async () => {
+  const token = localStorage.getItem('fh_token') || localStorage.getItem('token');
+  
+  // CRITICAL: Skip API call if no token
+  if (!token) {
+    setItems([]);
+    setTotal(0);
+    return;
+  }
+  
+  try {
+    const response = await getCart();
+    const cartData = response?.cart || response?.data || response;
+    setItems(cartData?.items || []);
+    setTotal(cartData?.total_cents || 0);
+  } catch (error) {
+    if (error.response?.status === 401) {
+      // Token expired or invalid - clear cart state silently
+      setItems([]);
+      setTotal(0);
+      localStorage.removeItem('fh_token');
+    }
+  }
+};
+```
+
+### 26. Component Prop Mismatch (ItemDetailModal / Store.jsx Pattern)
+**Problem**: Parent passes `item={...}` but child expects `product={...}`, or `onAdd(productId, qty)` vs `onAdd(product, qty)`.
+**Symptom**: "Add to cart" button does nothing, no POST request sent.
+**Solution**: Ensure prop names and signatures match exactly:
+```jsx
+// Store.jsx - Parent component
+<ItemDetailModal
+  product={selectedItem}  // NOT item={...}
+  onAdd={(product, quantity) => {
+    addToCart({
+      product_id: product.id,  // Use product.id, NOT productId param
+      quantity: quantity
+    });
+  }}
+/>
+
+// ItemDetailModal.jsx - Child component
+function ItemDetailModal({ product, onAdd }) {  // Match prop names!
+  const handleAddToCart = () => {
+    onAdd(product, quantity);  // Pass product object, not just ID
+  };
+}
+```
+**Debug tip**: If add-to-cart fails silently, check DevTools Network tab - if no POST appears, it's a prop mismatch.
+
+### 27. nginx proxy_pass Port Must Match Backend Internal Port
+**Problem**: API calls return 502 Bad Gateway after Docker rebuild.
+**Cause**: nginx.conf has `proxy_pass http://backend:3000` but backend actually listens on 8083.
+**Solution**: nginx.conf proxy_pass MUST match backend's actual PORT:
+```nginx
+# nginx.conf - Check backend's PORT env/Dockerfile!
+location /api {
+    proxy_pass http://backend:8083;  # Must match backend service port
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+}
+location /auth {
+    proxy_pass http://backend:8083;  # Same port for auth routes
+}
+```
+**Verification**: Run `docker compose logs backend | grep "listening"` to see actual port.
+
+### 28. Docker Build Cache Issues After Code Changes
+**Problem**: Code changes don't appear in running container, old behavior persists.
+**Cause**: Docker layer caching serves old build artifacts.
+**Solution**: Always rebuild with `--no-cache` after significant changes:
+```bash
+# In UserAgent testing flow:
+docker_build(service="frontend", no_cache=True)
+docker_build(service="backend", no_cache=True)
+docker_up(force_recreate=True)
+```
+**CRITICAL**: If behavior still wrong after rebuild, check if `npm run build` actually runs in Dockerfile (not just copying old dist/).
+{% endmacro %}
+

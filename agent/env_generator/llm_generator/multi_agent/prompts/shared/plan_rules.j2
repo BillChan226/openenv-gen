@@ -1,0 +1,93 @@
+{# Shared: Plan Creation Rules #}
+
+{% macro plan_rules() %}
+## Plan Creation Rules
+
+Your plan MUST enumerate EVERY file you will create.
+
+**PLAN VALIDATION IS ENFORCED! Vague plans will be REJECTED:**
+- "Create pages" → REJECTED (which pages?)
+- "Create components" → REJECTED (which components?)
+- "Set up project" → REJECTED (what files?)
+- "Create app/frontend/src/pages/Home.jsx" → ACCEPTED (specific file)
+
+**Each file = one plan item. No shortcuts!**
+
+After writing each file, mark it complete:
+```
+plan(action="complete", item_index=0)  # Mark first item done
+```
+
+**Plans are for YOUR tracking.** You can create multiple plans during your work.
+Use `plan(action="clear")` to start a fresh plan if needed.
+{% endmacro %}
+
+
+{% macro plan_example_frontend() %}
+**CORRECT plan example (Frontend):**
+```python
+plan(action="create", items=[
+    "Create app/frontend/index.html",
+    "Create app/frontend/package.json with dependencies",
+    "Create app/frontend/vite.config.js",
+    "Create app/frontend/tailwind.config.cjs",
+    "Create app/frontend/Dockerfile",
+    "Create app/frontend/src/main.jsx entry point",
+    "Create app/frontend/src/App.jsx with router",
+    "Create app/frontend/src/pages/Home.jsx",
+    "Create app/frontend/src/pages/Login.jsx",
+    "Create app/frontend/src/pages/Register.jsx",
+    "Create app/frontend/src/services/api.js",
+    "Create app/frontend/src/contexts/AuthContext.jsx",
+    "Create app/frontend/src/components/ui/Header.jsx",
+    "Create app/frontend/src/components/ui/Footer.jsx"
+])
+```
+{% endmacro %}
+
+
+{% macro plan_example_backend() %}
+**CORRECT plan example (Backend):**
+```python
+plan(action="create", items=[
+    "Create app/backend/server.js",
+    "Create app/backend/package.json",
+    "Create app/backend/Dockerfile",
+    "Create app/backend/eslint.config.js",
+    "Create app/backend/src/db.js",
+    "Create app/backend/src/middleware/auth.js",
+    "Create app/backend/src/middleware/error.js",
+    "Create app/backend/src/routes/auth.js",
+    "Create app/backend/src/routes/flights.js",
+    "Create app/backend/src/routes/hotels.js",
+    "Create app/backend/src/routes/bookings.js",
+    "Create app/backend/src/utils/response.js"
+])
+```
+{% endmacro %}
+
+
+{% macro plan_example_database() %}
+**CORRECT plan example (Database):**
+```python
+plan(action="create", items=[
+    "Create app/database/Dockerfile",
+    "Create app/database/init/01_schema.sql with all tables",
+    "Create app/database/init/02_seed.sql with sample data"
+])
+```
+{% endmacro %}
+
+
+{% macro plan_example_design() %}
+**CORRECT plan example (Design):**
+```python
+plan(action="create", items=[
+    "Create design/README.md - project overview",
+    "Create design/spec.database.json - database schema",
+    "Create design/spec.api.json - API specification",
+    "Create design/spec.ui.json - UI specification"
+])
+```
+{% endmacro %}
+

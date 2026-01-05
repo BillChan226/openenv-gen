@@ -66,7 +66,7 @@ Example:
         search_path = self.workspace.resolve(path)
         
         if not search_path.exists():
-            return ToolResult.fail(f"Path not found: {search_path}")
+            return ToolResult.fail(f"Path not found: {path or '.'}. Use relative paths like 'app/', 'docker/'")
         
         definitions = []
         
@@ -187,7 +187,7 @@ Example:
         search_path = self.workspace.resolve(path)
         
         if not search_path.exists():
-            return ToolResult.fail(f"Path not found: {search_path}")
+            return ToolResult.fail(f"Path not found: {path or '.'}. Use relative paths like 'app/', 'docker/'")
         
         references = []
         extensions = {".py", ".js", ".jsx", ".ts", ".tsx", ".json", ".sql"}

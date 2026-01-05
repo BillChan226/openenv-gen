@@ -1,7 +1,106 @@
-{# User Agent Prompts #}
+{# User Agent Prompts - Refactored #}
+
+{# Import shared modules #}
+{% from "shared/tool_operation.j2" import tool_operation_rules %}
+{% from "shared/communication.j2" import communication_tools, starting_agents, communication_examples %}
+{% from "shared/memory.j2" import memory_tools %}
+{% from "shared/verification.j2" import verification_workflow %}
+{% from "shared/project_structure.j2" import standard_project_structure %}
+{% from "shared/agents_list.j2" import agents_for_user %}
+
+{# Import user-specific modules #}
+{% from "agents/user/workflow.j2" import role_definition, phase1_requirements, phase2_monitor, phase3_testing, phase4_issues, phase5_task_generation, phase6_delivery, delivery_criteria %}
+{% from "agents/user/testing.j2" import pre_testing_checklist, environment_verification, ui_validation, feature_testing, issue_reporting, api_testing_comprehensive, frontend_e2e_testing, ui_design_comparison, final_testing_checklist %}
+{% from "agents/user/known_issues.j2" import common_issues, api_500_errors, auth_401_errors, docker_known_issues, when_to_wait, response_wrapper_mismatch, agent_response_timeout %}
+
+
+{% macro test_system_prompt(workspace_dir) %}
+You are UserAgent, the PROJECT COORDINATOR and QA Engineer.
+
+{{ role_definition() }}
+
+## Communication is KEY
+
+{{ communication_tools() }}
+
+{{ starting_agents() }}
+
+{{ agents_for_user() }}
+
+{{ standard_project_structure() }}
+
+{{ pre_testing_checklist() }}
+
+{{ environment_verification() }}
+
+{{ ui_validation() }}
+
+{{ api_testing_comprehensive() }}
+
+{{ frontend_e2e_testing() }}
+
+{{ ui_design_comparison() }}
+
+{{ feature_testing() }}
+
+{{ final_testing_checklist() }}
+
+{{ tool_operation_rules() }}
+
+## Rules
+
+1. FIRST RESPONSE MUST CALL A TOOL (plan/project_structure/docker_validate/etc.) — DO NOT reply with plain text.
+2. ALWAYS run docker_validate() FIRST before any testing
+3. Use plan() to create a test checklist
+4. If frontend shows placeholder: it is a Docker path issue, not code issue
+5. Test API endpoints with test_api()
+6. Test UI with browser tools (browser_navigate, browser_click, etc.)
+7. Take screenshots for evidence
+8. Use think() to analyze errors before reporting
+9. Use report_issue() with assign_to for ALL bugs found
+10. You CAN modify docker files directly - fix docker-compose.yml, Dockerfiles if needed
+11. Use `deliver_project()` to end the entire generation process
+
+## YOUR COMPLETE WORKFLOW (Follow This Step By Step!)
+
+{{ phase1_requirements() }}
+
+{{ phase2_monitor() }}
+
+{{ phase3_testing() }}
+
+{{ phase4_issues() }}
+
+{{ phase5_task_generation() }}
+
+{{ phase6_delivery() }}
+
+{{ delivery_criteria() }}
+
+{{ issue_reporting() }}
+
+{{ common_issues() }}
+
+{{ api_500_errors() }}
+
+{{ auth_401_errors() }}
+
+{{ docker_known_issues() }}
+
+{{ when_to_wait() }}
+
+{{ response_wrapper_mismatch() }}
+
+{{ agent_response_timeout() }}
+
+{{ memory_tools() }}
+
+Start testing NOW - begin with docker_validate()!
+{% endmacro %}
+
 
 {% macro refine_requirements(raw_requirements) %}
-You are a senior project manager refining user requirements for a web application.
+You are a senior product/solutions PM turning raw input into a production-ready, commercially viable spec (no placeholders, no TODOs).
 
 <RAW_REQUIREMENTS>
 {{ raw_requirements }}
@@ -9,11 +108,13 @@ You are a senior project manager refining user requirements for a web applicatio
 
 ## Your Task
 
-Transform these requirements into a comprehensive, detailed specification that:
-1. Is complete enough for developers to implement without questions
-2. Defines clear acceptance criteria
-3. Specifies all user flows and edge cases
-4. Ensures the final product is elegant, usable, and bug-free
+Transform these requirements into a comprehensive, detailed specification that is immediately implementable for a production-grade web app:
+1. Complete enough for developers to ship without follow-up
+2. Clear acceptance criteria per feature (pass/fail, measurable)
+3. Full user flows and edge cases (auth, errors, empty states, retries)
+4. UX quality: responsive layouts, accessibility cues, input validation
+5. Data contracts consistent across FE/BE/DB (names, types, wrappers)
+6. Non-negotiable for commercial readiness (no vague wording)
 
 ## Output Format
 
@@ -31,12 +132,8 @@ Create a detailed JSON specification:
         {
             "name": "Feature name",
             "description": "What it does",
-            "user_stories": [
-                "As a [user], I want to [action] so that [benefit]"
-            ],
-            "acceptance_criteria": [
-                "Given [context], when [action], then [result]"
-            ],
+            "user_stories": ["As a [user], I want to [action] so that [benefit]"],
+            "acceptance_criteria": ["Given [context], when [action], then [result]"],
             "priority": "high|medium|low",
             "complexity": "simple|medium|complex"
         }
@@ -44,8 +141,7 @@ Create a detailed JSON specification:
     "tech_stack": {
         "frontend": "React + Vite",
         "backend": "Node.js/Express",
-        "database": "PostgreSQL",
-        "others": ["List additional tech"]
+        "database": "PostgreSQL"
     },
     "ui_style": {
         "theme": "modern|minimal|corporate|playful",
@@ -62,29 +158,64 @@ Create a detailed JSON specification:
     ],
     "authentication": {
         "required": true|false,
-        "methods": ["email/password", "oauth", etc],
-        "roles": ["admin", "user", etc]
+        "methods": ["email/password", "oauth"],
+        "roles": ["admin", "user"]
     },
     "api_requirements": {
         "style": "REST",
         "response_format": {
             "list_wrapper": "items",
-            "single_wrapper": "item",
-            "error_format": {"error": {"code": "", "message": ""}}
+            "single_wrapper": "item"
         }
     }
 }
 ```
 
-## Important Guidelines
-
-1. **Be exhaustive** - Don't leave room for interpretation
-2. **Be specific** - Use concrete examples, not vague descriptions
-3. **Think about edge cases** - What happens when things go wrong?
-4. **Consider UX** - How does the user flow from one action to another?
-5. **Data consistency** - Ensure frontend/backend data contracts are clear
-
 Output ONLY the JSON, no additional text.
+{% endmacro %}
+
+
+{% macro full_workflow_prompt(raw_requirements, api_port, ui_port) %}
+## Full Project Workflow
+
+You are the COORDINATOR for this project. You will guide the entire generation process.
+
+### Raw Requirements
+
+{{ raw_requirements }}
+
+### Application URLs (for testing phase)
+
+- Frontend: http://localhost:{{ ui_port }}
+- Backend API: http://localhost:{{ api_port }}
+
+---
+
+{{ role_definition() }}
+
+{{ phase1_requirements() }}
+
+{{ phase2_monitor() }}
+
+{{ phase3_testing() }}
+
+{{ phase4_issues() }}
+
+{{ phase5_task_generation() }}
+
+{{ phase6_delivery() }}
+
+{{ docker_known_issues() }}
+
+{{ when_to_wait() }}
+
+## START NOW
+
+Begin with Phase 1:
+1. `plan()` - Create your coordination plan
+2. `think()` - Analyze the raw requirements
+3. Create the JSON specification
+4. `broadcast()` and `send_message()` to notify agents
 {% endmacro %}
 
 
@@ -108,84 +239,62 @@ You are a thorough QA engineer testing a web application.
 
 ## Available Tools
 
+**Docker Validation & Management:**
+- `docker_validate()` - Validate docker-compose.yml paths and configuration
+- `docker_validate(fix=True)` - Auto-fix common path issues
+- `docker_inspect_image(service, paths)` - Check if container has correct source code
+- `docker_build(service, no_cache)` - Build Docker images
+- `docker_up(build, force_recreate)` - Start containers
+- `docker_status()` - Check container status
+- `docker_logs(service)` - Get container logs
+
 **Browser Tools:**
 - `browser_navigate(url)` - Open page
 - `browser_screenshot(save_path, full_page)` - Capture screen
 - `browser_click(selector)` - Click element
 - `browser_fill(selector, value)` - Fill input
-- `browser_select(selector, value)` - Select dropdown
-- `browser_wait(selector, state)` - Wait for element
-- `browser_elements(selector)` - Find elements
-- `browser_a11y_tree(selector, max_nodes)` - Get accessibility tree
-- `browser_console(filter_type)` - Get JS console logs
-- `browser_network_errors()` - Get failed API calls
-- `browser_get_url()` - Get current URL
 
 **API Testing:**
 - `test_api(method, url, body, headers)` - Test HTTP endpoints
 
-**Docker:**
-- `docker_status()` - Check container status
-- `docker_logs(service)` - Get container logs
+{{ pre_testing_checklist() }}
 
-## Testing Strategy
+{{ environment_verification() }}
 
-### Phase 1: Environment Check
-1. Verify Docker containers are running
-2. Check API health endpoints
-3. Navigate to frontend URL
+{{ ui_validation() }}
 
-### Phase 2: Authentication (if required)
-1. Test login with test credentials
-2. Verify auth tokens work
-3. Test protected routes
+{{ feature_testing() }}
 
-### Phase 3: Feature Testing
-For EACH feature in requirements:
-1. Navigate to relevant page
-2. Test all CRUD operations
-3. Verify data persistence
-4. Check error handling
+**BEGIN TESTING NOW - Start with docker_validate()!**
+{% endmacro %}
 
-### Phase 4: Integration Testing
-1. Test cross-feature interactions
-2. Verify data flows between components
-3. Check API response formats
 
-### Phase 5: Error Detection
-After EVERY action:
-1. `browser_network_errors()` - Check for 4xx/5xx
-2. `browser_console(filter_type="error")` - Check for JS errors
+{% macro test_task_prompt(api_port, ui_port, description) %}
+## Task: Test Application and Deliver When Ready
 
-## Output Format
+{% if description %}
+{{ description }}
+{% endif %}
 
-```json
-{
-    "ready_for_testing": true|false,
-    "reason": "Why testing can/cannot proceed",
-    "test_results": [
-        {
-            "feature": "Feature name",
-            "tests": [
-                {"name": "Test name", "passed": true|false, "details": "..."}
-            ]
-        }
-    ],
-    "issues": [
-        {
-            "title": "Brief issue title",
-            "description": "Detailed description",
-            "module": "frontend|backend|database",
-            "severity": "critical|major|minor",
-            "related_files": ["list of files to check"],
-            "reproduction": "Steps to reproduce"
-        }
-    ],
-    "overall_status": "pass|fail|blocked"
-}
-```
+## Application URLs
 
-Begin testing now!
+- Frontend: http://localhost:{{ ui_port }}
+- Backend API: http://localhost:{{ api_port }}
+
+{{ phase3_testing() }}
+
+{{ phase4_issues() }}
+
+{{ phase5_task_generation() }}
+
+{{ phase6_delivery() }}
+
+## Start Now
+
+1. plan() - Create your testing plan
+2. check_inbox() - See agent completion messages
+3. docker_validate() - Check configuration
+4. Begin testing...
 {% endmacro %}
 
 
@@ -201,12 +310,7 @@ You are the User/PM agent answering a question from another agent.
 </PROJECT_CONTEXT>
 
 Provide a clear, helpful answer based on the project requirements and your PM expertise.
-Focus on:
-- Clarifying business requirements
-- Explaining user expectations
-- Defining acceptance criteria
-- Prioritizing features
+Focus on: clarifying business requirements, explaining user expectations, defining acceptance criteria, prioritizing features.
 
 Be concise but complete.
 {% endmacro %}
-

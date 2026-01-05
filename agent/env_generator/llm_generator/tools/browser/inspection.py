@@ -13,6 +13,7 @@ class BrowserGetElementsTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_elements", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_elements"
         self.browser = browser_manager
     
     @property
@@ -70,6 +71,7 @@ class BrowserEvaluateTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_eval", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_eval"
         self.browser = browser_manager
     
     @property
@@ -111,6 +113,7 @@ class BrowserGetUrlTool(BaseTool):
 
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_get_url", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_get_url"
         self.browser = browser_manager
 
     @property
@@ -143,6 +146,7 @@ class BrowserWaitForUrlTool(BaseTool):
 
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_wait_for_url", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_wait_for_url"
         self.browser = browser_manager
 
     @property
@@ -188,6 +192,7 @@ class BrowserFindTool(BaseTool):
 
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_find", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_find"
         self.browser = browser_manager
 
     @property
@@ -273,6 +278,7 @@ class BrowserGetAttributeTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_get_attribute", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_get_attribute"
         self.browser = browser_manager
     
     @property
@@ -319,6 +325,7 @@ class BrowserGetTextTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_get_text", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_get_text"
         self.browser = browser_manager
     
     @property
@@ -360,6 +367,7 @@ class BrowserCheckVisibleTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_is_visible", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_is_visible"
         self.browser = browser_manager
     
     @property
@@ -401,6 +409,7 @@ class BrowserCheckAccessibilityTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_check_a11y", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_check_a11y"
         self.browser = browser_manager
     
     @property
@@ -483,6 +492,7 @@ class BrowserAccessibilityTreeTool(BaseTool):
 
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_a11y_tree", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_a11y_tree"
         self.browser = browser_manager
 
     @property

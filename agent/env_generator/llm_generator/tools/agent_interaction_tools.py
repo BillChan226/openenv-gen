@@ -1,14 +1,15 @@
 """
-Agent Interaction Tools - Tools for agent-to-agent communication and task completion
+Agent Interaction Tools - Tools for memory access and task completion
 
 Provides:
 - ReadMemoryBankTool: Read project context from Memory Bank
-- RequestReviewTool: Request User Agent to review plans
-- AskUserAgentTool: Ask User Agent for help/clarification
 - FinishTool: Signal task completion
 
-These tools enable Code Agent to interact with User Agent and access shared context.
+For inter-agent communication, use communication_tools.py instead:
+- SendMessageTool, AskAgentTool, BroadcastTool, CheckInboxTool, etc.
 """
+
+from typing import TYPE_CHECKING
 
 from ._base import (
     BaseTool,
@@ -17,6 +18,9 @@ from ._base import (
     create_tool_param,
     Workspace,
 )
+
+if TYPE_CHECKING:
+    from ..multi_agent.agents.base import EnvGenAgent
 
 # Import PlanTool for finish verification (avoid circular import by using late import)
 
@@ -173,255 +177,73 @@ Examples:
 
 
 # ============================================================================
-# Request Review Tool
-# ============================================================================
-
-class RequestReviewTool(BaseTool):
-    """
-    Request User Agent to review and approve the current plan.
-    
-    Use this after creating a plan with plan() to get User Agent's feedback
-    before starting implementation.
-    """
-    
-    NAME = "request_review"
-    
-    DESCRIPTION = """Request User Agent to review your plan before execution.
-
-Use this after plan(action="create", ...) to get feedback from User Agent.
-User Agent will:
-- Evaluate if the plan covers all requirements
-- Suggest additions or modifications
-- Approve or reject the plan
-
-The review result will tell you whether to proceed or revise your plan.
-
-Example:
-    plan(action="create", items=["Create api.js", "Create Dashboard.jsx", ...])
-    request_review(subject="plan", message="Please review my implementation plan")
-"""
-    
-    # Class-level callback for User Agent interaction
-    _review_callback = None
-    
-    def __init__(self):
-        super().__init__(name=self.NAME, category=ToolCategory.AGENT)
-    
-    @classmethod
-    def set_review_callback(cls, callback):
-        """Set the callback function for User Agent review."""
-        cls._review_callback = callback
-    
-    @property
-    def tool_definition(self):
-        return self.get_tool_param()
-    
-    def get_tool_param(self):
-        return create_tool_param(
-            name=self.NAME,
-            description=self.DESCRIPTION,
-            parameters={
-                "type": "object",
-                "properties": {
-                    "subject": {
-                        "type": "string",
-                        "enum": ["plan", "design", "implementation"],
-                        "description": "What to review: plan, design decision, or implementation approach"
-                    },
-                    "message": {
-                        "type": "string",
-                        "description": "Your question or request for the User Agent"
-                    },
-                    "context": {
-                        "type": "string",
-                        "description": "Additional context (e.g., the plan details, code snippet, etc.)"
-                    }
-                },
-                "required": ["subject", "message"]
-            }
-        )
-    
-    def execute(self, subject: str, message: str, context: str = None) -> ToolResult:
-        # Get current plan if reviewing plan
-        from .reasoning_tools import PlanTool
-        
-        plan_info = ""
-        if subject == "plan":
-            plan_status = PlanTool.get_plan_status()
-            if plan_status["has_plan"]:
-                items = "\n".join(f"  {i+1}. {item}" for i, item in enumerate(PlanTool._current_plan))
-                plan_info = f"\n\nCurrent Plan:\n{items}"
-        
-        # Build review request
-        review_request = {
-            "type": "review_request",
-            "subject": subject,
-            "message": message,
-            "context": (context or "") + plan_info,
-        }
-        
-        # If callback is set, call User Agent synchronously
-        if RequestReviewTool._review_callback:
-            try:
-                response = RequestReviewTool._review_callback(review_request)
-                return ToolResult(
-                    success=True,
-                    data={
-                        "approved": response.get("approved", False),
-                        "feedback": response.get("feedback", ""),
-                        "suggestions": response.get("suggestions", []),
-                        "info": f"Review received: {'APPROVED' if response.get('approved') else 'NEEDS REVISION'}"
-                    }
-                )
-            except Exception as e:
-                return ToolResult(
-                    success=False,
-                    error_message=f"Error during review: {e}"
-                )
-        
-        # No callback - return pending status (will be handled by agent loop)
-        return ToolResult(
-            success=True,
-            data={
-                "status": "pending_review",
-                "request": review_request,
-                "info": "Review request submitted. Waiting for User Agent response."
-            }
-        )
-
-
-# ============================================================================
-# Ask User Agent Tool
-# ============================================================================
-
-class AskUserAgentTool(BaseTool):
-    """
-    Ask User Agent for help, clarification, or guidance during execution.
-    
-    Use when you're uncertain about requirements, need design decisions,
-    or want to confirm an approach before implementing.
-    """
-    
-    NAME = "ask_user_agent"
-    
-    DESCRIPTION = """Ask User Agent for help or clarification.
-
-Use this when you:
-- Are unsure about a requirement
-- Need to make a design decision
-- Want to confirm your understanding
-- Need help solving a complex problem
-
-The User Agent will respond with guidance or answers.
-
-Examples:
-    ask_user_agent(question="Should the API use JWT or session-based auth?")
-    ask_user_agent(question="The requirement says 'dashboard'. What data should it show?")
-    ask_user_agent(question="I'm getting this error: X. How should I handle it?", context="error details...")
-"""
-    
-    # Class-level callback for User Agent interaction
-    _ask_callback = None
-    
-    def __init__(self):
-        super().__init__(name=self.NAME, category=ToolCategory.AGENT)
-    
-    @classmethod
-    def set_ask_callback(cls, callback):
-        """Set the callback function for User Agent questions."""
-        cls._ask_callback = callback
-    
-    @property
-    def tool_definition(self):
-        return self.get_tool_param()
-    
-    def get_tool_param(self):
-        return create_tool_param(
-            name=self.NAME,
-            description=self.DESCRIPTION,
-            parameters={
-                "type": "object",
-                "properties": {
-                    "question": {
-                        "type": "string",
-                        "description": "Your question for the User Agent"
-                    },
-                    "context": {
-                        "type": "string",
-                        "description": "Additional context (code, error message, etc.)"
-                    },
-                    "options": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "If asking for a choice, provide the options"
-                    }
-                },
-                "required": ["question"]
-            }
-        )
-    
-    def execute(self, question: str, context: str = None, options: list = None) -> ToolResult:
-        ask_request = {
-            "type": "ask_request",
-            "question": question,
-            "context": context,
-            "options": options,
-        }
-        
-        # If callback is set, call User Agent
-        if AskUserAgentTool._ask_callback:
-            try:
-                response = AskUserAgentTool._ask_callback(ask_request)
-                return ToolResult(
-                    success=True,
-                    data={
-                        "answer": response.get("answer", ""),
-                        "guidance": response.get("guidance", ""),
-                        "choice": response.get("choice"),  # If options were provided
-                        "info": f"User Agent response: {response.get('answer', '')[:200]}..."
-                    }
-                )
-            except Exception as e:
-                return ToolResult(
-                    success=False,
-                    error_message=f"Error asking User Agent: {e}"
-                )
-        
-        # No callback - return pending status
-        return ToolResult(
-            success=True,
-            data={
-                "status": "pending_response",
-                "request": ask_request,
-                "info": "Question submitted. Waiting for User Agent response."
-            }
-        )
-
-
-# ============================================================================
 # Finish Tool
 # ============================================================================
 
 class FinishTool(BaseTool):
     """
-    Signal task completion.
+    Signal that agent's current task is complete.
     
-    IMPORTANT: If you have created a plan with plan(), all items must be
-    marked complete before finish() will succeed!
+    Key features:
+    - Can automatically notify downstream agents to start their work
+    - Ends the current agentic loop
+    - Agent remains available for new tasks/issues
     """
     
     NAME = "finish"
     
-    DESCRIPTION = """Use when the task is complete.
+    DESCRIPTION = """Signal your current task is complete.
 
-IMPORTANT: If you created a plan with plan(), ALL plan items must be marked
-complete before you can finish! Use plan(action="status") to check progress.
+## Basic Usage
+```
+finish(message="Completed database schema and seed data")
+```
 
-Provide a summary of what was done and any outputs.
+## Notify Downstream Agents (RECOMMENDED!)
+Use `notify` to automatically push your work to downstream agents:
+```
+# DesignAgent notifies all code agents to start
+finish(
+    message="Design specs created: spec.database.json, spec.api.json, spec.ui.json",
+    notify=["database", "backend", "frontend"],
+    notify_content="Design complete! Please start implementation based on specs in /design/"
+)
+
+# DatabaseAgent notifies backend
+finish(
+    message="Database schema ready",
+    notify=["backend"],
+    notify_content="Database schema ready. Tables: users, flights, bookings. See /app/database/init/"
+)
+
+# BackendAgent notifies frontend
+finish(
+    message="API complete with 12 endpoints",
+    notify=["frontend"],
+    notify_content="API ready at :8000. Endpoints: /auth/*, /flights/*, /bookings/*. See spec.api.json"
+)
+```
+
+The notify feature:
+- Sends HIGH priority messages to specified agents
+- Automatically tags with ["task_ready", "from_<your_agent>"]
+- Receivers can filter for these with check_inbox(tags=["task_ready"])
+
+## After finish()
+- Current task loop ends
+- You remain available for issues/questions from other agents
+- If you receive an issue, you'll automatically start working on it
 """
     
-    def __init__(self):
+    def __init__(self, agent_id: str = None, agent: "EnvGenAgent" = None):
         super().__init__(name=self.NAME, category=ToolCategory.AGENT)
+        self.agent_id = agent_id or "default"
+        self.agent = agent
+    
+    def set_agent(self, agent: "EnvGenAgent"):
+        """Inject agent reference for message sending."""
+        self.agent = agent
+        self.agent_id = agent.agent_id
     
     @property
     def tool_definition(self):
@@ -438,6 +260,15 @@ Provide a summary of what was done and any outputs.
                         "type": "string",
                         "description": "Summary of completed work"
                     },
+                    "notify": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Agents to notify (e.g., ['frontend', 'backend'])"
+                    },
+                    "notify_content": {
+                        "type": "string",
+                        "description": "Message content for notified agents (defaults to your message)"
+                    },
                     "outputs": {
                         "type": "object",
                         "description": "Any output data"
@@ -447,25 +278,216 @@ Provide a summary of what was done and any outputs.
             }
         )
     
-    def execute(self, message: str, outputs: dict = None) -> ToolResult:
-        # Check if there's an incomplete plan
+    def execute(
+        self, 
+        message: str, 
+        notify: list = None,
+        notify_content: str = None,
+        outputs: dict = None
+    ) -> ToolResult:
         from .reasoning_tools import PlanTool
         
-        plan_status = PlanTool.get_plan_status()
+        plan_tool = PlanTool.get_instance(self.agent_id)
+        plan_status = plan_tool.get_plan_status()
         
+        warnings = []
+        notifications_sent = []
+        
+        # Warning 1: Check if there's an incomplete plan (warning only, not blocking)
         if plan_status["has_plan"] and not plan_status["all_complete"]:
-            incomplete_items = "\n".join(f"  - {item}" for item in plan_status["incomplete"])
-            return ToolResult(
-                success=False,
-                error_message=f"CANNOT FINISH: You have {len(plan_status['incomplete'])} incomplete plan items:\n{incomplete_items}\n\n"
-                             f"Either complete these items and mark them done with plan(action='complete', ...), "
-                             f"or update your plan if items are no longer needed."
-            )
+            incomplete_count = len(plan_status["incomplete"])
+            warnings.append(f"Note: You have {incomplete_count} incomplete plan items.")
+        
+        # Send notifications to downstream agents
+        # NOTE: This is synchronous - notifications will be sent after this method returns
+        # by storing them for the agent to process
+        if notify and self.agent:
+            from uuid import uuid4
+            from utils.message import MessageHeader, MessageType, MessagePriority, BaseMessage
+            
+            bus = getattr(self.agent, "_external_bus", None) or getattr(self.agent, "_message_bus", None)
+            
+            if bus:
+                content = notify_content or f"[{self.agent_id.upper()}] Task complete: {message}"
+                tags = ["task_ready", f"from_{self.agent_id}"]
+                
+                # Store pending notifications on agent for async delivery
+                pending = getattr(self.agent, "_pending_notifications", None)
+                if pending is None:
+                    self.agent._pending_notifications = []
+                    pending = self.agent._pending_notifications
+                
+                for target in notify:
+                    try:
+                        header = MessageHeader(
+                            message_id=str(uuid4()),
+                            source_agent_id=self.agent_id,
+                            target_agent_id=target,
+                            priority=MessagePriority.HIGH,
+                        )
+                        msg = BaseMessage(
+                            header=header,
+                            message_type=MessageType.STATUS,
+                            payload=content,
+                            metadata={
+                                "msg_type": "task_ready",
+                                "tags": tags,
+                                "persist": False,
+                                "read": False,
+                            }
+                        )
+                        # Store for async delivery instead of create_task (thread-safe)
+                        pending.append((bus, msg))
+                        notifications_sent.append(target)
+                    except Exception as e:
+                        warnings.append(f"Failed to notify {target}: {e}")
+        
+        # Build response info
+        info = f"Task completed: {message}"
+        if notifications_sent:
+            info += f"\nNotified agents: {', '.join(notifications_sent)}"
+        if warnings:
+            info += "\n\nNotes:\n" + "\n".join(f"  - {w}" for w in warnings)
         
         return ToolResult(
             success=True,
-            data={"outputs": outputs or {}, "finished": True, "info": f"Task completed: {message}"}
+            data={
+                "outputs": outputs or {}, 
+                "finished": True,
+                "notified": notifications_sent,
+                "info": info
+            }
         )
+
+
+# ============================================================================
+# Deliver Project Tool (UserAgent only)
+# ============================================================================
+
+class DeliverProjectTool(BaseTool):
+    """
+    Signal that the project is ready for delivery to the user.
+    
+    This tool is ONLY for UserAgent and triggers the overall shutdown.
+    - Only call this when ALL criteria are met (no bugs, fully functional, etc.)
+    - This is different from finish() which just ends the current task
+    - deliver_project() ends the entire generation process
+    """
+    
+    NAME = "deliver_project"
+    
+    DESCRIPTION = """Signal that the project is complete and ready for delivery.
+
+CRITICAL: This tool triggers the END of the entire generation process!
+
+Only call this when ALL of these are true:
+1. NO outstanding bugs or issues
+2. ALL project requirements are satisfied
+3. Application is FULLY functional and usable
+4. Docker setup is correct and containers run successfully
+5. Application is ready for end-users
+
+This is NOT the same as finish()!
+- finish() = end current task, stay available for more work
+- deliver_project() = generation complete, shutdown all agents
+
+Args:
+    confirmation: Must be exactly "CONFIRMED" to proceed
+    delivery_summary: Summary of what's being delivered
+    checklist: Dict with verification results
+"""
+    
+    def __init__(self, agent: "EnvGenAgent" = None):
+        super().__init__(name=self.NAME, category=ToolCategory.AGENT)
+        self.agent = agent
+        self._delivered = False
+    
+    def set_agent(self, agent: "EnvGenAgent"):
+        """Set the agent that will use this tool."""
+        self.agent = agent
+    
+    @property
+    def tool_definition(self):
+        return self.get_tool_param()
+    
+    def get_tool_param(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "confirmation": {
+                        "type": "string",
+                        "description": "Must be exactly 'CONFIRMED' to proceed with delivery"
+                    },
+                    "delivery_summary": {
+                        "type": "string",
+                        "description": "Summary of what is being delivered"
+                    },
+                    "checklist": {
+                        "type": "object",
+                        "description": "Verification checklist: {no_bugs: bool, requirements_met: bool, fully_functional: bool, docker_ok: bool}",
+                        "properties": {
+                            "no_bugs": {"type": "boolean"},
+                            "requirements_met": {"type": "boolean"},
+                            "fully_functional": {"type": "boolean"},
+                            "docker_ok": {"type": "boolean"}
+                        }
+                    }
+                },
+                "required": ["confirmation", "delivery_summary", "checklist"]
+            }
+        )
+    
+    def execute(self, confirmation: str, delivery_summary: str, checklist: dict = None) -> ToolResult:
+        # Verify confirmation
+        if confirmation != "CONFIRMED":
+            return ToolResult(
+                success=False,
+                error_message=f"Confirmation must be exactly 'CONFIRMED', got '{confirmation}'. "
+                              "This is to prevent accidental project delivery."
+            )
+        
+        # Verify checklist
+        checklist = checklist or {}
+        required_checks = ["no_bugs", "requirements_met", "fully_functional", "docker_ok"]
+        failed_checks = []
+        
+        for check in required_checks:
+            if not checklist.get(check, False):
+                failed_checks.append(check)
+        
+        if failed_checks:
+            return ToolResult(
+                success=False,
+                error_message=f"Cannot deliver project. Failed checks: {failed_checks}. "
+                              "Please ensure all criteria are met before delivery."
+            )
+        
+        # Set delivered flag
+        self._delivered = True
+        
+        # Also set on agent if available - this triggers shutdown
+        if self.agent:
+            self.agent._project_delivered = True
+            # Set the event that orchestrator is waiting for
+            if hasattr(self.agent, '_project_delivered_event'):
+                self.agent._project_delivered_event.set()
+        
+        return ToolResult(
+            success=True,
+            data={
+                "delivered": True,
+                "summary": delivery_summary,
+                "checklist": checklist,
+                "info": "Project successfully delivered! Generation process will now shutdown."
+            }
+        )
+    
+    def is_delivered(self) -> bool:
+        """Check if project has been delivered."""
+        return self._delivered
 
 
 # ============================================================================
@@ -474,8 +496,7 @@ Provide a summary of what was done and any outputs.
 
 __all__ = [
     "ReadMemoryBankTool",
-    "RequestReviewTool",
-    "AskUserAgentTool",
     "FinishTool",
+    "DeliverProjectTool",
 ]
 

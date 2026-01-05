@@ -113,6 +113,35 @@ Examples:
     def get_tool_param(self):
         return self.tool_definition
     
+    def _find_similar_paths(self, path: str) -> list:
+        """Find similar paths in workspace to help with typos."""
+        from pathlib import Path as P
+        filename = P(path).name
+        parent = P(path).parent
+        suggestions = []
+        
+        # Search for files with similar names
+        try:
+            search_dir = self.workspace.root
+            if parent and str(parent) != ".":
+                try:
+                    search_dir = self.workspace.resolve(str(parent))
+                except:
+                    pass
+            
+            if search_dir.exists():
+                # Look for similar files
+                for f in search_dir.rglob("*"):
+                    if f.is_file() and filename.lower() in f.name.lower():
+                        rel = str(f.relative_to(self.workspace.root))
+                        suggestions.append(rel)
+                        if len(suggestions) >= 5:
+                            break
+        except:
+            pass
+        
+        return suggestions
+    
     def execute(self, path: str, view_range: list = None) -> ToolResult:
         try:
             file_path = self.workspace.resolve(path)
@@ -120,7 +149,12 @@ Examples:
             return ToolResult(success=False, error_message=f"Invalid path: {e}")
         
         if not file_path.exists():
-            return ToolResult(success=False, error_message=f"Path not found: {path}")
+            # Try to find similar files to help the user
+            suggestions = self._find_similar_paths(path)
+            msg = f"Path not found: {path}"
+            if suggestions:
+                msg += f". Did you mean: {', '.join(suggestions[:3])}?"
+            return ToolResult(success=False, error_message=msg)
         
         if file_path.is_dir():
             return self._list_directory(file_path)
@@ -269,6 +303,13 @@ Examples:
             }
         )
     
+    def _rel_path(self, abs_path: Path) -> str:
+        """Convert absolute path to relative for display in error messages."""
+        try:
+            return str(abs_path.relative_to(self.workspace.root))
+        except ValueError:
+            return str(abs_path.name)  # Fallback to just filename
+    
     def execute(
         self,
         command: str,
@@ -281,20 +322,20 @@ Examples:
         try:
             file_path = self.workspace.resolve(path)
         except Exception as e:
-            return ToolResult(success=False, error_message=f"Invalid path: {e}")
+            return ToolResult(success=False, error_message=f"Invalid path: {path}")
         
         if command == "create":
-            return self._create(file_path, file_text or "")
+            return self._create(file_path, file_text or "", path)
         elif command == "str_replace":
-            return self._str_replace(file_path, old_str or "", new_str or "")
+            return self._str_replace(file_path, old_str or "", new_str or "", path)
         elif command == "insert":
-            return self._insert(file_path, insert_line or 0, new_str or "")
+            return self._insert(file_path, insert_line or 0, new_str or "", path)
         elif command == "undo_edit":
-            return self._undo(file_path)
+            return self._undo(file_path, path)
         else:
             return ToolResult(success=False, error_message=f"Unknown command: {command}")
     
-    def _create(self, path: Path, content: str) -> ToolResult:
+    def _create(self, path: Path, content: str, orig_path: str = "") -> ToolResult:
         if path.exists():
             return ToolResult(
                 success=False,
@@ -330,16 +371,17 @@ Examples:
             path.write_text(content, encoding='utf-8')
             
             lines = content.count('\n') + 1
+            display_path = orig_path or self._rel_path(path)
             return ToolResult(
                 success=True,
-                data={"action": "create", "path": str(path), "lines": lines, "info": f"File created: {path} ({lines} lines)"}
+                data={"action": "create", "path": display_path, "lines": lines, "info": f"File created: {display_path} ({lines} lines)"}
             )
         except Exception as e:
             return ToolResult(success=False, error_message=f"Create failed: {e}")
     
-    def _str_replace(self, path: Path, old_str: str, new_str: str) -> ToolResult:
+    def _str_replace(self, path: Path, old_str: str, new_str: str, orig_path: str = "") -> ToolResult:
         if not path.exists():
-            return ToolResult(success=False, error_message=f"File not found: {path}")
+            return ToolResult(success=False, error_message=f"File not found: {orig_path or self._rel_path(path)}")
         
         if not old_str:
             return ToolResult(success=False, error_message="old_str cannot be empty")
@@ -383,16 +425,17 @@ Examples:
             path.write_text(new_content, encoding='utf-8')
             
             line_num = content[:content.find(old_str)].count('\n') + 1
+            display_path = orig_path or self._rel_path(path)
             return ToolResult(
                 success=True,
-                data={"action": "str_replace", "path": str(path), "line": line_num, "info": f"Replacement done at line {line_num}"}
+                data={"action": "str_replace", "path": display_path, "line": line_num, "info": f"Replacement done at line {line_num}"}
             )
         except Exception as e:
             return ToolResult(success=False, error_message=f"Write failed: {e}")
     
-    def _insert(self, path: Path, line_num: int, new_str: str) -> ToolResult:
+    def _insert(self, path: Path, line_num: int, new_str: str, orig_path: str = "") -> ToolResult:
         if not path.exists():
-            return ToolResult(success=False, error_message=f"File not found: {path}")
+            return ToolResult(success=False, error_message=f"File not found: {orig_path or self._rel_path(path)}")
         
         try:
             content = path.read_text(encoding='utf-8')
@@ -418,14 +461,15 @@ Examples:
         
         try:
             path.write_text(''.join(result), encoding='utf-8')
+            display_path = orig_path or self._rel_path(path)
             return ToolResult(
                 success=True,
-                data={"action": "insert", "path": str(path), "lines_added": len(new_lines), "info": f"Inserted {len(new_lines)} lines after line {line_num}"}
+                data={"action": "insert", "path": display_path, "lines_added": len(new_lines), "info": f"Inserted {len(new_lines)} lines after line {line_num}"}
             )
         except Exception as e:
             return ToolResult(success=False, error_message=f"Write failed: {e}")
     
-    def _undo(self, path: Path) -> ToolResult:
+    def _undo(self, path: Path, orig_path: str = "") -> ToolResult:
         prev = _file_history.get_previous(str(path))
         
         if prev is None:
@@ -433,9 +477,10 @@ Examples:
         
         try:
             path.write_text(prev, encoding='utf-8')
+            display_path = orig_path or self._rel_path(path)
             return ToolResult(
                 success=True,
-                data={"action": "undo", "path": str(path), "info": f"Reverted: {path}"}
+                data={"action": "undo", "path": display_path, "info": f"Reverted: {display_path}"}
             )
         except Exception as e:
             return ToolResult(success=False, error_message=f"Undo failed: {e}")
@@ -516,16 +561,18 @@ This tool is for creating new files or complete rewrites.
         
         try:
             # Save for undo if exists
-            if file_path.exists():
+            is_new = not file_path.exists()
+            if not is_new:
                 _file_history.save(str(file_path), file_path.read_text(encoding='utf-8'))
             
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_path.write_text(content, encoding='utf-8')
             
             lines = content.count('\n') + 1
+            action = "Created" if is_new else "Overwrote"
             return ToolResult(
                 success=True,
-                data={"path": str(file_path), "lines": lines, "message": f"Wrote {lines} lines to {file_path}"},
+                data={"path": path, "lines": lines, "is_new": is_new, "message": f"{action} {path} ({lines} lines)"},
             )
         except Exception as e:
             return ToolResult(success=False, error_message=f"Write failed: {e}")
@@ -598,7 +645,6 @@ Note: This only deletes files, not directories. Use with caution.
                 success=True,
                 data={
                     "deleted": str(path),
-                    "absolute_path": str(file_path),
                     "message": f"Successfully deleted: {path}"
                 }
             )
@@ -759,7 +805,6 @@ If you truly need the raw base64 payload, pass include_base64=true (WARNING: hug
             success=True,
             data={
                 "path": str(path),
-                "absolute_path": str(image_path),
                 "mime_type": mime_type,
                 "size_bytes": file_size,
                 "size_display": f"{file_size / 1024:.1f}KB" if file_size < 1024*1024 else f"{file_size / 1024 / 1024:.1f}MB",
@@ -960,7 +1005,6 @@ Use list_reference_images to see available images first.
                 data={
                     "source": source,
                     "destination": str(dest_path.relative_to(self.workspace.root)),
-                    "absolute_path": str(dest_path),
                     "size": f"{dest_path.stat().st_size / 1024:.1f}KB",
                     "message": f"Copied {source} to {dest_path.relative_to(self.workspace.root)}"
                 }
@@ -1031,7 +1075,7 @@ Examples:
             if not matches:
                 return ToolResult(
                     success=True,
-                    data={"matches": [], "info": f"No files matching '{pattern}' in {search_path}"}
+                    data={"matches": [], "info": f"No files matching '{pattern}' in {path or '.'}"}
                 )
             
             rel_matches = []

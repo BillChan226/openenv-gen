@@ -80,16 +80,21 @@ Note: Respect copyright and licensing when using downloaded images.
         """Search for images"""
         try:
             import aiohttp
+            import ssl
+            import certifi
         except ImportError:
             return ToolResult(
                 success=False,
-                error_message="aiohttp not installed. Run: pip install aiohttp"
+                error_message="aiohttp not installed. Run: pip install aiohttp certifi"
             )
         
         results = []
         
         try:
-            async with aiohttp.ClientSession() as session:
+            # Create SSL context to handle certificate issues on macOS
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            async with aiohttp.ClientSession(connector=connector) as session:
                 # Search based on image type
                 if image_type in ["icon", "any"]:
                     icon_results = await self._search_iconify(session, query, limit)
@@ -290,10 +295,12 @@ The image will be saved to the specified path in your workspace.
         """Download image from URL"""
         try:
             import aiohttp
+            import ssl
+            import certifi
         except ImportError:
             return ToolResult(
                 success=False,
-                error_message="aiohttp not installed. Run: pip install aiohttp"
+                error_message="aiohttp not installed. Run: pip install aiohttp certifi"
             )
         
         # Resolve destination path
@@ -306,7 +313,10 @@ The image will be saved to the specified path in your workspace.
         dest_path.parent.mkdir(parents=True, exist_ok=True)
         
         try:
-            async with aiohttp.ClientSession() as session:
+            # Create SSL context to handle certificate issues on macOS
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            async with aiohttp.ClientSession(connector=connector) as session:
                 async with session.get(url, timeout=30, allow_redirects=True) as resp:
                     if resp.status != 200:
                         return ToolResult(
@@ -341,7 +351,6 @@ The image will be saved to the specified path in your workspace.
                         data={
                             "url": url,
                             "destination": str(dest_path.relative_to(self.workspace.root)),
-                            "absolute_path": str(dest_path),
                             "size": size_display,
                             "content_type": content_type,
                             "message": f"Downloaded to {dest_path.relative_to(self.workspace.root)} ({size_display})"
@@ -391,9 +400,10 @@ Requires GOOGLE_API_KEY and GOOGLE_CX environment variables.
         self._logger = logging.getLogger(__name__)
         
         # API credentials from params or environment
+        # Note: GOOGLE_IMAGE_API_KEY is preferred to avoid confusion with Gemini API key
         import os
-        self.api_key = api_key or os.environ.get("GOOGLE_API_KEY", "")
-        self.cx = cx or os.environ.get("GOOGLE_CX", "")  # Custom Search Engine ID
+        self.api_key = api_key or os.environ.get("GOOGLE_IMAGE_API_KEY") or os.environ.get("GOOGLE_API_KEY", "")
+        self.cx = cx or os.environ.get("GOOGLE_CX", "")  # Custom Search Engine ID from https://programmablesearchengine.google.com/
     
     @property
     def tool_definition(self):
@@ -441,15 +451,17 @@ Requires GOOGLE_API_KEY and GOOGLE_CX environment variables.
         if not self.api_key or not self.cx:
             return ToolResult(
                 success=False,
-                error_message="Google API credentials not configured. Set GOOGLE_API_KEY and GOOGLE_CX environment variables."
+                error_message="Google Image Search not configured. Set GOOGLE_IMAGE_API_KEY (or GOOGLE_API_KEY) and GOOGLE_CX environment variables. Note: GOOGLE_CX is your Custom Search Engine ID from https://programmablesearchengine.google.com/"
             )
         
         try:
             import aiohttp
+            import ssl
+            import certifi
         except ImportError:
             return ToolResult(
                 success=False,
-                error_message="aiohttp not installed. Run: pip install aiohttp"
+                error_message="aiohttp not installed. Run: pip install aiohttp certifi"
             )
         
         # Build API URL
@@ -472,7 +484,10 @@ Requires GOOGLE_API_KEY and GOOGLE_CX environment variables.
             params["fileType"] = file_type
         
         try:
-            async with aiohttp.ClientSession() as session:
+            # Create SSL context to handle certificate issues on macOS
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            async with aiohttp.ClientSession(connector=connector) as session:
                 url = f"{base_url}?{urllib.parse.urlencode(params)}"
                 
                 async with session.get(url, timeout=15) as resp:
@@ -659,7 +674,6 @@ Requires Playwright to be installed.
                     data={
                         "url": url,
                         "destination": str(dest_path.relative_to(self.workspace.root)),
-                        "absolute_path": str(dest_path),
                         "size": size_display,
                         "dimensions": f"{width}x{height}" if not full_page else "full page",
                         "message": f"Screenshot saved: {dest_path.relative_to(self.workspace.root)} ({size_display})"
@@ -671,12 +685,217 @@ Requires Playwright to be installed.
             return ToolResult(success=False, error_message=f"Screenshot failed: {e}")
 
 
-def create_image_search_tools(workspace: Workspace = None, google_api_key: str = None, google_cx: str = None) -> List[BaseTool]:
+class LogoSearchTool(BaseTool):
+    """Search for company logos using multiple sources.
+    
+    Uses Clearbit for search and Logo.dev/Uplead for logo images.
+    """
+    
+    NAME = "logo_search"
+    
+    DESCRIPTION = """Search for company/brand logos.
+
+Get high-quality logos by company name or domain. Great for:
+- Adding brand logos to your UI
+- Creating professional landing pages
+- Building company directories
+
+Examples:
+    logo_search "apple"           # Search by company name
+    logo_search "nike.com"        # Search by domain
+    logo_search "stripe"          # Fintech logo
+    logo_search "airbnb"          # Travel logo
+
+Returns logo URLs that can be downloaded with download_image.
+
+If LOGO_DEV_TOKEN is set, uses Logo.dev API for higher quality logos.
+Otherwise uses free alternatives (Uplead, Google favicon).
+"""
+    
+    def __init__(self, workspace: Workspace = None, api_token: str = None):
+        super().__init__(name=self.NAME, category=ToolCategory.FILE)
+        self.workspace = workspace or Workspace(Path.cwd())
+        self._logger = logging.getLogger(__name__)
+        
+        import os
+        self.api_token = api_token or os.environ.get("LOGO_DEV_TOKEN", "")
+    
+    @property
+    def tool_definition(self):
+        return self.get_tool_param()
+    
+    def get_tool_param(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Company name or domain to search for (e.g., 'apple', 'google.com', 'stripe')"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results (default: 5)"
+                    }
+                },
+                "required": ["query"]
+            }
+        )
+    
+    async def execute(self, query: str, limit: int = 5) -> ToolResult:
+        """Search for company logo"""
+        try:
+            import aiohttp
+            import ssl
+            import certifi
+        except ImportError:
+            return ToolResult(
+                success=False,
+                error_message="aiohttp not installed. Run: pip install aiohttp certifi"
+            )
+        
+        results = []
+        
+        try:
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            
+            async with aiohttp.ClientSession(connector=connector) as session:
+                # Step 1: Use Clearbit Autocomplete to find company domains
+                search_url = f"https://autocomplete.clearbit.com/v1/companies/suggest?query={urllib.parse.quote(query)}"
+                
+                companies = []
+                try:
+                    async with session.get(search_url, timeout=10) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            companies = data[:limit]
+                except Exception as e:
+                    self._logger.debug(f"Clearbit search failed: {e}")
+                
+                # If no results from search, try direct domain
+                if not companies:
+                    domain = query.lower().strip()
+                    if "." not in domain:
+                        domain = f"{domain}.com"
+                    domain = domain.replace("https://", "").replace("http://", "").replace("www.", "")
+                    domain = domain.split("/")[0]
+                    companies = [{"name": query, "domain": domain}]
+                
+                # Step 2: Get logos for each company
+                for company in companies:
+                    domain = company.get("domain", "")
+                    name = company.get("name", domain)
+                    
+                    if not domain:
+                        continue
+                    
+                    # Try multiple logo sources
+                    logo_sources = []
+                    
+                    # Source 1: Logo.dev (if token available)
+                    if self.api_token:
+                        logo_sources.append({
+                            "url": f"https://img.logo.dev/{domain}?token={self.api_token}&size=256&format=png",
+                            "source": "logo.dev",
+                            "quality": "high"
+                        })
+                    
+                    # Source 2: Uplead (free, no auth needed)
+                    logo_sources.append({
+                        "url": f"https://logo.uplead.com/{domain}",
+                        "source": "uplead",
+                        "quality": "medium"
+                    })
+                    
+                    # Source 3: Google favicon (always works, lower quality)
+                    logo_sources.append({
+                        "url": f"https://www.google.com/s2/favicons?domain={domain}&sz=128",
+                        "source": "google_favicon",
+                        "quality": "low"
+                    })
+                    
+                    # Source 4: DuckDuckGo icon
+                    logo_sources.append({
+                        "url": f"https://icons.duckduckgo.com/ip3/{domain}.ico",
+                        "source": "duckduckgo",
+                        "quality": "low"
+                    })
+                    
+                    # Test each source and add working ones
+                    for source_info in logo_sources:
+                        url = source_info["url"]
+                        try:
+                            # Use GET with stream=True for Logo.dev (doesn't support HEAD)
+                            # For others, try HEAD first then fall back to GET
+                            method = "get" if "logo.dev" in url else "head"
+                            
+                            async with session.request(method, url, timeout=5, allow_redirects=True) as resp:
+                                if resp.status == 200:
+                                    content_type = resp.headers.get("Content-Type", "")
+                                    # Accept images, or special cases
+                                    is_image = (
+                                        "image" in content_type or 
+                                        "octet" in content_type or 
+                                        "x-msdos" in content_type or  # Uplead returns this
+                                        url.endswith(".ico") or
+                                        "logo.uplead.com" in url or
+                                        "logo.dev" in url or  # Logo.dev always returns images
+                                        "favicons" in url
+                                    )
+                                    if is_image:
+                                        results.append({
+                                            "url": url,
+                                            "domain": domain,
+                                            "title": f"{name} logo ({source_info['quality']})",
+                                            "company_name": name,
+                                            "source": source_info["source"],
+                                            "quality": source_info["quality"],
+                                            "type": "logo"
+                                        })
+                                        # Only add first working source per company for cleaner results
+                                        break
+                        except:
+                            continue
+            
+            if not results:
+                return ToolResult(
+                    success=True,
+                    data={
+                        "query": query,
+                        "results": [],
+                        "count": 0,
+                        "message": f"No logo found for '{query}'. Try the exact domain (e.g., 'apple.com')."
+                    }
+                )
+            
+            return ToolResult(
+                success=True,
+                data={
+                    "query": query,
+                    "results": results,
+                    "count": len(results),
+                    "message": f"Found {len(results)} logos for '{query}'. Use download_image to save.",
+                    "primary_url": results[0]["url"] if results else None
+                }
+            )
+            
+        except asyncio.TimeoutError:
+            return ToolResult(success=False, error_message="Logo search timed out")
+        except Exception as e:
+            self._logger.error(f"Logo search failed: {e}")
+            return ToolResult(success=False, error_message=f"Logo search failed: {e}")
+
+
+def create_image_search_tools(workspace: Workspace = None, google_api_key: str = None, google_cx: str = None, logo_dev_token: str = None) -> List[BaseTool]:
     """Create all image search tools"""
     return [
         SearchImageTool(workspace=workspace),
         DownloadImageTool(workspace=workspace),
         GoogleImageSearchTool(workspace=workspace, api_key=google_api_key, cx=google_cx),
         WebScreenshotTool(workspace=workspace),
+        LogoSearchTool(workspace=workspace, api_token=logo_dev_token),
     ]
 

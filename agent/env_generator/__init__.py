@@ -8,12 +8,12 @@ Usage:
     OPENAI_API_KEY=sk-... python -m env_generator.llm_generator.main --name calendar
     
     # Python API
-    from env_generator.llm_generator import Coordinator, GenerationContext
+    from env_generator.llm_generator import Orchestrator, GenerationContext
 """
 
-from .llm_generator import Coordinator, GenerationContext
+from .llm_generator import Orchestrator, GenerationContext
 
 __all__ = [
-    "Coordinator",
+    "Orchestrator",
     "GenerationContext",
 ]

@@ -15,6 +15,33 @@ from typing import Any, Callable, Dict, List, Optional
 import json
 
 
+class SafeJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles non-serializable objects."""
+    def default(self, obj):
+        # Handle objects with to_dict method
+        if hasattr(obj, 'to_dict'):
+            return obj.to_dict()
+        # Handle objects with __dict__ attribute
+        if hasattr(obj, '__dict__'):
+            return {k: v for k, v in obj.__dict__.items() if not k.startswith('_')}
+        # Handle datetime
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        # Handle enums
+        if isinstance(obj, Enum):
+            return obj.value
+        # Fallback to string representation
+        try:
+            return str(obj)
+        except Exception:
+            return f"<non-serializable: {type(obj).__name__}>"
+
+
+def safe_json_dumps(obj, **kwargs) -> str:
+    """Safely serialize object to JSON string."""
+    return json.dumps(obj, cls=SafeJSONEncoder, **kwargs)
+
+
 class EventType(Enum):
     """Types of events that can be emitted"""
     # Phase events
@@ -78,7 +105,7 @@ class Event:
         }
     
     def to_json(self) -> str:
-        return json.dumps(self.to_dict())
+        return safe_json_dumps(self.to_dict())
 
 
 class EventEmitter:
@@ -350,9 +377,9 @@ class FileLogger:
     def __call__(self, event: Event) -> None:
         self._events.append(event.to_dict())
         
-        # Write incrementally
+        # Write incrementally with safe encoder
         with open(self.filepath, "w") as f:
-            json.dump(self._events, f, indent=2)
+            f.write(safe_json_dumps(self._events, indent=2))
 
 
 class RealTimeTextLogger:
@@ -416,9 +443,8 @@ class RealTimeTextLogger:
             line = f"[{timestamp}] 💡 THOUGHT:\n"
             # Pretty print if it's a dict/JSON
             if isinstance(result, dict):
-                import json
                 try:
-                    formatted = json.dumps(result, indent=2, ensure_ascii=False)
+                    formatted = safe_json_dumps(result, indent=2, ensure_ascii=False)
                     for l in formatted.split("\n")[:30]:  # Limit lines
                         line += f"    {l}\n"
                     if len(formatted.split("\n")) > 30:

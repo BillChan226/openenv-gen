@@ -77,11 +77,12 @@ class Workspace:
         """
         Resolve a user-provided path to an absolute path within the workspace.
         
-        Handles various input formats:
+        Very forgiving - handles many path formats and tries to find valid paths:
         - Empty/None: returns workspace root
         - Relative path: "app/server.js" -> /root/app/server.js
         - Absolute path within workspace: returned as-is
         - Path with redundant prefixes: cleaned and resolved
+        - Tries fuzzy matching if exact path not found
         
         Args:
             path: User-provided path (from LLM or tool call)
@@ -90,7 +91,7 @@ class Workspace:
             Absolute path within the workspace
             
         Raises:
-            PathEscapeError: If resolved path would escape workspace
+            PathEscapeError: If resolved path would escape workspace (only if really outside)
         """
         if not path:
             return self._root
@@ -107,27 +108,63 @@ class Workspace:
         # If it's absolute and within workspace, use it
         if clean_path.startswith("/"):
             abs_path = Path(clean_path).resolve()
-        else:
+            # Check if this absolute path is within workspace
+            if self.contains(abs_path):
+                return abs_path
+            # If not, extract the relative part and try again
+            # e.g., /some/wrong/path/app/server.js -> try app/server.js
+            clean_path = self._extract_relative_from_absolute(clean_path)
             # Join with root
+            abs_path = (self._root / clean_path).resolve()
+        else:
+            # Relative path - join with root
             abs_path = (self._root / clean_path).resolve()
         
         # Security check: ensure path is within workspace
         if not self.contains(abs_path):
+            # Last resort: try to extract just the filename or last few components
+            parts = Path(clean_path).parts
+            if len(parts) > 1:
+                # Try with fewer path components
+                for i in range(1, len(parts)):
+                    shorter_path = Path(*parts[i:])
+                    test_path = (self._root / shorter_path).resolve()
+                    if self.contains(test_path):
+                        return test_path
+            
             raise PathEscapeError(
                 f"Path '{path}' resolves to '{abs_path}' which is outside workspace '{self._root}'"
             )
         
         return abs_path
     
+    def _extract_relative_from_absolute(self, abs_path: str) -> str:
+        """
+        Extract a relative path from an absolute path that's outside the workspace.
+        
+        Looks for common directory patterns like 'app/', 'src/', 'design/', etc.
+        """
+        common_dirs = ['app', 'src', 'design', 'docker', 'config', 'tests', 'lib', 'docs']
+        parts = Path(abs_path).parts
+        
+        for i, part in enumerate(parts):
+            if part in common_dirs:
+                return str(Path(*parts[i:]))
+        
+        # If no common dir found, return the last component
+        return parts[-1] if parts else ""
+    
     def _clean_path(self, path: str) -> str:
         """
         Clean a path by removing redundant prefixes.
         
-        Handles cases like:
+        Very forgiving - handles many common LLM mistakes:
         - "generated/atlassian_home/app/..." -> "app/..."
         - "atlassian_home/app/..." -> "app/..."
         - "./app/..." -> "app/..."
         - "env_generator/generated/atlassian_home/app/..." -> "app/..."
+        - "/Users/.../generated/project/app/..." -> "app/..."
+        - "llm_generator/generated/project/app/..." -> "app/..."
         """
         clean = path
         project_name = self._root.name
@@ -137,24 +174,30 @@ class Workspace:
         while clean.startswith("./"):
             clean = clean[2:]
         
-        # Remove full root path prefix
+        # Remove leading ../  (often mistakenly added)
+        while clean.startswith("../"):
+            clean = clean[3:]
+        
+        # Remove full root path prefix (absolute path)
         if clean.startswith(root_str + "/"):
             clean = clean[len(root_str) + 1:]
         elif clean.startswith(root_str):
             clean = clean[len(root_str):].lstrip("/")
         
-        # Remove "generated/project_name" prefix
-        generated_prefix = f"generated/{project_name}"
-        while clean.startswith(generated_prefix + "/"):
-            clean = clean[len(generated_prefix) + 1:]
-        if clean.startswith(generated_prefix):
-            clean = clean[len(generated_prefix):].lstrip("/")
+        # Remove any absolute path that ends with /generated/project_name/
+        # e.g., /Users/xxx/Desktop/xxx/generated/expedia/app/...
+        import re
+        abs_pattern = rf'^.*[/\\]generated[/\\]{re.escape(project_name)}[/\\](.*)$'
+        match = re.match(abs_pattern, clean)
+        if match:
+            clean = match.group(1)
         
-        # Remove just project_name prefix
-        while clean.startswith(project_name + "/"):
-            clean = clean[len(project_name) + 1:]
-        if clean == project_name:
-            clean = ""
+        # Remove "llm_generator/generated/project_name" prefix
+        llm_gen_prefix = f"llm_generator/generated/{project_name}"
+        if clean.startswith(llm_gen_prefix + "/"):
+            clean = clean[len(llm_gen_prefix) + 1:]
+        elif clean.startswith(llm_gen_prefix):
+            clean = clean[len(llm_gen_prefix):].lstrip("/")
         
         # Remove "env_generator/generated/project_name" prefix
         env_gen_prefix = f"env_generator/generated/{project_name}"
@@ -163,9 +206,46 @@ class Workspace:
         elif clean.startswith(env_gen_prefix):
             clean = clean[len(env_gen_prefix):].lstrip("/")
         
-        # Remove any remaining "generated/" prefix if followed by project name
+        # Remove "Agents/env_generator/llm_generator/generated/project_name" prefix
+        agents_prefix = f"Agents/env_generator/llm_generator/generated/{project_name}"
+        if clean.startswith(agents_prefix + "/"):
+            clean = clean[len(agents_prefix) + 1:]
+        elif clean.startswith(agents_prefix):
+            clean = clean[len(agents_prefix):].lstrip("/")
+        
+        # Remove "generated/project_name" or "generated-X/project_name" prefix (multiple times if nested)
+        # Handle both "generated/expedia" and "generated-2/expedia" patterns
+        generated_prefix = f"generated/{project_name}"
+        while clean.startswith(generated_prefix + "/"):
+            clean = clean[len(generated_prefix) + 1:]
+        if clean.startswith(generated_prefix):
+            clean = clean[len(generated_prefix):].lstrip("/")
+        
+        # Handle "generated-X/project_name" pattern (e.g., "generated-2/expedia")
+        generated_pattern = re.match(rf'^generated-\d+/{re.escape(project_name)}/(.*)$', clean)
+        if generated_pattern:
+            clean = generated_pattern.group(1)
+        elif re.match(rf'^generated-\d+/{re.escape(project_name)}$', clean):
+            clean = ""
+        
+        # Remove just project_name prefix (multiple times if nested)
+        while clean.startswith(project_name + "/"):
+            clean = clean[len(project_name) + 1:]
+        if clean == project_name:
+            clean = ""
+        
+        # Remove any remaining "generated/" or "generated-X/" prefix if followed by project name
         if clean.startswith("generated/"):
             remaining = clean[len("generated/"):]
+            if remaining.startswith(project_name + "/"):
+                clean = remaining[len(project_name) + 1:]
+            elif remaining == project_name:
+                clean = ""
+        
+        # Handle "generated-X/" pattern
+        gen_x_match = re.match(r'^generated-\d+/(.*)$', clean)
+        if gen_x_match:
+            remaining = gen_x_match.group(1)
             if remaining.startswith(project_name + "/"):
                 clean = remaining[len(project_name) + 1:]
             elif remaining == project_name:

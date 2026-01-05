@@ -1,30 +1,43 @@
 """
 LLM Generator - Generate OpenEnv-compatible web environments using LLM
 
-Architecture:
-- UserAgent: Plans tasks, verifies results, reports issues
-- CodeAgent: Generates code, fixes issues
-- Coordinator: Orchestrates the interaction
+Architecture (Multi-Agent):
+- UserAgent: Plans tasks, verifies results, reports issues, tracks progress
+- DesignAgent: Creates design specifications (API, UI, Database)
+- DatabaseAgent: Generates database code
+- BackendAgent: Generates backend code
+- FrontendAgent: Generates frontend code
+- Orchestrator: Coordinates multi-agent interaction
 
 Usage:
-    from llm_generator import Coordinator
+    from llm_generator import Orchestrator
     from utils.config import LLMConfig
     
-    coordinator = Coordinator(llm_config, output_dir)
-    result = await coordinator.run(goal="Build a calendar app")
+    orchestrator = Orchestrator(llm_config, output_dir, project_name)
+    result = await orchestrator.run(requirements="Build a calendar app")
 """
 
-from .agents import UserAgent, CodeAgent, Coordinator
+from .agents import (
+    Orchestrator,
+    UserAgent,
+    DesignAgent,
+    DatabaseAgent,
+    BackendAgent,
+    FrontendAgent,
+)
 from .messages import Task, TaskType, Issue, IssueSeverity, TaskResult, VerifyResult
 from .specs import PROJECT_STRUCTURE, PHASES, get_phase_spec
 from .context import GenerationContext
 from .progress import EventEmitter, EventType
 
 __all__ = [
-    # Agents
+    # Multi-Agent System
+    "Orchestrator",
     "UserAgent",
-    "CodeAgent", 
-    "Coordinator",
+    "DesignAgent",
+    "DatabaseAgent",
+    "BackendAgent",
+    "FrontendAgent",
     
     # Messages
     "Task",

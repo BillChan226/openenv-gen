@@ -12,6 +12,7 @@ class BrowserClickTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_click", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_click"
         self.browser = browser_manager
     
     @property
@@ -102,6 +103,7 @@ class BrowserFillTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_fill", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_fill"
         self.browser = browser_manager
     
     @property
@@ -144,6 +146,7 @@ class BrowserSelectTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_select", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_select"
         self.browser = browser_manager
     
     @property
@@ -196,6 +199,7 @@ class BrowserHoverTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_hover", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_hover"
         self.browser = browser_manager
     
     @property
@@ -234,6 +238,7 @@ class BrowserPressKeyTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_press_key", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_press_key"
         self.browser = browser_manager
     
     @property
@@ -272,6 +277,7 @@ class BrowserScrollTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_scroll", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_scroll"
         self.browser = browser_manager
     
     @property
@@ -332,6 +338,7 @@ class BrowserWaitTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_wait", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_wait"
         self.browser = browser_manager
     
     @property

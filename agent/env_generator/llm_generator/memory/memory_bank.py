@@ -77,17 +77,18 @@ class MemoryBank:
 ## Core Requirements
 {requirements_block}
 
-## Goals
-- Build a Jira-like issue tracking system with projects, boards, issues, workflows, and collaboration.
-- Provide a runnable dev environment (frontend + backend + database + docker).
+## Goals (project-specific)
+- Deliver a working frontend + backend + database stack per specs.
+- Ensure auth/login works with seeded users and core flows are testable.
+- Provide smoke-testable APIs and UI based on design specs.
 
-## Scope
-- In scope: Jira-like UI, REST API, PostgreSQL schema/seed, auth, search, and basic workflows.
-- Out of scope: Full enterprise Jira parity, marketplace apps, SSO/SCIM, advanced permissions.
+## Scope (adjust per project)
+- In scope: stated features in requirements/specs.
+- Out of scope: anything not in requirements/specs or marked optional.
 
 ## Success Criteria
-- No obvious runtime errors; core flows work end-to-end (create/update issues, move status, comment, search).
-- Services start via docker compose and basic smoke tests pass.
+- Services start (docker/local) and basic flows pass smoke tests.
+- No critical 500s/404s on specified endpoints; UI aligns with design spec.
 """
         },
         "tech_context": {
@@ -100,22 +101,22 @@ class MemoryBank:
 - Backend: {backend_tech}
 - Database: {database_tech}
 
-## Dependencies
-- Frontend: React Router, build tooling (Vite), lint tooling (ESLint) as applicable
-- Backend: Express, JWT auth, PostgreSQL client
+## Dependencies (adjust per package.json)
+- Frontend: router/build tooling, lint tooling as applicable
+- Backend: Express, JWT auth, PostgreSQL client, dotenv
 
 ## Development Setup
-- Use docker compose for local stack when available
-- Otherwise run backend + frontend locally with node and connect to postgres
+- Prefer docker compose when available
+- Otherwise run backend + frontend locally with node + postgres
 
 ## Technical Constraints
-- Keep paths within the workspace root; avoid writing outside generated project
-- Prefer deterministic, testable APIs and clear error handling
+- Keep paths within workspace root; no writes outside generated project
+- Deterministic, testable APIs; clear error handling
 
 ## Environment Variables
-- OPENAI_API_KEY (or provider-specific key)
-- GOOGLE_API_KEY / GOOGLE_CX (optional, for google_image_search)
-- DATABASE_URL or DB_HOST/DB_USER/DB_PASSWORD/DB_NAME/DB_PORT (backend)
+- DATABASE_URL or DB_HOST/DB_USER/DB_PASSWORD/DB_NAME/DB_PORT
+- PORT / CORS_ORIGIN / VITE_API_BASE (align UI/API ports)
+- Provider keys (OPENAI_API_KEY etc.) if needed
 """
         },
         "system_patterns": {
@@ -124,26 +125,25 @@ class MemoryBank:
             "template": """# System Patterns
 
 ## Architecture Overview
-- Monorepo-style generated project with app/frontend, app/backend, app/database and docker/
-- REST API backend with JWT auth, PostgreSQL persistence
+- Generated project with app/frontend, app/backend, app/database, docker/
+- REST API backend with JWT auth and PostgreSQL persistence
 - SPA frontend consuming backend API
 
 ## Design Patterns
-- Route/controller separation on backend
-- Basic validation middleware and centralized error handling
-- Frontend pages/components with shared layout, loading/error states
+- Backend: route/controller separation, validation + centralized error handling
+- Frontend: pages/components with shared layout, loading/error states
 
 ## Component Relationships
 - Frontend routes -> pages -> components -> API client -> backend endpoints
 - Backend routes -> controllers -> db queries -> postgres
 
 ## Key Technical Decisions
-- Keep file operations within Workspace to avoid path traversal/duplication
-- Prefer simple, consistent naming for routes and models
+- Keep file operations within workspace; avoid duplicates/out-of-root writes
+- Use consistent naming for routes/models; prefer schema-aligned field names
 
 ## API Patterns
-- JSON REST endpoints under /api/*
-- Use Authorization: Bearer <token> for protected routes
+- JSON REST under /api/*
+- Authorization: Bearer <token> for protected routes
 """
         },
         "active_context": {
@@ -176,7 +176,7 @@ Working on: initialization
 - [x] Initialized project and memory bank
 
 ## In Progress
-- [ ] (auto-updated during generation)
+- [ ] (update during generation)
 
 ## Known Issues
 - (none yet)

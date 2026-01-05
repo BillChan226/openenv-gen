@@ -23,6 +23,7 @@ class WorkspaceManager:
     - app/backend/  -> BackendAgent writes
     - app/frontend/ -> FrontendAgent writes
     - docker/       -> Orchestrator writes
+    - (anywhere)    -> UserAgent can write (for fixing issues during testing)
     
     All agents can read all directories.
     """
@@ -33,7 +34,7 @@ class WorkspaceManager:
         "database": "app/database",
         "backend": "app/backend",
         "frontend": "app/frontend",
-        "user": None,  # UserAgent doesn't write code
+        "user": "",  # UserAgent can write anywhere (for fixing issues during testing)
         "orchestrator": "docker",
     }
     
@@ -47,16 +48,33 @@ class WorkspaceManager:
         self._init_directories()
     
     def _init_directories(self):
-        """Create all workspace directories."""
+        """Create all workspace directories following jira-web structure."""
         dirs = [
+            # Design documents
             "design",
-            "app/database",
-            "app/backend/routes",
-            "app/backend/middleware",
+            
+            # Database - SQL init scripts
+            "app/database/init",
+            
+            # Backend - ALL code in src/
+            "app/backend/src/routes",
+            "app/backend/src/middleware",
+            "app/backend/src/utils",
+            "app/backend/src/config",
+            
+            # Frontend - ALL code in src/
             "app/frontend/src/pages",
             "app/frontend/src/components",
+            "app/frontend/src/components/ui",
             "app/frontend/src/services",
+            "app/frontend/src/contexts",
+            "app/frontend/src/hooks",
+            
+            # Docker
             "docker",
+            
+            # Screenshots
+            "screenshots",
         ]
         
         for d in dirs:
@@ -115,7 +133,7 @@ class WorkspaceManager:
         try:
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
-            self._logger.debug(f"[{agent_id}] Wrote: {path}")
+            self._logger.debug(f"[{agent_id}] File written: {path}")
             return True
         except Exception as e:
             self._logger.error(f"Failed to write {path}: {e}")

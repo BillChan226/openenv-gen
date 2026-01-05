@@ -160,7 +160,7 @@ class NetworkConfig:
 @dataclass
 class MemoryConfig:
     """Memory/context configuration"""
-    max_context_length: int = 8192  # tokens
+    max_context_length: int = 32768  # tokens (increased for complex projects)
     short_term_memory_size: int = 10  # Recent N conversation turns
     long_term_memory_enabled: bool = False
     long_term_memory_backend: str = "local"  # local, redis, vector_db

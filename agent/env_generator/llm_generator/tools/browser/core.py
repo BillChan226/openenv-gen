@@ -16,6 +16,7 @@ class BrowserNavigateTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_navigate", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_navigate"
         self.browser = browser_manager
     
     @property
@@ -108,6 +109,7 @@ class BrowserScreenshotTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_screenshot", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_screenshot"
         self.browser = browser_manager
     
     @property
@@ -169,8 +171,14 @@ class BrowserScreenshotTool(BaseTool):
             with open(resolved_path, 'wb') as f:
                 f.write(screenshot_bytes)
             
+            # Use relative path for display
+            try:
+                display_path = str(resolved_path.relative_to(self.browser.workspace.root))
+            except (ValueError, AttributeError):
+                display_path = save_path or resolved_path.name
+            
             data: Dict[str, Any] = {
-                "saved_to": str(resolved_path),
+                "saved_to": display_path,
                 "size_bytes": len(screenshot_bytes),
             }
 
@@ -189,6 +197,7 @@ class BrowserGetConsoleTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_console", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_console"
         self.browser = browser_manager
     
     @property
@@ -239,6 +248,7 @@ class BrowserGetNetworkErrorsTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_network_errors", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_network_errors"
         self.browser = browser_manager
     
     @property
@@ -278,6 +288,7 @@ class BrowserCloseTool(BaseTool):
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_close", category=ToolCategory.RUNTIME, **kwargs)
+        self.NAME = "browser_close"
         self.browser = browser_manager
     
     @property

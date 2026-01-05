@@ -9,7 +9,7 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 
 from utils.tool import BaseTool, ToolResult, ToolCategory, create_tool_param
-from workspace import Workspace
+from .file_tools import Workspace
 from jinja2 import Environment, FileSystemLoader
 
 
@@ -72,14 +72,17 @@ def get_image_mime_type(image_path: str) -> str:
 def resolve_image_path(workspace: Optional[Workspace], image_path: str) -> Optional[Path]:
     """
     Resolve an image path using the workspace when available.
-
-    - If a workspace is provided, treat image_path as workspace-relative.
-    - If that fails, fall back to interpreting image_path as a raw filesystem path.
+    Reference images should be copied to workspace/screenshot/ at startup.
     """
     if not image_path:
         return None
 
-    # Prefer workspace resolution (stable regardless of process cwd)
+    # If it's an absolute path that exists, use it directly
+    abs_path = Path(image_path)
+    if abs_path.is_absolute() and abs_path.exists():
+        return abs_path
+
+    # Prefer workspace resolution
     if workspace is not None:
         try:
             p = workspace.resolve(image_path)
@@ -88,12 +91,16 @@ def resolve_image_path(workspace: Optional[Workspace], image_path: str) -> Optio
         except Exception:
             pass
 
-        # Try common subdirectories when the caller provides only a filename
-        for prefix in ("screenshots", "screenshot", "design", "images", "assets"):
+        # Try common subdirectories within workspace (screenshot/ is primary)
+        for prefix in ("screenshot", "screenshots", "design", "images", "assets", "artifacts"):
             try:
                 p2 = workspace.resolve(f"{prefix}/{image_path}")
                 if p2.exists():
                     return p2
+                # Also try just filename (e.g., "Flight-Detail.png" -> "screenshot/Flight-Detail.png")
+                p3 = workspace.resolve(f"{prefix}/{Path(image_path).name}")
+                if p3.exists():
+                    return p3
             except Exception:
                 continue
 
@@ -103,8 +110,8 @@ def resolve_image_path(workspace: Optional[Workspace], image_path: str) -> Optio
 
 
 def _get_prompt_env() -> Environment:
-    """Jinja environment for prompts (shared across vision tools)."""
-    prompt_dir = Path(__file__).parent.parent / "prompts"
+    """Jinja environment for prompts."""
+    prompt_dir = Path(__file__).parent.parent / "multi_agent" / "prompts"
     return Environment(
         loader=FileSystemLoader(str(prompt_dir)),
         trim_blocks=True,
@@ -115,9 +122,10 @@ def _get_prompt_env() -> Environment:
 class AnalyzeImageTool(BaseTool):
     """Analyze an image to extract design information for web generation."""
     
+    name = "analyze_image"
     NAME = "analyze_image"
     
-    DESCRIPTION = """Analyze a screenshot/mockup image to extract design information.
+    description = """Analyze a screenshot/mockup image to extract design information.
 Returns detailed analysis including:
 - Layout structure (grid, flex, sections)
 - Color palette (primary, secondary, background, accent)
@@ -129,7 +137,7 @@ Use this when you have a reference image to build a web page from.
 """
     
     def __init__(self, llm_client=None, workspace: Workspace = None):
-        super().__init__(name=self.NAME, category=ToolCategory.CODE)
+        super().__init__()
         self._llm = llm_client
         self._logger = logging.getLogger(__name__)
         self._workspace = workspace
@@ -141,26 +149,14 @@ Use this when you have a reference image to build a web page from.
     
     @property
     def tool_definition(self):
-        return self.get_tool_param()
-    
-    def get_tool_param(self):
         return create_tool_param(
-            name=self.NAME,
-            description=self.DESCRIPTION,
+            name=self.name,
+            description=self.description,
             parameters={
-                "type": "object",
-                "properties": {
-                    "image_path": {
-                        "type": "string",
-                        "description": "Path to the screenshot/mockup image"
-                    },
-                    "focus_area": {
-                        "type": "string",
-                        "description": "Optional: specific area to focus on (e.g., 'header', 'sidebar', 'main content')"
-                    }
-                },
-                "required": ["image_path"]
-            }
+                "image_path": {"type": "string", "description": "Path to the screenshot/mockup image"},
+                "focus_area": {"type": "string", "description": "Optional: specific area to focus on (e.g., 'header', 'sidebar')"}
+            },
+            required=["image_path"]
         )
     
     async def execute(self, image_path: str, focus_area: str = None) -> ToolResult:
@@ -201,7 +197,6 @@ Use this when you have a reference image to build a web page from.
                 success=True,
                 data={
                     "image_path": image_path,
-                    "resolved_path": str(resolved),
                     "analysis": {
                         "layout_type": analysis.layout_type,
                         "sections": analysis.sections,
@@ -240,15 +235,9 @@ Use this when you have a reference image to build a web page from.
     
     async def _call_vision_llm(self, image_base64: str, mime_type: str, prompt: str) -> str:
         """Call the vision-capable LLM with the image"""
-        try:
-            from utils.llm import Message
-        except ImportError:
-            # Fallback for different import paths
-            import sys
-            sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-            from utils.llm import Message
+        from utils.llm import Message
         
-        # Build multimodal message using Message class
+        # Build multimodal message
         message = Message.user_with_image(
             text=prompt,
             image_base64=image_base64,
@@ -258,7 +247,7 @@ Use this when you have a reference image to build a web page from.
         # Call LLM with multimodal message
         response = await self._llm.chat_messages(
             messages=[message],
-            temperature=0.3,  # Lower for more consistent analysis
+            temperature=0.3,
         )
         
         return response.content if hasattr(response, 'content') else str(response)
@@ -304,15 +293,16 @@ Use this when you have a reference image to build a web page from.
 class CompareWithScreenshotTool(BaseTool):
     """Compare generated UI with reference screenshot"""
     
+    name = "compare_with_screenshot"
     NAME = "compare_with_screenshot"
     
-    DESCRIPTION = """Compare a generated web page screenshot with the reference design.
+    description = """Compare a generated web page screenshot with the reference design.
 Returns similarity analysis and specific differences to fix.
 Use this after generating UI code to verify it matches the reference.
 """
     
     def __init__(self, llm_client=None, workspace: Workspace = None):
-        super().__init__(name=self.NAME, category=ToolCategory.CODE)
+        super().__init__()
         self._llm = llm_client
         self._logger = logging.getLogger(__name__)
         self._workspace = workspace
@@ -322,26 +312,14 @@ Use this after generating UI code to verify it matches the reference.
     
     @property
     def tool_definition(self):
-        return self.get_tool_param()
-    
-    def get_tool_param(self):
         return create_tool_param(
-            name=self.NAME,
-            description=self.DESCRIPTION,
+            name=self.name,
+            description=self.description,
             parameters={
-                "type": "object",
-                "properties": {
-                    "reference_image": {
-                        "type": "string",
-                        "description": "Path to the reference screenshot"
-                    },
-                    "generated_image": {
-                        "type": "string",
-                        "description": "Path to screenshot of generated UI"
-                    }
-                },
-                "required": ["reference_image", "generated_image"]
-            }
+                "reference_image": {"type": "string", "description": "Path to the reference screenshot"},
+                "generated_image": {"type": "string", "description": "Path to screenshot of generated UI"}
+            },
+            required=["reference_image", "generated_image"]
         )
     
     async def execute(self, reference_image: str, generated_image: str) -> ToolResult:
@@ -402,9 +380,9 @@ Use this after generating UI code to verify it matches the reference.
 class ExtractComponentsTool(BaseTool):
     """Extract specific UI components from a screenshot for targeted generation"""
     
-    NAME = "extract_components"
+    name = "extract_components"
     
-    DESCRIPTION = """Extract specific UI components from a screenshot.
+    description = """Extract specific UI components from a screenshot.
 Use this to get detailed specs for individual components like:
 - Navigation bars
 - Cards
@@ -416,35 +394,24 @@ Use this to get detailed specs for individual components like:
 """
     
     def __init__(self, llm_client=None, workspace: Workspace = None):
-        super().__init__(name=self.NAME, category=ToolCategory.CODE)
+        super().__init__()
         self._llm = llm_client
         self._workspace = workspace
+        self.NAME = "extract_components"
     
     def set_llm(self, llm_client):
         self._llm = llm_client
     
     @property
     def tool_definition(self):
-        return self.get_tool_param()
-    
-    def get_tool_param(self):
         return create_tool_param(
-            name=self.NAME,
-            description=self.DESCRIPTION,
+            name=self.name,
+            description=self.description,
             parameters={
-                "type": "object",
-                "properties": {
-                    "image_path": {
-                        "type": "string",
-                        "description": "Path to the screenshot"
-                    },
-                    "component_type": {
-                        "type": "string",
-                        "description": "Type of component to extract (navbar, card, form, button, etc.)"
-                    }
-                },
-                "required": ["image_path", "component_type"]
-            }
+                "image_path": {"type": "string", "description": "Path to the screenshot"},
+                "component_type": {"type": "string", "description": "Type of component to extract (navbar, card, form, button, etc.)"}
+            },
+            required=["image_path", "component_type"]
         )
     
     async def execute(self, image_path: str, component_type: str) -> ToolResult:
@@ -470,7 +437,6 @@ Use this to get detailed specs for individual components like:
         try:
             from utils.llm import Message
             
-            # Build multimodal message
             message = Message.user_with_image(
                 text=prompt,
                 image_base64=image_base64,
@@ -493,23 +459,94 @@ Use this to get detailed specs for individual components like:
             return ToolResult(success=False, error_message=f"Extraction failed: {e}")
 
 
+class ListReferenceImagesTool(BaseTool):
+    """List available reference images in the screenshot folder"""
+    
+    name = "list_reference_images"
+    NAME = "list_reference_images"
+    
+    description = """List all reference images/screenshots available for design reference.
+Returns paths to images in the screenshot folder that can be used with analyze_image.
+"""
+    
+    def __init__(self, workspace: Workspace = None):
+        super().__init__()
+        self._workspace = workspace
+    
+    @property
+    def tool_definition(self):
+        return create_tool_param(
+            name=self.name,
+            description=self.description,
+            parameters={
+                "folder": {"type": "string", "description": "Optional subfolder to list (e.g., 'jira', 'expedia')"}
+            },
+            required=[]
+        )
+    
+    async def execute(self, folder: str = None) -> ToolResult:
+        """
+        List reference images in workspace.
+        Reference images should be copied to workspace/screenshot/ at startup via --reference-dir.
+        """
+        search_paths = ["screenshot", "screenshots", "design", "images", "references", "artifacts"]
+        
+        if self._workspace:
+            base = Path(self._workspace.root)
+        else:
+            base = Path.cwd()
+        
+        images = []
+        seen_names = set()  # Avoid duplicates by filename
+        image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+        
+        for search_path in search_paths:
+            target = base / search_path
+            if folder:
+                target = target / folder
+            
+            if target.exists() and target.is_dir():
+                for img_path in target.rglob("*"):
+                    if img_path.suffix.lower() in image_extensions:
+                        # Skip duplicates
+                        if img_path.name in seen_names:
+                            continue
+                        seen_names.add(img_path.name)
+                        
+                        rel_path = str(img_path.relative_to(base))
+                        images.append({
+                            "path": rel_path,
+                            "name": img_path.name,
+                            "size": img_path.stat().st_size,
+                        })
+        
+        if not images:
+            return ToolResult(
+                success=True,
+                data={
+                    "images": [],
+                    "count": 0,
+                    "message": "No reference images found. Use --reference-dir to specify reference screenshots at startup.",
+                    "hint": "Reference images should be in workspace/screenshot/ directory."
+                }
+            )
+        
+        return ToolResult(
+            success=True,
+            data={
+                "images": images,
+                "count": len(images),
+                "message": f"Found {len(images)} reference images in workspace"
+            }
+        )
+
+
 def create_vision_tools(llm_client=None, workspace: Workspace = None) -> List[BaseTool]:
     """Create all vision tools with optional LLM client"""
     tools = [
         AnalyzeImageTool(llm_client, workspace=workspace),
-        # Backward-compatible alias for older prompts/runs
-        AnalyzeScreenshotTool(llm_client, workspace=workspace),
         CompareWithScreenshotTool(llm_client, workspace=workspace),
         ExtractComponentsTool(llm_client, workspace=workspace),
+        ListReferenceImagesTool(workspace=workspace),
     ]
     return tools
-
-
-class AnalyzeScreenshotTool(AnalyzeImageTool):
-    """
-    Backward-compatible alias for analyze_image.
-
-    Deprecated: prefer analyze_image (works for any image, not only screenshots).
-    """
-    NAME = "analyze_screenshot"
-

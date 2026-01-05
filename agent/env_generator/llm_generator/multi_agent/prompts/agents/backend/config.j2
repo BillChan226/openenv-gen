@@ -1,0 +1,101 @@
+{# Backend Agent: Configuration Templates #}
+
+{% macro port_configuration(backend_port, api_port, db_port) %}
+## Port Configuration (CRITICAL)
+
+**Server port (inside Docker container):** {{ backend_port }}
+**External API port (host machine):** {{ api_port }}
+**Database port:** {{ db_port }}
+
+### server.js Port Configuration
+
+```javascript
+// Use environment variable with fallback
+const PORT = Number(process.env.PORT || {{ backend_port }});
+const HOST = process.env.HOST || '0.0.0.0';
+
+app.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
+});
+```
+
+### Database Connection (src/db.js)
+
+```javascript
+const { Pool } = require('pg');
+
+const pool = new Pool({
+    host: process.env.DB_HOST || 'localhost',
+    port: Number(process.env.DB_PORT || {{ db_port }}),
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+    database: process.env.DB_NAME || 'app',
+});
+
+module.exports = { pool, query: (text, params) => pool.query(text, params) };
+```
+
+**IMPORTANT:**
+- The frontend proxies to `http://backend:{{ backend_port }}` inside Docker
+- External testing uses `http://localhost:{{ api_port }}` on host machine
+- Database connects to `database:{{ db_port }}` inside Docker
+- **ALWAYS bind to `0.0.0.0`** - NEVER use `localhost` or `127.0.0.1`
+{% endmacro %}
+
+
+{% macro password_hashing() %}
+### Password Hashing (CRITICAL - Use bcryptjs!)
+
+**ALWAYS use `bcryptjs` instead of `bcrypt`!**
+
+`bcrypt` has native bindings that cause "Exec format error" in Docker. Use pure JavaScript `bcryptjs` instead:
+
+```javascript
+// In auth.js - CORRECT:
+const bcrypt = require('bcryptjs');
+
+// In package.json - CORRECT:
+"bcryptjs": "^2.4.3"
+```
+{% endmacro %}
+
+
+{% macro cors_configuration() %}
+### CORS Configuration
+
+```javascript
+const cors = require('cors');
+app.use(cors({
+    origin: process.env.CORS_ORIGIN 
+        ? process.env.CORS_ORIGIN.split(',') 
+        : true,
+    credentials: true
+}));
+
+// Handle preflight requests
+app.options('*', cors());
+```
+{% endmacro %}
+
+
+{% macro dockerfile_template() %}
+## Dockerfile Template
+
+```dockerfile
+FROM node:20-alpine
+
+# REQUIRED: Add build dependencies for native modules (bcrypt, etc.)
+RUN apk add --no-cache python3 make g++
+
+WORKDIR /usr/src/app
+COPY package.json package-lock.json* ./
+
+# Use --omit=dev and --legacy-peer-deps to handle dependency conflicts
+RUN npm install --omit=dev --legacy-peer-deps
+
+COPY . .
+EXPOSE 8082
+CMD ["npm", "start"]
+```
+{% endmacro %}
+

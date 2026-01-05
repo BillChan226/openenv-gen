@@ -82,12 +82,13 @@ Returns a tree-like view of the project with file sizes and line counts.
         try:
             target_dir = self.workspace.resolve(path)
         except Exception as e:
-            return ToolResult(success=False, error_message=f"Invalid path: {e}")
+            return ToolResult(success=False, error_message=f"Invalid path: {path}")
         
         if not target_dir.exists():
+            # Show the user's input path, not the resolved absolute path
             return ToolResult(
                 success=False,
-                error_message=f"Directory not found: {target_dir}"
+                error_message=f"Directory not found: {path}. Use relative paths like 'app/', 'docker/', 'design/'"
             )
         
         lines = []
@@ -180,14 +181,20 @@ Returns a tree-like view of the project with file sizes and line counts.
         # Add path usage hint to prevent LLM confusion
         lines.append("\n💡 Paths: Use paths relative to workspace root (e.g., 'app/backend/src/routes/issues.js'), NOT absolute paths or paths starting with project name.")
         
+        # Get relative path for display (never show absolute paths to LLM)
+        try:
+            rel_root = target_dir.relative_to(self.workspace.root)
+            display_path = f"./{rel_root}" if str(rel_root) != "." else "./"
+        except ValueError:
+            display_path = "./"
+        
         return ToolResult(
             success=True,
             data={
                 "tree": "\n".join(lines),
                 "stats": stats,
-                "root": str(target_dir),
-                "workspace_root": str(self.workspace.root),
-                "note": "Use RELATIVE paths like 'app/backend/...' - do NOT prefix with project name"
+                "path": display_path,  # Relative path only - never expose absolute paths
+                "note": "Use RELATIVE paths like 'app/backend/...' - do NOT prefix with project name or directory names"
             }
         )
 
@@ -241,7 +248,7 @@ Use this to check what already exists before generating new files.
         if not self.workspace.root.exists():
             return ToolResult(
                 success=False,
-                error_message=f"Output directory not found: {self.workspace.root}"
+                error_message="Output directory not found"
             )
         
         def categorize_file(path: str) -> str:
@@ -371,7 +378,7 @@ Use this before creating new files to avoid duplicates.
         if not self.workspace.root.exists():
             return ToolResult(
                 success=False,
-                error_message=f"Output directory not found: {self.workspace.root}"
+                error_message="Output directory not found"
             )
         
         # Collect all files by name

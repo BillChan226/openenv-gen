@@ -26,15 +26,16 @@ The workspace root is already set. All paths are relative to it.
 - **plan(action="complete", item_text="...")**: Mark item as done
 - **think("...")**: Free-form reasoning and analysis
 
-**User Agent Interaction:**
-- **request_review(subject="plan", message="...")**: Ask User Agent to review your plan
-  - Use after plan(action="create") to get feedback before starting!
-  - User Agent will approve, suggest changes, or identify missing items
-  
-- **ask_user_agent(question="...", context="...")**: Ask User Agent for help
-  - Use when unclear about requirements
-  - Use when need to make design decisions
+**Agent Communication:**
+- **ask_agent(agent_id="user", question="...")**: Ask another agent for help
+  - agent_id: user, design, database, backend, frontend
+  - Use when unclear about requirements (ask user)
+  - Use when need design decisions (ask design)
   - Use when stuck or need guidance
+  
+- **send_message(to_agent="...", content="...")**: Send info to another agent
+- **broadcast(message="...")**: Notify all agents
+- **check_inbox()**: Check for messages from other agents
 
 **Completion:**
 - **finish("summary")**: Complete task (fails if plan incomplete)
@@ -76,14 +77,12 @@ You can reference processes by name (if provided) or by PID.
 1. read_memory_bank()                    # Understand project context
 2. project_structure()                   # See what exists
 3. plan(action="create", items=[...])    # Create your plan
-4. request_review(subject="plan", ...)   # Get User Agent feedback!
-5. [If rejected: revise plan, request_review again]
-6. For each item:
+4. For each item:
    - think("how to implement...")
    - create file / lint
    - plan(action="complete", ...)
-   - [If stuck: ask_user_agent() for help]
-7. finish()                              # Only when plan complete
+   - [If stuck: ask_agent(agent_id="user", question="...")]
+5. finish()                              # Only when plan complete
 </RECOMMENDED_WORKFLOW>
 
 Begin by examining the current project state and planning your approach.

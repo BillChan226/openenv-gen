@@ -265,7 +265,13 @@ class LoggedEvent:
         }
     
     def to_json(self) -> str:
-        return json.dumps(self.to_dict(), ensure_ascii=False)
+        def default_handler(obj):
+            if hasattr(obj, 'to_dict'):
+                return obj.to_dict()
+            if hasattr(obj, '__dict__'):
+                return {k: v for k, v in obj.__dict__.items() if not k.startswith('_')}
+            return str(obj)
+        return json.dumps(self.to_dict(), ensure_ascii=False, default=default_handler)
 
 
 class StructuredLogger:

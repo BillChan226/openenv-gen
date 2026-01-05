@@ -40,10 +40,14 @@ class GenerationContext:
     features: List[str] = field(default_factory=list)
     api_endpoints: List[Dict] = field(default_factory=list)
     
-    # Ports
-    api_port: int = 8000
-    ui_port: int = 3000
-    openenv_port: int = 8080
+    # Ports - all dynamically assigned by orchestrator
+    # These are shared across all agents to ensure consistency
+    api_port: int = 0           # External API port (host machine)
+    ui_port: int = 0            # External frontend port (host machine)
+    openenv_port: int = 0       # OpenEnv compatibility port
+    backend_internal_port: int = 0   # Backend server port inside container
+    frontend_internal_port: int = 0  # Frontend dev server port inside container
+    db_port: int = 0                 # PostgreSQL port (dynamically assigned)
     
     # Generated files tracking
     files: Dict[str, GeneratedFile] = field(default_factory=dict)

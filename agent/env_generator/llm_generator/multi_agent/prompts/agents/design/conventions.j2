@@ -1,0 +1,107 @@
+{# Design Agent: Design Conventions #}
+
+{% macro design_conventions() %}
+## DESIGN CONVENTIONS (CRITICAL - Prevent Integration Bugs!)
+
+These conventions prevent common bugs during implementation. ALWAYS follow them:
+
+### 1. Column Naming - ALWAYS Use snake_case
+**Problem:** Backend uses `createdAt` but database has `created_at`.
+**Solution:** ALL column names in spec.database.json MUST be snake_case:
+```json
+// CORRECT
+"columns": [
+  {"name": "departure_city", ...},
+  {"name": "arrival_time", ...},
+  {"name": "price_cents", ...},
+  {"name": "created_at", ...}
+]
+
+// WRONG - will cause SQL errors
+"columns": [
+  {"name": "departureCity", ...},
+  {"name": "arrivalTime", ...}
+]
+```
+
+### 2. Price Fields - ALWAYS Use Integer Cents
+**Problem:** Floating point precision errors with decimal prices.
+**Solution:** ALL price fields MUST be INTEGER with `_cents` suffix:
+```json
+{"name": "price_cents", "type": "INTEGER", ...},
+{"name": "nightly_rate_cents", "type": "INTEGER", ...},
+{"name": "base_price_cents", "type": "INTEGER", ...}
+// $19.99 stored as 1999
+```
+
+### 3. API Response Format - ALWAYS Document Wrappers
+**Problem:** Frontend expects `data.flights` but backend returns `data.items`.
+**Solution:** spec.api.json MUST specify exact response wrappers:
+```json
+"responses": {
+  "200": {
+    "schema": {
+      "items": [/* array of results */],
+      "total": "integer"
+    }
+  }
+}
+```
+Broadcast this format to ALL agents after completing design.
+
+### 4. Component Export Style - Document in spec.ui.json
+**Problem:** Import mismatch between named and default exports.
+**Solution:** Specify export style in UI spec:
+```json
+"components": {
+  "Button": {
+    "file": "src/components/ui/Button.jsx",
+    "export_style": "named",
+    "props": ["children", "variant", "size", "onClick"]
+  }
+}
+```
+
+### 5. Required Dependencies - List in spec.ui.json
+**Problem:** Build fails because developer forgot to add package.
+**Solution:** List ALL required npm packages:
+```json
+"required_packages": {
+  "dependencies": {
+    "date-fns": "^3.6.0",
+    "axios": "^1.6.7",
+    "clsx": "^2.1.0",
+    "lucide-react": "^0.344.0",
+    "@radix-ui/react-tabs": "^1.0.4"
+  }
+}
+```
+{% endmacro %}
+
+
+{% macro column_naming_patterns() %}
+## Column Naming Conventions (CRITICAL - Backend relies on these!)
+
+**Use consistent, predictable column names:**
+- Time fields: `*_at` suffix (e.g., `created_at`, `depart_at`, `arrive_at`)
+- Price fields: `*_cents` suffix for money (e.g., `price_cents`, `nightly_base_price_cents`)
+- Foreign keys: `*_id` suffix (e.g., `user_id`, `location_id`)
+- Boolean flags: `is_*` prefix (e.g., `is_active`, `is_verified`)
+
+**Examples for travel app:**
+```
+flights table:
+  - depart_at (NOT depart_time)
+  - arrive_at (NOT arrive_time)
+  - price_cents (NOT price)
+
+hotels table:
+  - nightly_base_price_cents (NOT nightly_price, NOT price)
+  
+cars table:
+  - base_price_per_day_cents (NOT daily_price, NOT price)
+```
+
+**IMPORTANT:** Backend agents will use these EXACT column names in SQL queries!
+{% endmacro %}
+

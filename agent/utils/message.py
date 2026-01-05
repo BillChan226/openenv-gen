@@ -348,6 +348,16 @@ class MessagePriority(Enum):
     URGENT = 3
 
 
+class MessageStatus(Enum):
+    """Message delivery and processing status"""
+    PENDING = "pending"       # Sent, waiting for delivery
+    DELIVERED = "delivered"   # Delivered to inbox
+    READ = "read"             # Recipient has seen it (via check_inbox)
+    PROCESSING = "processing" # Recipient is working on it
+    RESPONDED = "responded"   # Recipient has replied
+    EXPIRED = "expired"       # TTL expired, no response
+
+
 class ControlAction(Enum):
     """Control action types"""
     START = "start"
@@ -369,6 +379,12 @@ class MessageHeader:
     correlation_id: Optional[str] = None  # Used to track related message chains
     reply_to: Optional[str] = None  # ID of message being replied to
     ttl: Optional[int] = None  # Message time-to-live (seconds)
+    # Status tracking
+    status: MessageStatus = MessageStatus.PENDING
+    delivered_at: Optional[datetime] = None
+    read_at: Optional[datetime] = None
+    responded_at: Optional[datetime] = None
+    requires_response: bool = False  # Whether sender expects a reply
 
 
 @dataclass
@@ -538,3 +554,132 @@ def create_error_message(
         error_message=error_message,
         recoverable=recoverable,
     )
+
+
+# =============================================================================
+# Message Tracker - Track sent messages and their status
+# =============================================================================
+
+class MessageTracker:
+    """
+    Tracks message delivery and response status.
+    
+    Used by agents to:
+    - Know if their messages were delivered/read/responded
+    - Get notified when messages are overdue for response
+    - Query pending messages awaiting response
+    """
+    
+    def __init__(self):
+        self._sent_messages: Dict[str, Dict] = {}  # message_id -> info
+        self._response_timeout_seconds: int = 120  # Default timeout for expected responses
+    
+    def track_sent(
+        self,
+        message_id: str,
+        to_agent: str,
+        content: str,
+        msg_type: str,
+        requires_response: bool = False,
+        timeout_seconds: int = None,
+    ):
+        """Track a sent message."""
+        self._sent_messages[message_id] = {
+            "to": to_agent,
+            "content": content[:100],  # Truncate for storage
+            "type": msg_type,
+            "sent_at": datetime.now(),
+            "status": MessageStatus.PENDING,
+            "delivered_at": None,
+            "read_at": None,
+            "responded_at": None,
+            "requires_response": requires_response,
+            "timeout_seconds": timeout_seconds or self._response_timeout_seconds,
+            "response_message_id": None,
+        }
+    
+    def mark_delivered(self, message_id: str):
+        """Mark message as delivered to recipient's inbox."""
+        if message_id in self._sent_messages:
+            self._sent_messages[message_id]["status"] = MessageStatus.DELIVERED
+            self._sent_messages[message_id]["delivered_at"] = datetime.now()
+    
+    def mark_read(self, message_id: str):
+        """Mark message as read by recipient."""
+        if message_id in self._sent_messages:
+            self._sent_messages[message_id]["status"] = MessageStatus.READ
+            self._sent_messages[message_id]["read_at"] = datetime.now()
+    
+    def mark_responded(self, message_id: str, response_message_id: str = None):
+        """Mark message as responded to."""
+        if message_id in self._sent_messages:
+            self._sent_messages[message_id]["status"] = MessageStatus.RESPONDED
+            self._sent_messages[message_id]["responded_at"] = datetime.now()
+            self._sent_messages[message_id]["response_message_id"] = response_message_id
+    
+    def get_status(self, message_id: str) -> Optional[Dict]:
+        """Get status of a sent message."""
+        if message_id not in self._sent_messages:
+            return None
+        
+        info = self._sent_messages[message_id]
+        now = datetime.now()
+        
+        # Check if overdue
+        is_overdue = False
+        if info["requires_response"] and info["status"] != MessageStatus.RESPONDED:
+            elapsed = (now - info["sent_at"]).total_seconds()
+            is_overdue = elapsed > info["timeout_seconds"]
+        
+        return {
+            "message_id": message_id,
+            "to": info["to"],
+            "status": info["status"].value,
+            "sent_at": info["sent_at"].isoformat(),
+            "delivered_at": info["delivered_at"].isoformat() if info["delivered_at"] else None,
+            "read_at": info["read_at"].isoformat() if info["read_at"] else None,
+            "responded_at": info["responded_at"].isoformat() if info["responded_at"] else None,
+            "requires_response": info["requires_response"],
+            "is_overdue": is_overdue,
+            "response_message_id": info["response_message_id"],
+        }
+    
+    def get_pending_responses(self) -> List[Dict]:
+        """Get all messages that expect a response but haven't received one."""
+        pending = []
+        now = datetime.now()
+        
+        for msg_id, info in self._sent_messages.items():
+            if info["requires_response"] and info["status"] != MessageStatus.RESPONDED:
+                elapsed = (now - info["sent_at"]).total_seconds()
+                pending.append({
+                    "message_id": msg_id,
+                    "to": info["to"],
+                    "type": info["type"],
+                    "content_preview": info["content"],
+                    "status": info["status"].value,
+                    "elapsed_seconds": int(elapsed),
+                    "is_overdue": elapsed > info["timeout_seconds"],
+                    "timeout_seconds": info["timeout_seconds"],
+                })
+        
+        # Sort by most overdue first
+        pending.sort(key=lambda x: -x["elapsed_seconds"])
+        return pending
+    
+    def get_overdue_messages(self) -> List[Dict]:
+        """Get messages that are overdue for response."""
+        return [m for m in self.get_pending_responses() if m["is_overdue"]]
+    
+    def cleanup_old(self, max_age_hours: int = 2):
+        """Remove tracking for old messages."""
+        cutoff = datetime.now()
+        to_remove = []
+        
+        for msg_id, info in self._sent_messages.items():
+            age_hours = (cutoff - info["sent_at"]).total_seconds() / 3600
+            if age_hours > max_age_hours:
+                to_remove.append(msg_id)
+        
+        for msg_id in to_remove:
+            del self._sent_messages[msg_id]

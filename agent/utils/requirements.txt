@@ -7,6 +7,7 @@ pyyaml>=6.0
 # LLM Providers (install as needed)
 openai>=1.0.0          # For OpenAI API
 anthropic>=0.18.0      # For Anthropic Claude API
+google-genai>=1.0.0        # For Google Gemini API (native SDK, supports Gemini 3)
 httpx>=0.24.0          # For local LLM (Ollama, vLLM)
 
 # Optional: Type checking

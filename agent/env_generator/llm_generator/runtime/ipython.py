@@ -41,7 +41,7 @@ class IPythonSession:
     - Import agent skills automatically
     """
     
-    MAX_OUTPUT_SIZE = 50000
+    MAX_OUTPUT_SIZE = 100000  # Increased for large outputs
     
     def __init__(self, work_dir: str = None):
         self.work_dir = Path(work_dir) if work_dir else Path.cwd()

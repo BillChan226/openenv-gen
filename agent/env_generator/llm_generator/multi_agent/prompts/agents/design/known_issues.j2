@@ -1,0 +1,150 @@
+{# Design Agent: Known Issues and Solutions #}
+
+{% macro known_issues() %}
+## KNOWN ISSUES & SOLUTIONS (CRITICAL - Apply These!)
+
+### 1. API Response Format MUST Be Specified in spec.api.json
+**Problem**: Backend and Frontend use different response wrapper formats, causing UI to show "empty".
+**Example**: 
+- Backend returns `{ cart: { items: [...] } }`
+- Frontend expects `{ data: { items: [...] } }`
+- Result: Cart UI shows "Your cart is empty" even though data exists!
+
+**Solution**: In spec.api.json, explicitly define response format for EVERY endpoint:
+```json
+{
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/cart",
+      "response_format": {
+        "success": true,
+        "data": {
+          "id": "uuid",
+          "items": "array",
+          "total_cents": "integer"
+        }
+      }
+    }
+  ],
+  "response_conventions": {
+    "list_response": "{ success: boolean, data: { items: [], pagination: {} } }",
+    "single_item": "{ success: boolean, data: { ...item } }",
+    "error_response": "{ success: false, error: { message: string, code: string } }"
+  }
+}
+```
+
+### 2. Naming Convention Consistency
+**Problem**: Backend uses snake_case, Frontend expects camelCase.
+**Solution**: Specify transformation rules in spec:
+```json
+{
+  "naming_conventions": {
+    "database": "snake_case",
+    "api_response": "camelCase",
+    "api_request": "camelCase",
+    "transform_rules": [
+      "full_name → fullName",
+      "created_at → createdAt",
+      "total_cents → totalCents"
+    ]
+  }
+}
+```
+
+### 3. Price Fields Must Be in Cents
+**Problem**: Floating point precision issues with dollar amounts.
+**Solution**: ALL price fields must be integers in cents:
+- Database columns: `price_cents`, `total_cents`, `tax_cents`
+- API responses: `{ "price_cents": 9999 }` (not `{ "price": 99.99 }`)
+- Frontend converts to display: `(cents / 100).toFixed(2)`
+
+### 4. Cart/Checkout API Response Format (CRITICAL!)
+**These endpoints are frequently buggy - be extra specific:**
+
+```json
+{
+  "cart_api": {
+    "GET /api/cart": {
+      "response": {
+        "success": true,
+        "data": {
+          "id": "cart-uuid",
+          "items": [
+            {
+              "id": "item-uuid",
+              "product_type": "flight|hotel|car|package",
+              "product_id": "product-uuid",
+              "quantity": 1,
+              "price_cents": 12500,
+              "details": {}
+            }
+          ],
+          "total_cents": 12500,
+          "item_count": 1
+        }
+      }
+    },
+    "POST /api/cart/items": {
+      "request": {
+        "product_type": "flight",
+        "product_id": "uuid",
+        "quantity": 1,
+        "details": {}
+      },
+      "response": {
+        "success": true,
+        "data": {
+          "cart": { "id", "items", "total_cents" },
+          "added_item": { "id", "product_type", "..." }
+        }
+      }
+    }
+  }
+}
+```
+
+### 5. Authentication Response Format
+**Problem**: Frontend can't extract user data after login.
+**Solution**: Specify exact auth response:
+```json
+{
+  "auth_api": {
+    "POST /api/auth/login": {
+      "response": {
+        "success": true,
+        "data": {
+          "user": {
+            "id": "uuid",
+            "email": "string",
+            "fullName": "string"
+          },
+          "token": "jwt-string"
+        }
+      }
+    }
+  }
+}
+```
+{% endmacro %}
+
+
+{% macro design_checklist() %}
+## Design Checklist (Before finish())
+
+**Before notifying code agents, verify:**
+
+1. **API Response Format** - Every endpoint has explicit `response_format`
+2. **Naming Conventions** - Transformation rules specified
+3. **Price Fields** - All use `_cents` suffix
+4. **Cart/Auth APIs** - Extra detailed specifications
+5. **Error Responses** - Consistent error format defined
+6. **Pagination** - Format specified for list endpoints
+
+**Common issues that cause frontend "empty" bugs:**
+- Missing response wrapper specification
+- Inconsistent data key names (`items` vs `data` vs `cart`)
+- Price format mismatch (cents vs dollars)
+{% endmacro %}
+
