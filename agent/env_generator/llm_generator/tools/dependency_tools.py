@@ -364,10 +364,208 @@ Example:
         }
 
 
+class InstallDependenciesTool(BaseTool):
+    """Install npm dependencies with proper handling of devDependencies."""
+    
+    NAME = "install_dependencies"
+    DESCRIPTION = """Install npm/pip dependencies in a project directory.
+
+Handles common issues:
+- Installs devDependencies by default (needed for vite, typescript, etc.)
+- Uses --legacy-peer-deps to avoid ERESOLVE errors
+- Shows clear progress and error messages
+
+IMPORTANT: Unlike execute_bash, this tool properly handles package installation
+and won't timeout on long installs.
+
+Example:
+  install_dependencies(path="app/frontend")
+  install_dependencies(path="app/backend", production=True)  # Skip devDeps
+  install_dependencies(path="app/frontend", packages=["axios", "date-fns"])  # Add specific
+"""
+    
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
+        super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
+    
+    @property
+    def tool_definition(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Path to project directory containing package.json"
+                    },
+                    "production": {
+                        "type": "boolean",
+                        "description": "Production mode - skip devDependencies (default: false)"
+                    },
+                    "packages": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Specific packages to install (adds to existing)"
+                    },
+                    "dev_packages": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Packages to install as devDependencies"
+                    },
+                },
+                "required": ["path"],
+            },
+        )
+    
+    async def execute(
+        self,
+        path: str,
+        production: bool = False,
+        packages: List[str] = None,
+        dev_packages: List[str] = None,
+    ) -> ToolResult:
+        import subprocess
+        
+        project_path = self.workspace.resolve(path)
+        
+        if not project_path.exists():
+            return ToolResult.fail(f"Path not found: {path}")
+        
+        # Check for package.json
+        package_json = project_path / "package.json"
+        if not package_json.exists():
+            return ToolResult.fail(f"No package.json found in {path}")
+        
+        results = []
+        errors = []
+        
+        try:
+            # Step 1: Main npm install
+            cmd = ["npm", "install"]
+            if production:
+                cmd.append("--omit=dev")
+            else:
+                cmd.append("--include=dev")  # Explicitly include devDeps
+            cmd.append("--legacy-peer-deps")  # Avoid ERESOLVE errors
+            
+            result = subprocess.run(
+                cmd,
+                cwd=str(project_path),
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minute timeout
+                encoding='utf-8',
+                errors='replace',
+            )
+            
+            if result.returncode != 0:
+                # Try without --legacy-peer-deps
+                cmd_retry = ["npm", "install"]
+                if production:
+                    cmd_retry.append("--omit=dev")
+                else:
+                    cmd_retry.append("--include=dev")
+                
+                result = subprocess.run(
+                    cmd_retry,
+                    cwd=str(project_path),
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                    encoding='utf-8',
+                    errors='replace',
+                )
+                
+                if result.returncode != 0:
+                    errors.append(f"npm install failed: {result.stderr[:500]}")
+                else:
+                    results.append("npm install completed (without legacy-peer-deps)")
+            else:
+                results.append("npm install completed")
+            
+            # Step 2: Install specific packages if requested
+            if packages:
+                pkg_cmd = ["npm", "install", "--legacy-peer-deps"] + packages
+                pkg_result = subprocess.run(
+                    pkg_cmd,
+                    cwd=str(project_path),
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                    encoding='utf-8',
+                    errors='replace',
+                )
+                
+                if pkg_result.returncode != 0:
+                    errors.append(f"Failed to install {packages}: {pkg_result.stderr[:200]}")
+                else:
+                    results.append(f"Installed packages: {', '.join(packages)}")
+            
+            # Step 3: Install dev packages if requested
+            if dev_packages:
+                dev_cmd = ["npm", "install", "--save-dev", "--legacy-peer-deps"] + dev_packages
+                dev_result = subprocess.run(
+                    dev_cmd,
+                    cwd=str(project_path),
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                    encoding='utf-8',
+                    errors='replace',
+                )
+                
+                if dev_result.returncode != 0:
+                    errors.append(f"Failed to install devDeps {dev_packages}: {dev_result.stderr[:200]}")
+                else:
+                    results.append(f"Installed devDependencies: {', '.join(dev_packages)}")
+            
+            # Step 4: Verify key executables exist
+            node_modules_bin = project_path / "node_modules" / ".bin"
+            key_bins = []
+            if node_modules_bin.exists():
+                for bin_name in ["vite", "tsc", "eslint", "jest"]:
+                    if (node_modules_bin / bin_name).exists():
+                        key_bins.append(bin_name)
+            
+            # Summary
+            if errors:
+                return ToolResult.ok(data={
+                    "success": False,
+                    "path": path,
+                    "results": results,
+                    "errors": errors,
+                    "executables_found": key_bins,
+                    "message": f"Installation completed with {len(errors)} error(s)",
+                })
+            else:
+                return ToolResult.ok(data={
+                    "success": True,
+                    "path": path,
+                    "results": results,
+                    "executables_found": key_bins,
+                    "message": "All dependencies installed successfully",
+                })
+                
+        except subprocess.TimeoutExpired:
+            return ToolResult.fail(f"Installation timed out after 5 minutes. Results so far: {results}")
+        except FileNotFoundError:
+            return ToolResult.fail("npm not found. Ensure Node.js is installed.")
+        except Exception as e:
+            return ToolResult.fail(f"Installation error: {e}")
+
+
 def create_dependency_tools(output_dir: str = None, workspace: Workspace = None) -> List[BaseTool]:
     """Create all dependency analysis tools."""
     return [
         CheckImportsTool(output_dir=output_dir, workspace=workspace),
         MissingDependenciesTool(output_dir=output_dir, workspace=workspace),
+        InstallDependenciesTool(output_dir=output_dir, workspace=workspace),
     ]
 

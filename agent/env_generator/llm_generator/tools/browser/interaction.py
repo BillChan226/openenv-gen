@@ -8,7 +8,7 @@ from ._manager import BrowserManager, PLAYWRIGHT_AVAILABLE
 
 
 class BrowserClickTool(BaseTool):
-    """Click an element on the page"""
+    """Click an element on the page with auto-retry and smart waiting"""
     
     def __init__(self, browser_manager: BrowserManager, **kwargs):
         super().__init__(name="browser_click", category=ToolCategory.RUNTIME, **kwargs)
@@ -21,7 +21,22 @@ class BrowserClickTool(BaseTool):
             "type": "function",
             "function": {
                 "name": "browser_click",
-                "description": "Click an element on the page using stable locators (preferred) or fallback text/selector.",
+                "description": """Click an element on the page with auto-retry and smart waiting.
+
+PREFERRED locators (stable, recommended):
+- testid: data-testid attribute (most reliable)
+- aria_label: aria-label attribute
+- role + name: ARIA role with accessible name
+
+FALLBACK locators:
+- selector: CSS selector
+- text: element containing text
+
+Features:
+- Auto-waits for element to be visible
+- Retries up to 3 times on timeout
+- 500ms delay between retries
+""",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -48,6 +63,18 @@ class BrowserClickTool(BaseTool):
                         "name": {
                             "type": "string",
                             "description": "Accessible name used with role-based queries (works with role)"
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "description": "Timeout in ms per attempt (default: 5000)"
+                        },
+                        "retry": {
+                            "type": "integer",
+                            "description": "Number of retry attempts (default: 3)"
+                        },
+                        "wait_for_visible": {
+                            "type": "boolean",
+                            "description": "Wait for element to be visible before clicking (default: true)"
                         }
                     },
                     "required": []
@@ -63,39 +90,96 @@ class BrowserClickTool(BaseTool):
         aria_label: Optional[str] = None,
         role: Optional[str] = None,
         name: Optional[str] = None,
+        timeout: int = 5000,
+        retry: int = 3,
+        wait_for_visible: bool = True,
         **kwargs
     ) -> ToolResult:
+        import asyncio
+        
         if not self.browser.state.page:
             return ToolResult.fail("No page open. Use browser_navigate first.")
         
-        try:
-            # Priority: stable locators first
-            if testid:
-                await self.browser.state.page.click(f'[data-testid="{testid}"]', timeout=5000)
-                return ToolResult.ok(f"Clicked element by testid: {testid}")
-            if aria_label:
-                await self.browser.state.page.click(f'[aria-label="{aria_label}"]', timeout=5000)
-                return ToolResult.ok(f"Clicked element by aria-label: {aria_label}")
-            if role:
-                role_selector = f'role={role}'
-                if name:
-                    role_selector += f'[name="{name}"]'
-                await self.browser.state.page.click(role_selector, timeout=5000)
-                return ToolResult.ok(
-                    f"Clicked element by role: {role}" + (f" name={name}" if name else "")
-                )
-            # Fallbacks
-            if selector:
-                await self.browser.state.page.click(selector, timeout=5000)
-                return ToolResult.ok(f"Clicked element: {selector}")
-            elif text:
-                await self.browser.state.page.click(f"text={text}", timeout=5000)
-                return ToolResult.ok(f"Clicked element with text: {text}")
-            else:
-                return ToolResult.fail("Provide one of: testid, aria_label, role, selector, or text")
+        # Build the selector to use
+        final_selector = None
+        selector_type = None
+        
+        if testid:
+            final_selector = f'[data-testid="{testid}"]'
+            selector_type = f"testid={testid}"
+        elif aria_label:
+            final_selector = f'[aria-label="{aria_label}"]'
+            selector_type = f"aria-label={aria_label}"
+        elif role:
+            final_selector = f'role={role}'
+            if name:
+                final_selector += f'[name="{name}"]'
+            selector_type = f"role={role}" + (f" name={name}" if name else "")
+        elif selector:
+            final_selector = selector
+            selector_type = f"selector={selector}"
+        elif text:
+            final_selector = f"text={text}"
+            selector_type = f"text={text}"
+        else:
+            return ToolResult.fail("Provide one of: testid, aria_label, role, selector, or text")
+        
+        last_error = None
+        
+        for attempt in range(retry):
+            try:
+                page = self.browser.state.page
                 
-        except Exception as e:
-            return ToolResult.fail(f"Click failed: {str(e)}")
+                # First, wait for element to be visible if requested
+                if wait_for_visible and attempt == 0:
+                    try:
+                        await page.wait_for_selector(
+                            final_selector, 
+                            state="visible", 
+                            timeout=timeout
+                        )
+                    except Exception:
+                        pass  # Continue to click attempt even if wait fails
+                
+                # Attempt click
+                await page.click(final_selector, timeout=timeout)
+                
+                # Success
+                result_msg = f"Clicked element ({selector_type})"
+                if attempt > 0:
+                    result_msg += f" after {attempt + 1} attempts"
+                return ToolResult.ok(result_msg)
+                
+            except Exception as e:
+                last_error = str(e)
+                
+                if attempt < retry - 1:
+                    # Wait before retry
+                    await asyncio.sleep(0.5)
+                    
+                    # Try scrolling element into view on retry
+                    try:
+                        await self.browser.state.page.evaluate(
+                            f"document.querySelector('{final_selector}')?.scrollIntoView({{behavior: 'smooth', block: 'center'}})"
+                        )
+                        await asyncio.sleep(0.3)
+                    except:
+                        pass
+        
+        # All retries failed - provide helpful error message
+        error_hints = []
+        if "Timeout" in last_error:
+            error_hints.append("Element may not exist or is not visible")
+            error_hints.append("Try using browser_find() first to check if element exists")
+            error_hints.append("Consider using a more specific selector or data-testid")
+        if "strict mode violation" in last_error.lower():
+            error_hints.append("Multiple elements match - use a more specific selector")
+        
+        error_msg = f"Click failed after {retry} attempts: {last_error}"
+        if error_hints:
+            error_msg += "\n\nHints:\n- " + "\n- ".join(error_hints)
+        
+        return ToolResult.fail(error_msg)
 
 
 class BrowserFillTool(BaseTool):

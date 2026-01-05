@@ -229,6 +229,73 @@ class Orchestrator:
             for task in self._agent_tasks.values():
                 task.cancel()
     
+    async def _preflight_check(self) -> Dict[str, Any]:
+        """Pre-flight environment check before generation."""
+        import subprocess
+        import shutil
+        
+        results = {
+            "docker": {"available": False, "message": ""},
+            "node": {"available": False, "message": ""},
+            "ports": {"available": True, "blocked": []},
+        }
+        
+        # Check Docker
+        try:
+            docker_result = subprocess.run(
+                ["docker", "info"],
+                capture_output=True,
+                timeout=10,
+            )
+            if docker_result.returncode == 0:
+                results["docker"]["available"] = True
+                results["docker"]["message"] = "Docker daemon running"
+            else:
+                results["docker"]["message"] = "Docker daemon not running"
+        except FileNotFoundError:
+            results["docker"]["message"] = "Docker not installed"
+        except subprocess.TimeoutExpired:
+            results["docker"]["message"] = "Docker check timed out"
+        except Exception as e:
+            results["docker"]["message"] = f"Docker check failed: {e}"
+        
+        # Check Node.js
+        try:
+            node_result = subprocess.run(
+                ["node", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if node_result.returncode == 0:
+                results["node"]["available"] = True
+                results["node"]["message"] = f"Node.js {node_result.stdout.strip()}"
+        except FileNotFoundError:
+            results["node"]["message"] = "Node.js not installed"
+        except Exception as e:
+            results["node"]["message"] = f"Node check failed: {e}"
+        
+        # Check common ports
+        common_ports = [
+            self.context.api_port, 
+            self.context.ui_port, 
+            self.context.db_port,
+            3000, 5432, 8080, 8083
+        ]
+        
+        for port in set(common_ports):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.settimeout(1)
+                    s.bind(('localhost', port))
+            except OSError:
+                results["ports"]["blocked"].append(port)
+        
+        if results["ports"]["blocked"]:
+            results["ports"]["available"] = False
+        
+        return results
+    
     async def run(
         self,
         goal: str,
@@ -238,6 +305,31 @@ class Orchestrator:
         """Run environment generation."""
         start_time = datetime.now()
         phases_completed = []
+        
+        # Pre-flight environment check
+        self._logger.info("Running pre-flight environment check...")
+        preflight = await self._preflight_check()
+        
+        # Log results
+        for check, result in preflight.items():
+            if isinstance(result, dict):
+                available = result.get("available", False)
+                msg = result.get("message", "")
+                status = "OK" if available else "WARN"
+                self._logger.info(f"  [{status}] {check}: {msg}")
+                if check == "ports" and result.get("blocked"):
+                    self._logger.warning(f"  Blocked ports: {result['blocked']}")
+        
+        # Store preflight results in context for agents to access
+        self.context.preflight = preflight
+        
+        # Warn if Docker is not available
+        if not preflight["docker"]["available"]:
+            self._logger.warning(
+                "Docker is not available. Docker-based testing will fail.\n"
+                "  → Start Docker Desktop or docker daemon before testing.\n"
+                "  → Agents will use docker_compose_reset() to clean up stale state."
+            )
         
         await self.message_bus.start()
         self._create_agents()

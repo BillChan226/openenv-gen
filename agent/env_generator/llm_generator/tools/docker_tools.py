@@ -983,6 +983,388 @@ Example:
             return ToolResult.fail(f"Inspect error: {e}")
 
 
+class DockerComposeResetTool(BaseTool):
+    """Reset Docker Compose state to fix 'No such container' errors."""
+    
+    NAME = "docker_compose_reset"
+    DESCRIPTION = """Fully reset Docker Compose state to fix stale container issues.
+
+This tool solves the common "No such container: <id>" error by:
+1. Stopping all containers (with orphan removal)
+2. Removing all containers and networks for the project
+3. Optionally removing volumes
+4. Starting fresh with a unique project name
+
+Use this when you see errors like:
+- "Error response from daemon: No such container: 909e9ebe4cc0"
+- Containers stuck in recreate loop
+- Stale container references
+
+Example:
+  docker_compose_reset()  # Full cleanup and restart
+  docker_compose_reset(keep_volumes=True)  # Keep database data
+  docker_compose_reset(start=False)  # Just cleanup, don't start
+"""
+    
+    def __init__(self, output_dir: str = None, workspace: Workspace = None):
+        super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
+        if workspace:
+            self.workspace = workspace
+        elif output_dir:
+            self.workspace = Workspace(output_dir)
+        else:
+            self.workspace = Workspace(Path.cwd())
+    
+    @property
+    def tool_definition(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "keep_volumes": {
+                        "type": "boolean",
+                        "description": "Keep data volumes (default: false, removes everything)"
+                    },
+                    "start": {
+                        "type": "boolean",
+                        "description": "Start containers after reset (default: true)"
+                    },
+                    "build": {
+                        "type": "boolean",
+                        "description": "Rebuild images with --no-cache (default: false)"
+                    },
+                },
+                "required": [],
+            },
+        )
+    
+    async def execute(
+        self,
+        keep_volumes: bool = False,
+        start: bool = True,
+        build: bool = False,
+    ) -> ToolResult:
+        compose_file = _find_compose_file_global(self.workspace.root)
+        if not compose_file:
+            return ToolResult.fail("docker-compose.yml not found")
+        
+        import uuid
+        import time
+        
+        steps_completed = []
+        errors = []
+        
+        # Generate unique project name to avoid stale references
+        project_name = f"gen_{uuid.uuid4().hex[:8]}"
+        compose_dir = compose_file.parent
+        
+        try:
+            # Step 1: Stop and remove all containers with orphan cleanup
+            down_args = ["down", "--remove-orphans", "-t", "5"]
+            if not keep_volumes:
+                down_args.append("-v")
+            
+            result = _run_compose(compose_file, down_args, cwd=self.workspace.root, timeout=120)
+            steps_completed.append(f"docker compose down (exit={result.returncode})")
+            
+            # Step 2: Prune any dangling containers for this directory
+            prune_cmd = ["docker", "container", "prune", "-f"]
+            subprocess.run(prune_cmd, capture_output=True, timeout=30)
+            steps_completed.append("docker container prune")
+            
+            # Step 3: Small delay to ensure Docker releases resources
+            await asyncio.sleep(2)
+            steps_completed.append("wait 2s")
+            
+            if start:
+                # Step 4: Build if requested
+                if build:
+                    build_result = _run_compose(
+                        compose_file,
+                        ["-p", project_name, "build", "--no-cache"],
+                        cwd=self.workspace.root,
+                        timeout=600,
+                    )
+                    if build_result.returncode != 0:
+                        errors.append(f"Build failed: {build_result.stderr[:500]}")
+                    else:
+                        steps_completed.append(f"docker compose build --no-cache")
+                
+                # Step 5: Start with fresh project name
+                up_result = _run_compose(
+                    compose_file,
+                    ["-p", project_name, "up", "-d", "--force-recreate"],
+                    cwd=self.workspace.root,
+                    timeout=180,
+                )
+                
+                if up_result.returncode != 0:
+                    errors.append(f"Start failed: {up_result.stderr[:500]}")
+                else:
+                    steps_completed.append(f"docker compose -p {project_name} up -d")
+                
+                # Step 6: Wait for containers to be running
+                await asyncio.sleep(3)
+                
+                # Check status
+                status_result = _run_compose(
+                    compose_file,
+                    ["-p", project_name, "ps"],
+                    cwd=self.workspace.root,
+                    timeout=30,
+                )
+                
+                running_count = status_result.stdout.count("Up") if status_result.stdout else 0
+                steps_completed.append(f"verify: {running_count} containers running")
+            
+            return ToolResult.ok(data={
+                "success": len(errors) == 0,
+                "project_name": project_name,
+                "steps": steps_completed,
+                "errors": errors if errors else None,
+                "message": (
+                    f"Docker Compose reset complete. Project: {project_name}"
+                    if not errors else
+                    f"Reset completed with {len(errors)} error(s)"
+                ),
+                "hint": "Use this project name for subsequent docker commands if needed",
+            })
+            
+        except subprocess.TimeoutExpired:
+            return ToolResult.fail(f"Reset timed out. Completed steps: {steps_completed}")
+        except Exception as e:
+            return ToolResult.fail(f"Reset error: {e}. Completed steps: {steps_completed}")
+
+
+class WaitForServiceTool(BaseTool):
+    """Wait for a service to become healthy."""
+    
+    NAME = "wait_for_service"
+    DESCRIPTION = """Wait until a service URL responds with HTTP 200.
+
+Use this AFTER docker_up to ensure services are ready before testing.
+Prevents test failures due to services still starting up.
+
+Example:
+  wait_for_service(url="http://localhost:8083/health")
+  wait_for_service(url="http://localhost:3001", timeout=120)
+  wait_for_service(url="http://localhost:8083/api/health", expected_status=200)
+"""
+    
+    def __init__(self, **kwargs):
+        super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
+    
+    @property
+    def tool_definition(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "URL to check (e.g., http://localhost:8083/health)"
+                    },
+                    "timeout": {
+                        "type": "integer",
+                        "description": "Max seconds to wait (default: 60)"
+                    },
+                    "interval": {
+                        "type": "integer",
+                        "description": "Seconds between checks (default: 2)"
+                    },
+                    "expected_status": {
+                        "type": "integer",
+                        "description": "Expected HTTP status code (default: 200, also accepts 201-299)"
+                    },
+                },
+                "required": ["url"],
+            },
+        )
+    
+    async def execute(
+        self,
+        url: str,
+        timeout: int = 60,
+        interval: int = 2,
+        expected_status: int = 200,
+    ) -> ToolResult:
+        import time
+        
+        try:
+            import httpx
+        except ImportError:
+            # Fallback to urllib
+            import urllib.request
+            import urllib.error
+            
+            start = time.time()
+            attempts = 0
+            last_error = None
+            
+            while time.time() - start < timeout:
+                attempts += 1
+                try:
+                    req = urllib.request.Request(url, method='GET')
+                    with urllib.request.urlopen(req, timeout=5) as response:
+                        status = response.getcode()
+                        if status == expected_status or (expected_status == 200 and 200 <= status < 300):
+                            elapsed = time.time() - start
+                            return ToolResult.ok(data={
+                                "ready": True,
+                                "url": url,
+                                "status": status,
+                                "elapsed_seconds": round(elapsed, 1),
+                                "attempts": attempts,
+                            })
+                except urllib.error.HTTPError as e:
+                    last_error = f"HTTP {e.code}"
+                except urllib.error.URLError as e:
+                    last_error = str(e.reason)
+                except Exception as e:
+                    last_error = str(e)
+                
+                await asyncio.sleep(interval)
+            
+            return ToolResult.ok(data={
+                "ready": False,
+                "url": url,
+                "timeout": timeout,
+                "attempts": attempts,
+                "last_error": last_error,
+                "message": f"Service not ready after {timeout}s ({attempts} attempts). Last error: {last_error}",
+            })
+        
+        # Use httpx if available (better async support)
+        start = time.time()
+        attempts = 0
+        last_error = None
+        
+        async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
+            while time.time() - start < timeout:
+                attempts += 1
+                try:
+                    response = await client.get(url)
+                    if response.status_code == expected_status or (expected_status == 200 and 200 <= response.status_code < 300):
+                        elapsed = time.time() - start
+                        return ToolResult.ok(data={
+                            "ready": True,
+                            "url": url,
+                            "status": response.status_code,
+                            "elapsed_seconds": round(elapsed, 1),
+                            "attempts": attempts,
+                        })
+                    else:
+                        last_error = f"HTTP {response.status_code}"
+                except httpx.ConnectError:
+                    last_error = "Connection refused"
+                except httpx.TimeoutException:
+                    last_error = "Timeout"
+                except Exception as e:
+                    last_error = str(e)
+                
+                await asyncio.sleep(interval)
+        
+        return ToolResult.ok(data={
+            "ready": False,
+            "url": url,
+            "timeout": timeout,
+            "attempts": attempts,
+            "last_error": last_error,
+            "message": f"Service not ready after {timeout}s ({attempts} attempts). Last error: {last_error}",
+        })
+
+
+class CleanupPortsTool(BaseTool):
+    """Kill processes using specific ports."""
+    
+    NAME = "cleanup_ports"
+    DESCRIPTION = """Kill processes using specific ports to free them for Docker.
+
+Use when you see errors like:
+- "port is already allocated"
+- "address already in use"
+
+Example:
+  cleanup_ports()  # Clean common ports (3000, 3001, 5432, 8080, 8083)
+  cleanup_ports(ports=[3000, 5432])  # Clean specific ports
+"""
+    
+    def __init__(self, **kwargs):
+        super().__init__(name=self.NAME, category=ToolCategory.RUNTIME)
+    
+    @property
+    def tool_definition(self):
+        return create_tool_param(
+            name=self.NAME,
+            description=self.DESCRIPTION,
+            parameters={
+                "type": "object",
+                "properties": {
+                    "ports": {
+                        "type": "array",
+                        "items": {"type": "integer"},
+                        "description": "Ports to clean (default: [3000, 3001, 5432, 8080, 8083])"
+                    },
+                },
+                "required": [],
+            },
+        )
+    
+    async def execute(self, ports: List[int] = None) -> ToolResult:
+        if ports is None:
+            ports = [3000, 3001, 5432, 8080, 8083, 8000, 80]
+        
+        import platform
+        freed = []
+        errors = []
+        
+        for port in ports:
+            try:
+                if platform.system() == "Darwin" or platform.system() == "Linux":
+                    # Find process using port
+                    result = subprocess.run(
+                        ["lsof", "-ti", f":{port}"],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    
+                    if result.stdout.strip():
+                        pids = result.stdout.strip().split('\n')
+                        for pid in pids:
+                            if pid:
+                                subprocess.run(["kill", "-9", pid], timeout=5)
+                                freed.append({"port": port, "pid": pid})
+                else:
+                    # Windows
+                    result = subprocess.run(
+                        ["netstat", "-ano"],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    # Parse and kill (simplified)
+                    for line in result.stdout.split('\n'):
+                        if f":{port}" in line and "LISTENING" in line:
+                            parts = line.split()
+                            if parts:
+                                pid = parts[-1]
+                                subprocess.run(["taskkill", "/F", "/PID", pid], timeout=5)
+                                freed.append({"port": port, "pid": pid})
+            except Exception as e:
+                errors.append({"port": port, "error": str(e)})
+        
+        return ToolResult.ok(data={
+            "freed": freed,
+            "errors": errors if errors else None,
+            "message": f"Freed {len(freed)} port(s)" if freed else "No ports were in use",
+        })
+
+
 class EnvironmentStatusTool(BaseTool):
     """Check and manage environment status cache."""
     
@@ -1069,6 +1451,9 @@ def create_docker_tools(output_dir: str = None, workspace: Workspace = None) -> 
         DockerRestartTool(output_dir=output_dir, workspace=workspace),
         DockerValidateTool(output_dir=output_dir, workspace=workspace),
         DockerInspectImageTool(output_dir=output_dir, workspace=workspace),
+        DockerComposeResetTool(output_dir=output_dir, workspace=workspace),
+        WaitForServiceTool(),
+        CleanupPortsTool(),
         EnvironmentStatusTool(),
     ]
 
