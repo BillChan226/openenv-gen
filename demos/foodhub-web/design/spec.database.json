@@ -1,0 +1,383 @@
+{
+  "$schema": "https://example.com/spec.database.schema.json",
+  "database": {
+    "engine": "postgresql",
+    "version": "14+",
+    "naming": {
+      "tables": "snake_case_plural",
+      "columns": "snake_case",
+      "money": "integer_cents_with__cents_suffix",
+      "timestamps": "*_at"
+    }
+  },
+  "extensions": ["pgcrypto"],
+  "enums": {
+    "order_status": ["CONFIRMED", "PREPARING", "ON_THE_WAY", "DELIVERED", "CANCELLED"],
+    "fulfillment_type": ["DELIVERY", "PICKUP"],
+    "promo_discount_type": ["PERCENT", "FIXED"],
+    "modifier_type": ["SINGLE", "MULTI"],
+    "payment_brand": ["VISA", "MASTERCARD", "AMEX", "DISCOVER", "OTHER"]
+  },
+  "tables": [
+    {
+      "name": "users",
+      "comment": "End users (customers).",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "email", "type": "TEXT", "nullable": false, "unique": true},
+        {"name": "password_hash", "type": "TEXT", "nullable": false},
+        {"name": "full_name", "type": "TEXT", "nullable": false},
+        {"name": "phone", "type": "TEXT", "nullable": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()"}
+      ],
+      "indexes": [
+        {"name": "idx_users_created_at", "columns": ["created_at"]}
+      ]
+    },
+    {
+      "name": "addresses",
+      "comment": "Saved delivery addresses.",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "user_id", "type": "UUID", "nullable": false, "references": {"table": "users", "column": "id", "on_delete": "CASCADE"}},
+        {"name": "label", "type": "TEXT", "nullable": false},
+        {"name": "line1", "type": "TEXT", "nullable": false},
+        {"name": "line2", "type": "TEXT", "nullable": true},
+        {"name": "city", "type": "TEXT", "nullable": false},
+        {"name": "state", "type": "TEXT", "nullable": false},
+        {"name": "postal_code", "type": "TEXT", "nullable": false},
+        {"name": "lat", "type": "NUMERIC(9,6)", "nullable": true},
+        {"name": "lng", "type": "NUMERIC(9,6)", "nullable": true},
+        {"name": "is_default", "type": "BOOLEAN", "nullable": false, "default": false},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()"}
+      ],
+      "indexes": [
+        {"name": "idx_addresses_user_id", "columns": ["user_id"]}
+      ]
+    },
+    {
+      "name": "payment_methods",
+      "comment": "Saved payment methods (tokenized in real life; simplified here).",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "user_id", "type": "UUID", "nullable": false, "references": {"table": "users", "column": "id", "on_delete": "CASCADE"}},
+        {"name": "brand", "type": "payment_brand", "nullable": false},
+        {"name": "last4", "type": "TEXT", "nullable": false},
+        {"name": "exp_month", "type": "INTEGER", "nullable": false},
+        {"name": "exp_year", "type": "INTEGER", "nullable": false},
+        {"name": "billing_zip", "type": "TEXT", "nullable": true},
+        {"name": "is_default", "type": "BOOLEAN", "nullable": false, "default": false},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()"}
+      ],
+      "indexes": [
+        {"name": "idx_payment_methods_user_id", "columns": ["user_id"]}
+      ]
+    },
+    {
+      "name": "restaurant_categories",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "name", "type": "TEXT", "nullable": false, "unique": true},
+        {"name": "emoji", "type": "TEXT", "nullable": false},
+        {"name": "sort_order", "type": "INTEGER", "nullable": false, "default": 0}
+      ]
+    },
+    {
+      "name": "restaurants",
+      "comment": "Restaurants/stores shown on home and store pages.",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "category_id", "type": "UUID", "nullable": false, "references": {"table": "restaurant_categories", "column": "id", "on_delete": "RESTRICT"}},
+        {"name": "name", "type": "TEXT", "nullable": false},
+        {"name": "description", "type": "TEXT", "nullable": true},
+        {"name": "price_range", "type": "INTEGER", "nullable": false, "check": "price_range between 1 and 4"},
+        {"name": "rating", "type": "NUMERIC(2,1)", "nullable": false, "default": 0},
+        {"name": "reviews_count", "type": "INTEGER", "nullable": false, "default": 0},
+        {"name": "distance_miles", "type": "NUMERIC(5,2)", "nullable": false, "default": 0},
+        {"name": "delivery_time_min", "type": "INTEGER", "nullable": false},
+        {"name": "delivery_fee_cents", "type": "INTEGER", "nullable": false, "default": 0},
+        {"name": "minimum_order_cents", "type": "INTEGER", "nullable": false, "default": 0},
+        {"name": "cover_image_url", "type": "TEXT", "nullable": true},
+        {"name": "hero_image_url", "type": "TEXT", "nullable": true},
+        {"name": "is_active", "type": "BOOLEAN", "nullable": false, "default": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()"}
+      ],
+      "indexes": [
+        {"name": "idx_restaurants_category_id", "columns": ["category_id"]},
+        {"name": "idx_restaurants_rating", "columns": ["rating"]}
+      ]
+    },
+    {
+      "name": "menu_categories",
+      "comment": "Menu sections within a restaurant (e.g., Popular, Pizza, Drinks).",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "restaurant_id", "type": "UUID", "nullable": false, "references": {"table": "restaurants", "column": "id", "on_delete": "CASCADE"}},
+        {"name": "name", "type": "TEXT", "nullable": false},
+        {"name": "sort_order", "type": "INTEGER", "nullable": false, "default": 0}
+      ],
+      "indexes": [
+        {"name": "idx_menu_categories_restaurant_id", "columns": ["restaurant_id"]}
+      ]
+    },
+    {
+      "name": "menu_items",
+      "comment": "Items/dishes sold by a restaurant.",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "restaurant_id", "type": "UUID", "nullable": false, "references": {"table": "restaurants", "column": "id", "on_delete": "CASCADE"}},
+        {"name": "menu_category_id", "type": "UUID", "nullable": true, "references": {"table": "menu_categories", "column": "id", "on_delete": "SET NULL"}},
+        {"name": "name", "type": "TEXT", "nullable": false},
+        {"name": "description", "type": "TEXT", "nullable": true},
+        {"name": "price_cents", "type": "INTEGER", "nullable": false},
+        {"name": "image_url", "type": "TEXT", "nullable": true},
+        {"name": "unit_info", "type": "TEXT", "nullable": true},
+        {"name": "is_available", "type": "BOOLEAN", "nullable": false, "default": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()"}
+      ],
+      "indexes": [
+        {"name": "idx_menu_items_restaurant_id", "columns": ["restaurant_id"]},
+        {"name": "idx_menu_items_menu_category_id", "columns": ["menu_category_id"]},
+        {"name": "idx_menu_items_name_trgm", "columns": ["name"], "using": "btree"}
+      ]
+    },
+    {
+      "name": "modifier_groups",
+      "comment": "Customization groups for menu items (size, toppings, spice level).",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "menu_item_id", "type": "UUID", "nullable": false, "references": {"table": "menu_items", "column": "id", "on_delete": "CASCADE"}},
+        {"name": "name", "type": "TEXT", "nullable": false},
+        {"name": "modifier_type", "type": "modifier_type", "nullable": false},
+        {"name": "is_required", "type": "BOOLEAN", "nullable": false, "default": false},
+        {"name": "min_selected", "type": "INTEGER", "nullable": false, "default": 0},
+        {"name": "max_selected", "type": "INTEGER", "nullable": false, "default": 1},
+        {"name": "sort_order", "type": "INTEGER", "nullable": false, "default": 0}
+      ],
+      "indexes": [
+        {"name": "idx_modifier_groups_menu_item_id", "columns": ["menu_item_id"]}
+      ]
+    },
+    {
+      "name": "modifier_options",
+      "comment": "Options inside a modifier group.",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "modifier_group_id", "type": "UUID", "nullable": false, "references": {"table": "modifier_groups", "column": "id", "on_delete": "CASCADE"}},
+        {"name": "name", "type": "TEXT", "nullable": false},
+        {"name": "price_delta_cents", "type": "INTEGER", "nullable": false, "default": 0},
+        {"name": "sort_order", "type": "INTEGER", "nullable": false, "default": 0}
+      ],
+      "indexes": [
+        {"name": "idx_modifier_options_group_id", "columns": ["modifier_group_id"]}
+      ]
+    },
+    {
+      "name": "favorites",
+      "comment": "User favorite restaurants.",
+      "columns": [
+        {"name": "user_id", "type": "UUID", "pk": true, "references": {"table": "users", "column": "id", "on_delete": "CASCADE"}},
+        {"name": "restaurant_id", "type": "UUID", "pk": true, "references": {"table": "restaurants", "column": "id", "on_delete": "CASCADE"}},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()"}
+      ],
+      "indexes": [
+        {"name": "idx_favorites_user_id", "columns": ["user_id"]},
+        {"name": "idx_favorites_restaurant_id", "columns": ["restaurant_id"]}
+      ]
+    },
+    {
+      "name": "promo_codes",
+      "comment": "Promo codes that can be applied to cart/checkout.",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "code", "type": "TEXT", "nullable": false, "unique": true},
+        {"name": "description", "type": "TEXT", "nullable": true},
+        {"name": "discount_type", "type": "promo_discount_type", "nullable": false},
+        {"name": "discount_value", "type": "INTEGER", "nullable": false, "comment": "If PERCENT: 0-100. If FIXED: cents."},
+        {"name": "min_subtotal_cents", "type": "INTEGER", "nullable": false, "default": 0},
+        {"name": "max_discount_cents", "type": "INTEGER", "nullable": true},
+        {"name": "starts_at", "type": "TIMESTAMPTZ", "nullable": true},
+        {"name": "ends_at", "type": "TIMESTAMPTZ", "nullable": true},
+        {"name": "usage_limit", "type": "INTEGER", "nullable": true},
+        {"name": "used_count", "type": "INTEGER", "nullable": false, "default": 0},
+        {"name": "is_active", "type": "BOOLEAN", "nullable": false, "default": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()"}
+      ],
+      "indexes": [
+        {"name": "idx_promo_codes_code", "columns": ["code"]}
+      ]
+    },
+    {
+      "name": "carts",
+      "comment": "One active cart per user. Single-restaurant enforced via restaurant_id.",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "user_id", "type": "UUID", "nullable": false, "unique": true, "references": {"table": "users", "column": "id", "on_delete": "CASCADE"}},
+        {"name": "restaurant_id", "type": "UUID", "nullable": true, "references": {"table": "restaurants", "column": "id", "on_delete": "SET NULL"}},
+        {"name": "fulfillment_type", "type": "fulfillment_type", "nullable": false, "default": "DELIVERY"},
+        {"name": "promo_code_id", "type": "UUID", "nullable": true, "references": {"table": "promo_codes", "column": "id", "on_delete": "SET NULL"}},
+        {"name": "special_instructions", "type": "TEXT", "nullable": true},
+        {"name": "updated_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()"},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()"}
+      ],
+      "indexes": [
+        {"name": "idx_carts_restaurant_id", "columns": ["restaurant_id"]}
+      ]
+    },
+    {
+      "name": "cart_items",
+      "comment": "Items in cart; price snapshot stored to ensure stable checkout totals.",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "cart_id", "type": "UUID", "nullable": false, "references": {"table": "carts", "column": "id", "on_delete": "CASCADE"}},
+        {"name": "menu_item_id", "type": "UUID", "nullable": false, "references": {"table": "menu_items", "column": "id", "on_delete": "RESTRICT"}},
+        {"name": "quantity", "type": "INTEGER", "nullable": false, "default": 1, "check": "quantity >= 1"},
+        {"name": "unit_price_cents", "type": "INTEGER", "nullable": false},
+        {"name": "modifier_total_cents", "type": "INTEGER", "nullable": false, "default": 0},
+        {"name": "notes", "type": "TEXT", "nullable": true},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()"}
+      ],
+      "indexes": [
+        {"name": "idx_cart_items_cart_id", "columns": ["cart_id"]},
+        {"name": "idx_cart_items_menu_item_id", "columns": ["menu_item_id"]}
+      ]
+    },
+    {
+      "name": "cart_item_modifiers",
+      "comment": "Selected modifier options for a cart item.",
+      "columns": [
+        {"name": "cart_item_id", "type": "UUID", "pk": true, "references": {"table": "cart_items", "column": "id", "on_delete": "CASCADE"}},
+        {"name": "modifier_option_id", "type": "UUID", "pk": true, "references": {"table": "modifier_options", "column": "id", "on_delete": "RESTRICT"}},
+        {"name": "price_delta_cents", "type": "INTEGER", "nullable": false, "default": 0}
+      ],
+      "indexes": [
+        {"name": "idx_cart_item_modifiers_cart_item_id", "columns": ["cart_item_id"]}
+      ]
+    },
+    {
+      "name": "orders",
+      "comment": "Placed orders.",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "user_id", "type": "UUID", "nullable": false, "references": {"table": "users", "column": "id", "on_delete": "RESTRICT"}},
+        {"name": "restaurant_id", "type": "UUID", "nullable": false, "references": {"table": "restaurants", "column": "id", "on_delete": "RESTRICT"}},
+        {"name": "address_id", "type": "UUID", "nullable": false, "references": {"table": "addresses", "column": "id", "on_delete": "RESTRICT"}},
+        {"name": "payment_method_id", "type": "UUID", "nullable": false, "references": {"table": "payment_methods", "column": "id", "on_delete": "RESTRICT"}},
+        {"name": "fulfillment_type", "type": "fulfillment_type", "nullable": false},
+        {"name": "scheduled_for", "type": "TIMESTAMPTZ", "nullable": true},
+        {"name": "status", "type": "order_status", "nullable": false, "default": "CONFIRMED"},
+        {"name": "promo_code_id", "type": "UUID", "nullable": true, "references": {"table": "promo_codes", "column": "id", "on_delete": "SET NULL"}},
+        {"name": "subtotal_cents", "type": "INTEGER", "nullable": false},
+        {"name": "delivery_fee_cents", "type": "INTEGER", "nullable": false},
+        {"name": "service_fee_cents", "type": "INTEGER", "nullable": false},
+        {"name": "discount_cents", "type": "INTEGER", "nullable": false, "default": 0},
+        {"name": "total_cents", "type": "INTEGER", "nullable": false},
+        {"name": "driver_name", "type": "TEXT", "nullable": true},
+        {"name": "driver_phone", "type": "TEXT", "nullable": true},
+        {"name": "eta_minutes", "type": "INTEGER", "nullable": true},
+        {"name": "placed_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()"}
+      ],
+      "indexes": [
+        {"name": "idx_orders_user_id", "columns": ["user_id"]},
+        {"name": "idx_orders_status", "columns": ["status"]},
+        {"name": "idx_orders_placed_at", "columns": ["placed_at"]}
+      ]
+    },
+    {
+      "name": "order_items",
+      "comment": "Snapshot of purchased items.",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "order_id", "type": "UUID", "nullable": false, "references": {"table": "orders", "column": "id", "on_delete": "CASCADE"}},
+        {"name": "menu_item_id", "type": "UUID", "nullable": false, "references": {"table": "menu_items", "column": "id", "on_delete": "RESTRICT"}},
+        {"name": "name", "type": "TEXT", "nullable": false},
+        {"name": "unit_price_cents", "type": "INTEGER", "nullable": false},
+        {"name": "modifier_total_cents", "type": "INTEGER", "nullable": false, "default": 0},
+        {"name": "quantity", "type": "INTEGER", "nullable": false},
+        {"name": "notes", "type": "TEXT", "nullable": true}
+      ],
+      "indexes": [
+        {"name": "idx_order_items_order_id", "columns": ["order_id"]}
+      ]
+    },
+    {
+      "name": "order_item_modifiers",
+      "comment": "Snapshot of selected modifiers for an order item.",
+      "columns": [
+        {"name": "order_item_id", "type": "UUID", "pk": true, "references": {"table": "order_items", "column": "id", "on_delete": "CASCADE"}},
+        {"name": "modifier_option_id", "type": "UUID", "pk": true, "references": {"table": "modifier_options", "column": "id", "on_delete": "RESTRICT"}},
+        {"name": "name", "type": "TEXT", "nullable": false},
+        {"name": "price_delta_cents", "type": "INTEGER", "nullable": false, "default": 0}
+      ]
+    },
+    {
+      "name": "recent_searches",
+      "comment": "Stores recent searches per user.",
+      "columns": [
+        {"name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()"},
+        {"name": "user_id", "type": "UUID", "nullable": false, "references": {"table": "users", "column": "id", "on_delete": "CASCADE"}},
+        {"name": "query", "type": "TEXT", "nullable": false},
+        {"name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()"}
+      ],
+      "indexes": [
+        {"name": "idx_recent_searches_user_id_created_at", "columns": ["user_id", "created_at"]}
+      ]
+    }
+  ],
+  "relationships": [
+    {"from": "addresses.user_id", "to": "users.id", "type": "many_to_one"},
+    {"from": "payment_methods.user_id", "to": "users.id", "type": "many_to_one"},
+    {"from": "restaurants.category_id", "to": "restaurant_categories.id", "type": "many_to_one"},
+    {"from": "menu_categories.restaurant_id", "to": "restaurants.id", "type": "many_to_one"},
+    {"from": "menu_items.restaurant_id", "to": "restaurants.id", "type": "many_to_one"},
+    {"from": "menu_items.menu_category_id", "to": "menu_categories.id", "type": "many_to_one"},
+    {"from": "modifier_groups.menu_item_id", "to": "menu_items.id", "type": "many_to_one"},
+    {"from": "modifier_options.modifier_group_id", "to": "modifier_groups.id", "type": "many_to_one"},
+    {"from": "favorites.user_id", "to": "users.id", "type": "many_to_one"},
+    {"from": "favorites.restaurant_id", "to": "restaurants.id", "type": "many_to_one"},
+    {"from": "carts.user_id", "to": "users.id", "type": "one_to_one"},
+    {"from": "carts.restaurant_id", "to": "restaurants.id", "type": "many_to_one"},
+    {"from": "cart_items.cart_id", "to": "carts.id", "type": "many_to_one"},
+    {"from": "cart_items.menu_item_id", "to": "menu_items.id", "type": "many_to_one"},
+    {"from": "cart_item_modifiers.cart_item_id", "to": "cart_items.id", "type": "many_to_one"},
+    {"from": "cart_item_modifiers.modifier_option_id", "to": "modifier_options.id", "type": "many_to_one"},
+    {"from": "orders.user_id", "to": "users.id", "type": "many_to_one"},
+    {"from": "orders.restaurant_id", "to": "restaurants.id", "type": "many_to_one"},
+    {"from": "orders.address_id", "to": "addresses.id", "type": "many_to_one"},
+    {"from": "orders.payment_method_id", "to": "payment_methods.id", "type": "many_to_one"},
+    {"from": "order_items.order_id", "to": "orders.id", "type": "many_to_one"},
+    {"from": "order_items.menu_item_id", "to": "menu_items.id", "type": "many_to_one"},
+    {"from": "order_item_modifiers.order_item_id", "to": "order_items.id", "type": "many_to_one"},
+    {"from": "recent_searches.user_id", "to": "users.id", "type": "many_to_one"}
+  ],
+  "seed_expectations": {
+    "required": [
+      "restaurant_categories",
+      "restaurants",
+      "menu_categories",
+      "menu_items",
+      "modifier_groups",
+      "modifier_options",
+      "promo_codes",
+      "users (demo)",
+      "addresses (demo)",
+      "payment_methods (demo)"
+    ],
+    "demo_user": {
+      "email": "demo@foodhub.local",
+      "password_plain": "Password123!",
+      "full_name": "Demo User"
+    },
+    "minimum_counts": {
+      "restaurant_categories": 6,
+      "restaurants": 12,
+      "menu_items_per_restaurant": 8,
+      "promo_codes": 4
+    },
+    "notes": [
+      "Use realistic image URLs (e.g., https://images.unsplash.com/...).",
+      "Ensure each restaurant has at least 3 menu categories and at least one item with modifier groups.",
+      "Promo codes must match the list in design/spec.requirements.json."
+    ]
+  }
+}

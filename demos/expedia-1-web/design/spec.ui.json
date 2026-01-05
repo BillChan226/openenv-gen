@@ -1,0 +1,610 @@
+{
+  "schema_version": "1.0.0",
+  "app": {
+    "name": "Voyager",
+    "description": "Expedia-style travel booking SPA",
+    "routing": { "type": "spa", "library": "react-router" },
+    "api_base": "/api"
+  },
+  "theme": {
+    "colors": {
+      "primary": "#1668E3",
+      "primary_hover": "#0B5BD3",
+      "accent": "#F59E0B",
+      "background": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "surface_alt": "#F5F7FA",
+      "border": "#E5E7EB",
+      "text": "#111827",
+      "muted_text": "#6B7280",
+      "success": "#10B981",
+      "danger": "#DC2626",
+      "warning": "#F59E0B",
+      "info": "#2563EB"
+    },
+    "typography": {
+      "font_family_base": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+      "font_family_heading": "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+      "sizes_px": {
+        "xs": 12,
+        "sm": 14,
+        "base": 16,
+        "lg": 18,
+        "xl": 20,
+        "2xl": 24,
+        "3xl": 32,
+        "4xl": 40,
+        "5xl": 56
+      },
+      "weights": { "regular": 400, "medium": 500, "semibold": 600, "bold": 700 }
+    },
+    "radii_px": { "sm": 8, "md": 12, "lg": 16, "xl": 20 },
+    "shadows": {
+      "card": "0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.06)",
+      "dropdown": "0 10px 30px rgba(0,0,0,0.12)"
+    },
+    "spacing_px": { "1": 4, "2": 8, "3": 12, "4": 16, "5": 20, "6": 24, "8": 32, "10": 40, "12": 48, "16": 64 },
+    "breakpoints_px": { "sm": 640, "md": 768, "lg": 1024, "xl": 1280 }
+  },
+  "layout": {
+    "app_shell": {
+      "type": "topnav",
+      "max_width_px": 1200,
+      "content_padding_px": 16,
+      "header": {
+        "height_px": 72,
+        "sticky": true,
+        "background": "#FFFFFF",
+        "border_bottom": "1px solid #E5E7EB"
+      },
+      "footer": {
+        "background": "#FFFFFF",
+        "border_top": "1px solid #E5E7EB",
+        "sections": ["Company", "Explore", "Policies"]
+      }
+    },
+    "responsive": {
+      "mobile_nav": "collapsed_tabs_in_scroll_or_dropdown",
+      "filters": {
+        "desktop": "left_sidebar",
+        "mobile": "drawer"
+      },
+      "results": {
+        "desktop": "two_or_three_column_grid",
+        "mobile": "single_column"
+      }
+    }
+  },
+  "state_management": {
+    "auth": {
+      "storage": "localStorage",
+      "token_key": "voyager_access_token",
+      "me_cache_ttl_seconds": 300
+    },
+    "cart": {
+      "source_of_truth": "server",
+      "refresh_on": ["login", "logout", "add_item", "remove_item", "apply_promo", "checkout_success"]
+    },
+    "search": {
+      "url_query_is_source_of_truth": true,
+      "debounce_ms": 250
+    },
+    "notifications": {
+      "style": "toast_and_inline",
+      "library": "custom_or_react-hot-toast"
+    }
+  },
+  "routes": [
+    { "path": "/", "page": "HomePage", "auth": false },
+    { "path": "/flights", "page": "FlightsSearchPage", "auth": false },
+    { "path": "/flights/results", "page": "FlightsResultsPage", "auth": false },
+    { "path": "/hotels", "page": "HotelsSearchPage", "auth": false },
+    { "path": "/hotels/results", "page": "HotelsResultsPage", "auth": false },
+    { "path": "/hotels/:id", "page": "HotelDetailPage", "auth": false },
+    { "path": "/cars", "page": "CarsSearchPage", "auth": false },
+    { "path": "/cars/results", "page": "CarsResultsPage", "auth": false },
+    { "path": "/cars/:id", "page": "CarDetailPage", "auth": false },
+    { "path": "/packages", "page": "PackagesPage", "auth": false },
+    { "path": "/favorites", "page": "FavoritesPage", "auth": true },
+    { "path": "/cart", "page": "CartPage", "auth": true },
+    { "path": "/checkout", "page": "CheckoutPage", "auth": true },
+    { "path": "/confirmation", "page": "OrderConfirmationPage", "auth": true },
+    { "path": "/trips", "page": "TripsPage", "auth": true },
+    { "path": "/bookings/:id", "page": "BookingDetailPage", "auth": true },
+    { "path": "/profile", "page": "ProfilePage", "auth": true },
+    { "path": "/login", "page": "LoginPage", "auth": false },
+    { "path": "/register", "page": "RegisterPage", "auth": false },
+    { "path": "*", "page": "NotFoundPage", "auth": false }
+  ],
+  "pages": {
+    "HomePage": {
+      "title": "Plan your next trip",
+      "layout": "AppShell",
+      "sections": ["Hero", "TabbedSearchCard", "DealsCarousel", "Footer"],
+      "components": ["HeroBanner", "SearchTabs", "StaysSearchForm", "FlightsSearchForm", "CarsSearchForm", "PackagesSearchForm", "DealCard"],
+      "api_calls": [
+        {
+          "name": "seedStatus",
+          "method": "GET",
+          "path": "/admin/seed-status",
+          "optional": true,
+          "usage": "QA-only badge or hidden debug panel"
+        }
+      ]
+    },
+
+    "FlightsSearchPage": {
+      "title": "Search flights",
+      "layout": "AppShell",
+      "components": ["SearchTabs", "FlightsSearchForm"],
+      "api_calls": [
+        { "name": "locationsAutocomplete", "method": "GET", "path": "/locations?q={q}&limit=8" }
+      ],
+      "actions": [
+        "On submit: navigate to /flights/results with query params (shareable)"
+      ]
+    },
+    "FlightsResultsPage": {
+      "title": "Flight results",
+      "layout": "AppShell",
+      "components": [
+        "FlightsSearchFormInline",
+        "FilterSidebar",
+        "SortDropdown",
+        "FlightResultCard",
+        "FlightFareDrawer"
+      ],
+      "url_query_schema": {
+        "origin_id": "uuid",
+        "destination_id": "uuid",
+        "depart_date": "YYYY-MM-DD",
+        "return_date": "YYYY-MM-DD|null",
+        "trip_type": "one_way|round_trip",
+        "passengers": "int",
+        "seat_class": "economy|business|first",
+        "airlines": "string[]",
+        "stops": "int[]",
+        "price_min": "int|null",
+        "price_max": "int|null",
+        "depart_time_min": "HH:MM|null",
+        "depart_time_max": "HH:MM|null",
+        "sort": "string"
+      },
+      "api_calls": [
+        {
+          "name": "searchFlights",
+          "method": "GET",
+          "path": "/flights?origin_id={origin_id}&destination_id={destination_id}&depart_date={depart_date}&return_date={return_date}&trip_type={trip_type}&passengers={passengers}&seat_class={seat_class}&airlines={airlines}&stops={stops}&price_min={price_min}&price_max={price_max}&depart_time_min={depart_time_min}&depart_time_max={depart_time_max}&sort={sort}",
+          "response": "{items:[{itinerary_id, outbound, inbound, pricing}]}"
+        },
+        { "name": "flightDetails", "method": "GET", "path": "/flights/{flight_id}" },
+        { "name": "addToCart", "method": "POST", "path": "/cart/items" }
+      ],
+      "states": {
+        "loading": "skeleton list",
+        "empty": "no results with suggestions",
+        "error": "inline banner with retry"
+      }
+    },
+
+    "HotelsSearchPage": {
+      "title": "Search hotels",
+      "layout": "AppShell",
+      "components": ["SearchTabs", "StaysSearchForm"],
+      "api_calls": [
+        { "name": "locationsAutocomplete", "method": "GET", "path": "/locations?q={q}&limit=8" }
+      ]
+    },
+    "HotelsResultsPage": {
+      "title": "Hotel results",
+      "layout": "AppShell",
+      "components": [
+        "StaysSearchFormInline",
+        "FilterSidebar",
+        "SortDropdown",
+        "HotelResultCard",
+        "MapToggle",
+        "HotelsMapPanel"
+      ],
+      "url_query_schema": {
+        "location_id": "uuid",
+        "check_in": "YYYY-MM-DD",
+        "check_out": "YYYY-MM-DD",
+        "guests": "int",
+        "rooms": "int",
+        "star_min": "number|null",
+        "star_max": "number|null",
+        "amenities": "string[]",
+        "price_min": "int|null",
+        "price_max": "int|null",
+        "distance_max_km": "number|null",
+        "sort": "string",
+        "map": "boolean"
+      },
+      "api_calls": [
+        {
+          "name": "searchHotels",
+          "method": "GET",
+          "path": "/hotels?location_id={location_id}&check_in={check_in}&check_out={check_out}&guests={guests}&rooms={rooms}&star_min={star_min}&star_max={star_max}&amenities={amenities}&price_min={price_min}&price_max={price_max}&distance_max_km={distance_max_km}&sort={sort}",
+          "response": "{items:[{hotel, pricing, review_summary, distance_km, thumbnail_url}]}"
+        }
+      ],
+      "map_behavior": {
+        "provider": "leaflet+osm",
+        "pin_sync": "hover/click sync between list and map",
+        "bounds_filter_optional": true
+      }
+    },
+    "HotelDetailPage": {
+      "title": "Hotel details",
+      "layout": "AppShell",
+      "components": [
+        "HotelGallery",
+        "VipBadge",
+        "HotelOverview",
+        "RoomTypeSelector",
+        "ReviewsSection",
+        "SaveHeartButton"
+      ],
+      "api_calls": [
+        { "name": "getHotel", "method": "GET", "path": "/hotels/{id}?check_in={check_in}&check_out={check_out}&guests={guests}&rooms={rooms}" },
+        { "name": "getReviews", "method": "GET", "path": "/hotels/{id}/reviews?limit=10&offset={offset}" },
+        { "name": "addToCart", "method": "POST", "path": "/cart/items" },
+        { "name": "toggleFavorite", "method": "POST|DELETE", "path": "/favorites" }
+      ]
+    },
+
+    "CarsSearchPage": {
+      "title": "Search cars",
+      "layout": "AppShell",
+      "components": ["SearchTabs", "CarsSearchForm"],
+      "api_calls": [
+        { "name": "locationsAutocomplete", "method": "GET", "path": "/locations?q={q}&limit=8" }
+      ]
+    },
+    "CarsResultsPage": {
+      "title": "Car results",
+      "layout": "AppShell",
+      "components": ["CarsSearchFormInline", "FilterSidebar", "SortDropdown", "CarResultCard"],
+      "url_query_schema": {
+        "pickup_location_id": "uuid",
+        "dropoff_location_id": "uuid",
+        "pickup_date": "YYYY-MM-DD",
+        "dropoff_date": "YYYY-MM-DD",
+        "car_type": "string[]",
+        "company": "string[]",
+        "price_min": "int|null",
+        "price_max": "int|null",
+        "sort": "string"
+      },
+      "api_calls": [
+        {
+          "name": "searchCars",
+          "method": "GET",
+          "path": "/cars?pickup_location_id={pickup_location_id}&dropoff_location_id={dropoff_location_id}&pickup_date={pickup_date}&dropoff_date={dropoff_date}&car_type={car_type}&company={company}&price_min={price_min}&price_max={price_max}&sort={sort}",
+          "response": "{items:[{car, pricing}]}"
+        }
+      ]
+    },
+    "CarDetailPage": {
+      "title": "Car details",
+      "layout": "AppShell",
+      "components": ["CarDetailCard", "CarExtrasSelector", "PriceBreakdown", "AddToCartButton"],
+      "api_calls": [
+        { "name": "getCar", "method": "GET", "path": "/cars/{id}" },
+        { "name": "addToCart", "method": "POST", "path": "/cart/items" }
+      ]
+    },
+
+    "PackagesPage": {
+      "title": "Build a package",
+      "layout": "AppShell",
+      "components": ["SearchTabs", "PackagesBuilder", "PackageQuoteCard"],
+      "api_calls": [
+        { "name": "quote", "method": "POST", "path": "/packages/quote" },
+        { "name": "addToCart", "method": "POST", "path": "/cart/items" }
+      ]
+    },
+
+    "FavoritesPage": {
+      "title": "Favorites",
+      "layout": "AppShell",
+      "components": ["FavoritesList", "HotelResultCard"],
+      "api_calls": [
+        { "name": "listFavorites", "method": "GET", "path": "/favorites" },
+        { "name": "removeFavorite", "method": "DELETE", "path": "/favorites/{id}" }
+      ]
+    },
+
+    "CartPage": {
+      "title": "Your cart",
+      "layout": "AppShell",
+      "components": ["CartItemCard", "PromoCodeBox", "CartTotals", "CheckoutCTA"],
+      "api_calls": [
+        { "name": "getCart", "method": "GET", "path": "/cart" },
+        { "name": "removeItem", "method": "DELETE", "path": "/cart/items/{id}" },
+        { "name": "applyPromo", "method": "POST", "path": "/cart/apply-promo" },
+        { "name": "removePromo", "method": "POST", "path": "/cart/remove-promo" }
+      ],
+      "states": {
+        "empty": "empty state with links to /flights /hotels /cars /packages"
+      }
+    },
+
+    "CheckoutPage": {
+      "title": "Checkout",
+      "layout": "AppShell",
+      "components": [
+        "CheckoutSummary",
+        "TravelerForm",
+        "PaymentMethodPicker",
+        "PaymentForm",
+        "PlaceOrderButton"
+      ],
+      "api_calls": [
+        { "name": "getCart", "method": "GET", "path": "/cart" },
+        { "name": "listPaymentMethods", "method": "GET", "path": "/payment-methods" },
+        { "name": "checkout", "method": "POST", "path": "/checkout" }
+      ]
+    },
+
+    "OrderConfirmationPage": {
+      "title": "Confirmed",
+      "layout": "AppShell",
+      "components": ["ConfirmationCard", "BookingLinkList"],
+      "api_calls": []
+    },
+
+    "TripsPage": {
+      "title": "Trips",
+      "layout": "AppShell",
+      "components": ["TripsTabs", "BookingCard"],
+      "api_calls": [
+        { "name": "listBookings", "method": "GET", "path": "/bookings?limit=50&offset=0" }
+      ],
+      "grouping": {
+        "upcoming_vs_past": "based_on_booking_details.start_at (local timezone); fallback created_at",
+        "note": "Backend should include derived start_at/end_at in booking.details for consistent grouping."
+      }
+    },
+
+    "BookingDetailPage": {
+      "title": "Booking",
+      "layout": "AppShell",
+      "components": ["BookingHeader", "BookingItemsTable", "PolicyPanel", "DownloadButton", "CancelButton", "ModifyButton"],
+      "api_calls": [
+        { "name": "getBooking", "method": "GET", "path": "/bookings/{id}" },
+        { "name": "downloadConfirmation", "method": "GET", "path": "/bookings/{id}/confirmation?format=pdf" },
+        { "name": "cancel", "method": "POST", "path": "/bookings/{id}/cancel" },
+        { "name": "modify", "method": "POST", "path": "/bookings/{id}/modify" }
+      ]
+    },
+
+    "ProfilePage": {
+      "title": "Profile",
+      "layout": "AppShell",
+      "components": ["ProfileForm", "PaymentMethodsList", "AddPaymentMethodModal"],
+      "api_calls": [
+        { "name": "getMe", "method": "GET", "path": "/users/me" },
+        { "name": "updateMe", "method": "PATCH", "path": "/users/me" },
+        { "name": "listPaymentMethods", "method": "GET", "path": "/payment-methods" },
+        { "name": "addPaymentMethod", "method": "POST", "path": "/payment-methods" },
+        { "name": "deletePaymentMethod", "method": "DELETE", "path": "/payment-methods/{id}" }
+      ]
+    },
+
+    "LoginPage": {
+      "title": "Log in",
+      "layout": "AuthLayout",
+      "components": ["LoginForm"],
+      "api_calls": [
+        { "name": "login", "method": "POST", "path": "/auth/login" }
+      ],
+      "auth_behavior": {
+        "after_login": "redirect to ?next=... else /",
+        "on_401": "show generic error"
+      }
+    },
+    "RegisterPage": {
+      "title": "Create account",
+      "layout": "AuthLayout",
+      "components": ["RegisterForm"],
+      "api_calls": [
+        { "name": "register", "method": "POST", "path": "/auth/register" }
+      ]
+    },
+
+    "NotFoundPage": {
+      "title": "Not found",
+      "layout": "AppShell",
+      "components": ["NotFoundCard"],
+      "api_calls": []
+    }
+  },
+  "components": {
+    "AppShell": {
+      "type": "layout",
+      "description": "Top nav + content container + footer",
+      "children": ["TopNav", "Footer"],
+      "props": { "children": "ReactNode" }
+    },
+    "TopNav": {
+      "type": "navigation",
+      "props": {
+        "activeTab": "stays|flights|cars|packages",
+        "cartCount": "int",
+        "user": "User|null"
+      },
+      "behavior": {
+        "tabs": [
+          { "label": "Stays", "to": "/hotels" },
+          { "label": "Flights", "to": "/flights" },
+          { "label": "Cars", "to": "/cars" },
+          { "label": "Packages", "to": "/packages" }
+        ],
+        "mobile": "tabs scroll or collapse into dropdown",
+        "cart_badge": "sum of cart items"
+      },
+      "api_integration": {
+        "cart": { "method": "GET", "path": "/cart", "when": ["onAppLoad", "onRouteChange"] }
+      }
+    },
+    "SearchTabs": {
+      "type": "navigation",
+      "props": { "active": "stays|flights|cars|packages" },
+      "style": "pill tabs with icons; active underline (Expedia-like)"
+    },
+    "LocationAutocomplete": {
+      "type": "input",
+      "props": {
+        "value": "{label:string, id:string, type:string}|null",
+        "onChange": "function",
+        "placeholder": "string",
+        "icon": "airport|city|region|place"
+      },
+      "behavior": {
+        "min_chars": 2,
+        "max_suggestions": 8,
+        "keyboard_nav": "up/down/enter/esc",
+        "close_on_outside_click": true
+      },
+      "api_integration": {
+        "method": "GET",
+        "path": "/locations?q={q}&limit=8",
+        "response": "{items:[Location]}"
+      }
+    },
+    "DateRangePicker": {
+      "type": "input",
+      "props": {
+        "startDate": "YYYY-MM-DD|null",
+        "endDate": "YYYY-MM-DD|null",
+        "mode": "single|range",
+        "minDate": "YYYY-MM-DD (default today)",
+        "maxDate": "YYYY-MM-DD|null",
+        "onChange": "function"
+      },
+      "behavior": {
+        "disable_past": true,
+        "prevent_invalid_range": true,
+        "mobile": "supports swipe"
+      }
+    },
+    "FlightsSearchForm": {
+      "type": "form",
+      "props": {
+        "tripType": "one_way|round_trip",
+        "origin": "LocationAutocomplete value",
+        "destination": "LocationAutocomplete value",
+        "departDate": "date",
+        "returnDate": "date|null",
+        "passengers": "int (1-9)",
+        "seatClass": "economy|business|first"
+      },
+      "validation": {
+        "passengers_max": 9,
+        "return_required_when_round_trip": true
+      }
+    },
+    "FlightResultCard": {
+      "type": "card",
+      "props": { "itinerary": "object", "onSelect": "function", "onViewDetails": "function" },
+      "ui": {
+        "shows": ["times", "airline", "stops", "duration", "price"],
+        "cta": "View details"
+      }
+    },
+    "FlightFareDrawer": {
+      "type": "drawer",
+      "props": { "open": "boolean", "flightId": "uuid", "passengers": "int", "onAddToCart": "function" },
+      "api_integration": { "method": "GET", "path": "/flights/{id}" },
+      "ui": {
+        "pattern": "right-side panel (Expedia-like)",
+        "fare_cards": "economy/business/first with features"
+      }
+    },
+
+    "HotelResultCard": {
+      "type": "card",
+      "props": { "hotel": "Hotel", "pricing": "object", "review": "object", "distanceKm": "number", "favorite": "boolean" },
+      "ui": {
+        "includes": ["thumbnail", "name", "stars", "vip_badge", "review_score", "amenities_preview", "nightly_price", "total_price"],
+        "actions": ["open details", "toggle favorite"]
+      }
+    },
+    "HotelGallery": {
+      "type": "carousel",
+      "props": { "photos": "HotelPhoto[]" },
+      "behavior": { "min_photos": 3, "mobile_swipe": true }
+    },
+    "RoomTypeSelector": {
+      "type": "list",
+      "props": { "roomTypes": "RoomType[]", "selected": "uuid|null", "onSelect": "function" },
+      "ui": { "shows": ["bed_configuration", "max_guests", "refundable", "price_per_night"] }
+    },
+    "ReviewsSection": {
+      "type": "section",
+      "props": { "hotelId": "uuid" },
+      "api_integration": { "method": "GET", "path": "/hotels/{id}/reviews?limit=10&offset={offset}" },
+      "pagination": { "page_size": 10 }
+    },
+    "VipBadge": {
+      "type": "badge",
+      "props": { "vip": "boolean" },
+      "style": "small pill; primary blue border"
+    },
+
+    "CarResultCard": {
+      "type": "card",
+      "props": { "car": "Car", "pricing": "object" },
+      "ui": { "shows": ["company", "model", "car_type", "seats", "transmission", "fuel", "daily_price", "total_price"] }
+    },
+    "CarExtrasSelector": {
+      "type": "form",
+      "props": { "extras": "CarExtra[]", "selectedCodes": "string[]", "onChange": "function" },
+      "ui": { "pricing": "per-day and per-rental labels" }
+    },
+
+    "CartItemCard": {
+      "type": "card",
+      "props": { "item": "CartItem", "onRemove": "function" },
+      "ui": { "shows": ["type", "dates", "key_details", "line_total"] }
+    },
+    "PromoCodeBox": {
+      "type": "form",
+      "props": { "appliedCode": "string|null", "onApply": "function", "onRemove": "function" },
+      "api_integration": [
+        { "method": "POST", "path": "/cart/apply-promo" },
+        { "method": "POST", "path": "/cart/remove-promo" }
+      ]
+    },
+    "PaymentMethodPicker": {
+      "type": "picker",
+      "props": { "methods": "PaymentMethod[]", "selectedId": "uuid|null", "onSelect": "function" },
+      "ui": { "masked": "brand + last4 + exp" }
+    },
+
+    "TripsTabs": {
+      "type": "tabs",
+      "props": { "active": "upcoming|past" }
+    },
+    "BookingCard": {
+      "type": "card",
+      "props": { "booking": "Booking", "onOpen": "function" },
+      "ui": { "shows": ["status", "type", "start/end", "total"] }
+    },
+
+    "Toast": {
+      "type": "feedback",
+      "behavior": {
+        "on_401": "show 'Session expired' then redirect to /login?next=...",
+        "on_network_error": "show retry"
+      }
+    }
+  },
+  "accessibility": {
+    "autocomplete": { "aria": ["combobox", "listbox", "option"] },
+    "keyboard": { "support": ["tab_navigation", "esc_to_close_modals", "enter_to_select"] },
+    "contrast": { "min_ratio": 4.5 }
+  }
+}

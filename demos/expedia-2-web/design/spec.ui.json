@@ -1,0 +1,434 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "expedia_style_travel_booking_ui",
+  "framework": "react",
+  "bundler": "vite",
+  "styling": {
+    "system": "tailwindcss",
+    "theme": {
+      "colors": {
+        "primary": "#1668E3",
+        "accent": "#F4B400",
+        "bg": "#FFFFFF",
+        "text": "#111827",
+        "muted": "#6B7280",
+        "border": "#E5E7EB",
+        "surface": "#FFFFFF",
+        "surface_alt": "#F3F4F6"
+      },
+      "radii": {
+        "card": "16px",
+        "pill": "9999px"
+      }
+    }
+  },
+  "required_packages": {
+    "dependencies": {
+      "react-router-dom": "^6.26.2",
+      "axios": "^1.7.7",
+      "clsx": "^2.1.1",
+      "lucide-react": "^0.468.0",
+      "date-fns": "^3.6.0",
+      "react-hook-form": "^7.53.2",
+      "zod": "^3.23.8",
+      "@hookform/resolvers": "^3.9.0",
+      "leaflet": "^1.9.4",
+      "react-leaflet": "^4.2.1"
+    }
+  },
+  "routing": {
+    "base": "/",
+    "routes": [
+      { "path": "/", "page": "HomePage" },
+      { "path": "/flights", "page": "FlightsResultsPage" },
+      { "path": "/flights/:flightId", "page": "FlightDetailsPage" },
+      { "path": "/hotels", "page": "HotelsResultsPage" },
+      { "path": "/hotels/:hotelId", "page": "HotelDetailsPage" },
+      { "path": "/cars", "page": "CarsResultsPage" },
+      { "path": "/cars/:carId", "page": "CarDetailsPage" },
+      { "path": "/packages", "page": "PackagesPage" },
+      { "path": "/favorites", "page": "FavoritesPage" },
+      { "path": "/cart", "page": "CartPage" },
+      { "path": "/checkout", "page": "CheckoutPage" },
+      { "path": "/trips", "page": "TripsPage" },
+      { "path": "/profile", "page": "ProfilePage" },
+      { "path": "/login", "page": "LoginPage" },
+      { "path": "/register", "page": "RegisterPage" }
+    ]
+  },
+  "layout": {
+    "app_shell": {
+      "header": {
+        "component": "Header",
+        "notes": "Expedia-like top nav with logo left, tabs (Stays/Flights/Cars/Packages) near center, actions right (Favorites, Trips, Cart, Profile/Login)."
+      },
+      "footer": {
+        "component": "Footer",
+        "notes": "Simple footer with links and copyright."
+      }
+    }
+  },
+  "state_management": {
+    "auth": {
+      "context": "AuthContext",
+      "storage": "localStorage",
+      "token_key": "auth_token"
+    },
+    "cart": {
+      "context": "CartContext",
+      "behavior": "Fetch cart on login; optimistic update allowed, then refetch."
+    }
+  },
+  "api_client": {
+    "service": "src/services/apiClient.js",
+    "base_url_env": "VITE_API_BASE_URL",
+    "default": "http://localhost:3000",
+    "auth": "Attach Bearer token from AuthContext"
+  },
+  "pages": {
+    "HomePage": {
+      "file": "src/pages/HomePage.jsx",
+      "export_style": "default",
+      "title": "Home",
+      "layout": {
+        "sections": [
+          "Hero image banner",
+          "TabbedSearchCard (Stays/Flights/Cars/Packages)",
+          "PromoBanner",
+          "DealsGrid"
+        ]
+      },
+      "primary_actions": [
+        "Search stays → /hotels?location=...",
+        "Search flights → /flights?origin=...",
+        "Search cars → /cars?pickup_location=...",
+        "Search packages → /packages?..."
+      ]
+    },
+    "FlightsResultsPage": {
+      "file": "src/pages/FlightsResultsPage.jsx",
+      "export_style": "default",
+      "title": "Flights",
+      "layout": {
+        "left": "FilterSidebar (price, airline, stops, departure time)",
+        "center": "ResultsList (FlightResultCard)",
+        "top": "SearchSummaryBar + SortSelect"
+      },
+      "data": {
+        "fetch": "GET /flights",
+        "list_wrapper": "items"
+      }
+    },
+    "FlightDetailsPage": {
+      "file": "src/pages/FlightDetailsPage.jsx",
+      "export_style": "default",
+      "title": "Flight details",
+      "layout": {
+        "main": "FlightItineraryCard + FareOptions",
+        "aside": "PriceSummaryCard with AddToCart"
+      },
+      "data": {
+        "fetch": "GET /flights/:flightId"
+      }
+    },
+    "HotelsResultsPage": {
+      "file": "src/pages/HotelsResultsPage.jsx",
+      "export_style": "default",
+      "title": "Stays",
+      "layout": {
+        "left": "FilterSidebar (price, star rating, amenities)",
+        "center": "ResultsList (HotelResultCard)",
+        "right_optional": "MapPanel (Leaflet or placeholder)",
+        "top": "SearchSummaryBar + SortSelect"
+      },
+      "data": {
+        "fetch": "GET /hotels",
+        "list_wrapper": "items"
+      }
+    },
+    "HotelDetailsPage": {
+      "file": "src/pages/HotelDetailsPage.jsx",
+      "export_style": "default",
+      "title": "Hotel details",
+      "layout": {
+        "top": "HotelGallery (carousel/grid)",
+        "main": "HotelOverview + Amenities + RoomsTable",
+        "aside": "Sticky booking card (dates/guests/room select + AddToCart)"
+      },
+      "data": {
+        "fetch": "GET /hotels/:hotelId"
+      }
+    },
+    "CarsResultsPage": {
+      "file": "src/pages/CarsResultsPage.jsx",
+      "export_style": "default",
+      "title": "Cars",
+      "layout": {
+        "left": "FilterSidebar (car type, company, price)",
+        "center": "ResultsList (CarResultCard)",
+        "top": "SearchSummaryBar + SortSelect"
+      },
+      "data": {
+        "fetch": "GET /cars",
+        "list_wrapper": "items"
+      }
+    },
+    "CarDetailsPage": {
+      "file": "src/pages/CarDetailsPage.jsx",
+      "export_style": "default",
+      "title": "Car details",
+      "layout": {
+        "main": "CarDetailsCard + ExtrasSelector",
+        "aside": "PriceSummaryCard with AddToCart"
+      },
+      "data": {
+        "fetch": "GET /cars/:carId"
+      }
+    },
+    "PackagesPage": {
+      "file": "src/pages/PackagesPage.jsx",
+      "export_style": "default",
+      "title": "Packages",
+      "layout": {
+        "top": "PackageSearchCard",
+        "center": "ResultsList (PackageResultCard)"
+      },
+      "data": {
+        "fetch": "GET /packages",
+        "list_wrapper": "items"
+      }
+    },
+    "FavoritesPage": {
+      "file": "src/pages/FavoritesPage.jsx",
+      "export_style": "default",
+      "title": "Favorites",
+      "data": {
+        "fetch": "GET /favorites",
+        "list_wrapper": "items"
+      },
+      "empty_state": "No favorites yet. Browse hotels and tap the heart to save."
+    },
+    "CartPage": {
+      "file": "src/pages/CartPage.jsx",
+      "export_style": "default",
+      "title": "Cart",
+      "layout": {
+        "main": "CartItemsList",
+        "aside": "CartSummaryCard (promo + totals + checkout CTA)"
+      },
+      "data": {
+        "fetch": "GET /cart"
+      }
+    },
+    "CheckoutPage": {
+      "file": "src/pages/CheckoutPage.jsx",
+      "export_style": "default",
+      "title": "Checkout",
+      "layout": {
+        "main": "TravelerInfoForm + PaymentForm",
+        "aside": "OrderSummaryCard"
+      },
+      "data": {
+        "submit": "POST /checkout"
+      }
+    },
+    "TripsPage": {
+      "file": "src/pages/TripsPage.jsx",
+      "export_style": "default",
+      "title": "Trips",
+      "layout": {
+        "top": "Tabs (Upcoming/Past)",
+        "center": "TripCard list",
+        "details": "TripDetailsModal or separate view using /trips/:orderId"
+      },
+      "data": {
+        "fetch": "GET /trips",
+        "list_wrapper": "items"
+      }
+    },
+    "ProfilePage": {
+      "file": "src/pages/ProfilePage.jsx",
+      "export_style": "default",
+      "title": "Profile",
+      "layout": {
+        "sections": ["ProfileForm", "PaymentMethods", "BookingHistoryLink"]
+      },
+      "data": {
+        "fetch": "GET /auth/me",
+        "update": "PATCH /users/me"
+      }
+    },
+    "LoginPage": {
+      "file": "src/pages/LoginPage.jsx",
+      "export_style": "default",
+      "title": "Sign in",
+      "data": {
+        "submit": "POST /auth/login"
+      }
+    },
+    "RegisterPage": {
+      "file": "src/pages/RegisterPage.jsx",
+      "export_style": "default",
+      "title": "Create account",
+      "data": {
+        "submit": "POST /auth/register"
+      }
+    }
+  },
+  "components": {
+    "Header": {
+      "file": "src/components/layout/Header.jsx",
+      "export_style": "default",
+      "props": [],
+      "contains": ["Logo", "PrimaryNavTabs", "GlobalActions"],
+      "behavior": [
+        "Tabs navigate to / (Stays), /flights, /cars, /packages",
+        "Actions: Favorites (/favorites), Trips (/trips), Cart (/cart), Profile/Login"
+      ]
+    },
+    "Footer": {
+      "file": "src/components/layout/Footer.jsx",
+      "export_style": "default",
+      "props": []
+    },
+    "TabbedSearchCard": {
+      "file": "src/components/search/TabbedSearchCard.jsx",
+      "export_style": "default",
+      "props": [],
+      "contains": ["StaysSearchForm", "FlightsSearchForm", "CarsSearchForm", "PackagesSearchForm"],
+      "notes": "Rounded card with tabs like Expedia home."
+    },
+    "LocationAutocomplete": {
+      "file": "src/components/search/LocationAutocomplete.jsx",
+      "export_style": "default",
+      "props": ["value", "onChange", "placeholder", "icon"],
+      "api": "GET /locations?q=",
+      "notes": "Shows iconified suggestions (city/airport/region)."
+    },
+    "DateRangePicker": {
+      "file": "src/components/search/DateRangePicker.jsx",
+      "export_style": "default",
+      "props": ["startDate", "endDate", "onChange"],
+      "notes": "Simplified calendar; can be two <input type=date> if needed."
+    },
+    "FilterSidebar": {
+      "file": "src/components/search/FilterSidebar.jsx",
+      "export_style": "default",
+      "props": ["filters", "onChange", "variant"],
+      "variants": ["flights", "hotels", "cars"],
+      "notes": "Matches Expedia results layout with left filters."
+    },
+    "SortSelect": {
+      "file": "src/components/search/SortSelect.jsx",
+      "export_style": "named",
+      "props": ["value", "options", "onChange"]
+    },
+    "FlightResultCard": {
+      "file": "src/components/flights/FlightResultCard.jsx",
+      "export_style": "default",
+      "props": ["flight", "onSelect"],
+      "notes": "Card shows airline, times, duration, stops, price and select button."
+    },
+    "HotelResultCard": {
+      "file": "src/components/hotels/HotelResultCard.jsx",
+      "export_style": "default",
+      "props": ["hotel", "onSelect", "isFavorite", "onToggleFavorite"],
+      "notes": "Card shows image, name, rating, VIP badge, price, heart icon."
+    },
+    "CarResultCard": {
+      "file": "src/components/cars/CarResultCard.jsx",
+      "export_style": "default",
+      "props": ["car", "onSelect"]
+    },
+    "PackageResultCard": {
+      "file": "src/components/packages/PackageResultCard.jsx",
+      "export_style": "default",
+      "props": ["pkg", "onSelect"]
+    },
+    "HotelGallery": {
+      "file": "src/components/hotels/HotelGallery.jsx",
+      "export_style": "default",
+      "props": ["photos"],
+      "notes": "Grid/carousel like Expedia hotel detail."
+    },
+    "RoomsTable": {
+      "file": "src/components/hotels/RoomsTable.jsx",
+      "export_style": "default",
+      "props": ["rooms", "onSelectRoom"]
+    },
+    "MapPanel": {
+      "file": "src/components/maps/MapPanel.jsx",
+      "export_style": "default",
+      "props": ["lat", "lng", "markers"],
+      "notes": "Use react-leaflet if available; otherwise show placeholder card with coords."
+    },
+    "CartItemsList": {
+      "file": "src/components/cart/CartItemsList.jsx",
+      "export_style": "default",
+      "props": ["cart", "onUpdateItem", "onRemoveItem"]
+    },
+    "CartSummaryCard": {
+      "file": "src/components/cart/CartSummaryCard.jsx",
+      "export_style": "default",
+      "props": ["pricing", "promoCode", "onApplyPromo", "onCheckout"]
+    },
+    "OrderSummaryCard": {
+      "file": "src/components/checkout/OrderSummaryCard.jsx",
+      "export_style": "default",
+      "props": ["cart"],
+      "notes": "Shows subtotal/taxes/fees/discount/total."
+    },
+    "PaymentForm": {
+      "file": "src/components/checkout/PaymentForm.jsx",
+      "export_style": "default",
+      "props": ["paymentMethods", "onSubmit", "loading"],
+      "notes": "Allow selecting saved method or entering test card." 
+    },
+    "TripCard": {
+      "file": "src/components/trips/TripCard.jsx",
+      "export_style": "default",
+      "props": ["order", "onView", "onCancel"]
+    },
+    "Modal": {
+      "file": "src/components/ui/Modal.jsx",
+      "export_style": "named",
+      "props": ["open", "title", "children", "onClose"]
+    },
+    "Button": {
+      "file": "src/components/ui/Button.jsx",
+      "export_style": "named",
+      "props": ["children", "variant", "size", "type", "disabled", "onClick"],
+      "variants": ["primary", "secondary", "ghost", "danger"],
+      "sizes": ["sm", "md", "lg"],
+      "notes": "Primary is Expedia blue, pill-shaped for main CTAs."
+    },
+    "Input": {
+      "file": "src/components/ui/Input.jsx",
+      "export_style": "named",
+      "props": ["label", "value", "onChange", "placeholder", "type", "error"]
+    },
+    "Badge": {
+      "file": "src/components/ui/Badge.jsx",
+      "export_style": "named",
+      "props": ["children", "variant"],
+      "variants": ["vip", "deal", "muted"]
+    }
+  },
+  "formatting": {
+    "money": {
+      "util": "src/utils/money.js",
+      "rule": "Display USD via Intl.NumberFormat; input cents, output string."
+    },
+    "datetime": {
+      "util": "src/utils/datetime.js",
+      "rule": "Use date-fns for formatting depart/arrive times and durations."
+    }
+  },
+  "accessibility": {
+    "requirements": [
+      "All form controls have labels",
+      "Keyboard navigable tabs and modals",
+      "Visible focus states"
+    ]
+  }
+}

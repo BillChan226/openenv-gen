@@ -1,0 +1,372 @@
+-- FoodHub seed data
+-- Manual/synthetic seed data (intentionally). This project uses deterministic UUIDs and demo-friendly records
+-- to support browsing, cart, checkout, and orders without any external dataset dependency.
+
+BEGIN;
+
+-- Deterministic IDs for easier dev/testing
+
+-- Users
+INSERT INTO users (id, email, password_hash, full_name, phone, created_at) VALUES
+  ('00000000-0000-0000-0000-000000000001', 'demo@foodhub.local', '$2b$10$7EqJtq98hPqEX7fNZaFWoOhi5Xv3gZHJqhGlywbn4T/6QAEyy6Xo2', 'Demo User', '+1-555-0100', now());
+-- password_hash above is bcrypt for: Password123!
+
+-- Addresses
+INSERT INTO addresses (id, user_id, label, line1, line2, city, state, postal_code, lat, lng, is_default) VALUES
+  ('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-000000000001', 'Home', '123 Market St', 'Apt 5B', 'San Francisco', 'CA', '94103', 37.774900, -122.419400, true);
+
+-- Payment methods
+INSERT INTO payment_methods (id, user_id, brand, last4, exp_month, exp_year, billing_zip, is_default) VALUES
+  ('00000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-000000000001', 'VISA', '4242', 12, 2030, '94103', true);
+
+-- Restaurant categories (6)
+INSERT INTO restaurant_categories (id, name, emoji, sort_order) VALUES
+  ('00000000-0000-0000-0000-000000001001', 'Chinese', '🥡', 1),
+  ('00000000-0000-0000-0000-000000001002', 'Italian', '🍝', 2),
+  ('00000000-0000-0000-0000-000000001003', 'Fast Food', '🍔', 3),
+  ('00000000-0000-0000-0000-000000001004', 'Mexican', '🌮', 4),
+  ('00000000-0000-0000-0000-000000001005', 'Indian', '🍛', 5),
+  ('00000000-0000-0000-0000-000000001006', 'Dessert', '🍰', 6);
+
+-- Restaurants (12)
+INSERT INTO restaurants (
+  id, category_id, name, description, price_range, rating, reviews_count, distance_miles,
+  delivery_time_min, delivery_fee_cents, minimum_order_cents, cover_image_url, hero_image_url, is_active
+) VALUES
+  ('00000000-0000-0000-0000-000000002001','00000000-0000-0000-0000-000000001002','Piazza Roma Pizzeria','Wood-fired pies, fresh salads, and house-made sauces.',2,4.6,1280,1.8,32,199,1500,'https://source.unsplash.com/1200x800/?pizza%20restaurant%20food%20cover%20photo','https://source.unsplash.com/1200x800/?pizza%20oven',true),
+  ('00000000-0000-0000-0000-000000002002','00000000-0000-0000-0000-000000001001','Golden Wok Express','Classic stir-fries, dumplings, and fried rice favorites.',1,4.4,860,2.4,28,99,1200,'https://source.unsplash.com/1200x800/?chinese%20food','https://source.unsplash.com/1200x800/?dumplings',true),
+  ('00000000-0000-0000-0000-000000002003','00000000-0000-0000-0000-000000001004','Taqueria El Sol','Street tacos, burritos, and aguas frescas.',1,4.7,940,1.2,25,0,1000,'https://source.unsplash.com/1200x800/?tacos%20mexican%20food%20photo','https://source.unsplash.com/1200x800/?burrito',true),
+  ('00000000-0000-0000-0000-000000002004','00000000-0000-0000-0000-000000001005','Spice Route Kitchen','Curries, biryani, and fresh naan baked to order.',2,4.5,670,3.1,40,299,1800,'https://source.unsplash.com/1200x800/?indian%20curry%20food%20photo','https://source.unsplash.com/1200x800/?naan',true),
+  ('00000000-0000-0000-0000-000000002005','00000000-0000-0000-0000-000000001003','Burger Barn','Smash burgers, fries, shakes  fast and satisfying.',1,4.2,520,0.9,22,0,0,'https://source.unsplash.com/1200x800/?burger%20fries','https://source.unsplash.com/1200x800/?milkshake',true),
+  ('00000000-0000-0000-0000-000000002006','00000000-0000-0000-0000-000000001006','Sugar & Crumb Bakery','Cookies, cakes, and pastries baked daily.',2,4.8,410,2.0,30,199,1200,'https://source.unsplash.com/1200x800/?dessert%20bakery%20pastry%20photo','https://source.unsplash.com/1200x800/?cupcakes',true),
+  ('00000000-0000-0000-0000-000000002007','00000000-0000-0000-0000-000000001001','Dragon Noodle House','Hand-pulled noodles and spicy soups.',2,4.3,390,4.6,45,399,2000,'https://source.unsplash.com/1200x800/?noodles','https://source.unsplash.com/1200x800/?ramen',true),
+  ('00000000-0000-0000-0000-000000002008','00000000-0000-0000-0000-000000001002','Trattoria Verde','Pasta bowls, antipasti, and tiramisu.',3,4.6,310,5.2,50,499,2500,'https://source.unsplash.com/1200x800/?italian%20pasta','https://source.unsplash.com/1200x800/?tiramisu',true),
+  ('00000000-0000-0000-0000-000000002009','00000000-0000-0000-0000-000000001004','Casa Verde Cantina','Bowls, quesadillas, and chips & guac.',2,4.1,210,3.8,35,299,1500,'https://source.unsplash.com/1200x800/?mexican%20restaurant','https://source.unsplash.com/1200x800/?guacamole',true),
+  ('00000000-0000-0000-0000-000000002010','00000000-0000-0000-0000-000000001005','Bombay Bites','Quick Indian plates and vegetarian options.',1,4.4,180,2.9,33,199,1200,'https://source.unsplash.com/1200x800/?indian%20food','https://source.unsplash.com/1200x800/?biryani',true),
+  ('00000000-0000-0000-0000-000000002011','00000000-0000-0000-0000-000000001003','Fry & Co.','Chicken sandwiches, tenders, and seasoned fries.',1,4.0,150,1.6,24,0,0,'https://source.unsplash.com/1200x800/?fried%20chicken%20sandwich','https://source.unsplash.com/1200x800/?chicken%20tenders',true),
+  ('00000000-0000-0000-0000-000000002012','00000000-0000-0000-0000-000000001006','Gelato Grove','Small-batch gelato and sundaes.',2,4.7,120,1.4,26,99,1000,'https://source.unsplash.com/1200x800/?gelato','https://source.unsplash.com/1200x800/?ice%20cream',true),
+  ('00000000-0000-0000-0000-000000002013','00000000-0000-0000-0000-000000001006','Green Garden Salads','Fresh salads, bowls, and juices.',2,4.5,260,1.9,27,199,1200,'https://source.unsplash.com/1200x800/?salad%20restaurant','https://source.unsplash.com/1200x800/?healthy%20food%20bowl',true),
+  ('00000000-0000-0000-0000-000000002014','00000000-0000-0000-0000-000000001001','Seoul Street Kitchen','Korean bowls, fried chicken, and dumplings.',2,4.6,340,2.7,34,199,1500,'https://source.unsplash.com/1200x800/?korean%20food','https://source.unsplash.com/1200x800/?bibimbap',true),
+  ('00000000-0000-0000-0000-000000002015','00000000-0000-0000-0000-000000001002','Mediterranean Mezze','Wraps, dips, and fresh salads.',2,4.4,210,3.3,38,299,1500,'https://source.unsplash.com/1200x800/?mediterranean%20food','https://source.unsplash.com/1200x800/?shawarma',true),
+  ('00000000-0000-0000-0000-000000002016','00000000-0000-0000-0000-000000001003','BBQ Smokehouse','Slow-smoked brisket, ribs, and sides.',3,4.5,190,4.1,48,399,2000,'https://source.unsplash.com/1200x800/?bbq%20restaurant','https://source.unsplash.com/1200x800/?brisket',true),
+  ('00000000-0000-0000-0000-000000002017','00000000-0000-0000-0000-000000001003','Sunrise Breakfast','Breakfast sandwiches and coffee.',1,4.3,160,1.1,20,0,0,'https://source.unsplash.com/1200x800/?breakfast%20sandwich','https://source.unsplash.com/1200x800/?pancakes',true),
+  ('00000000-0000-0000-0000-000000002018','00000000-0000-0000-0000-000000001006','Vegan Vibes','Plant-based comfort food and bowls.',2,4.7,220,2.2,30,199,1200,'https://source.unsplash.com/1200x800/?vegan%20food','https://source.unsplash.com/1200x800/?vegan%20burger',true),
+  ('00000000-0000-0000-0000-000000002019','00000000-0000-0000-0000-000000001004','Taco Truck Express','Fast street tacos and sides.',1,4.4,300,1.5,23,0,0,'https://source.unsplash.com/1200x800/?taco%20truck','https://source.unsplash.com/1200x800/?street%20tacos',true);
+
+-- Menu categories (3 per restaurant)
+INSERT INTO menu_categories (id, restaurant_id, name, sort_order) VALUES
+  -- Piazza Roma
+  ('00000000-0000-0000-0000-000000003001','00000000-0000-0000-0000-000000002001','Popular',1),
+  ('00000000-0000-0000-0000-000000003002','00000000-0000-0000-0000-000000002001','Pizzas',2),
+  ('00000000-0000-0000-0000-000000003003','00000000-0000-0000-0000-000000002001','Drinks',3),
+  -- Golden Wok
+  ('00000000-0000-0000-0000-000000003011','00000000-0000-0000-0000-000000002002','Popular',1),
+  ('00000000-0000-0000-0000-000000003012','00000000-0000-0000-0000-000000002002','Dumplings',2),
+  ('00000000-0000-0000-0000-000000003013','00000000-0000-0000-0000-000000002002','Rice & Noodles',3),
+  -- Taqueria El Sol
+  ('00000000-0000-0000-0000-000000003021','00000000-0000-0000-0000-000000002003','Popular',1),
+  ('00000000-0000-0000-0000-000000003022','00000000-0000-0000-0000-000000002003','Tacos',2),
+  ('00000000-0000-0000-0000-000000003023','00000000-0000-0000-0000-000000002003','Sides & Drinks',3),
+  -- Spice Route
+  ('00000000-0000-0000-0000-000000003031','00000000-0000-0000-0000-000000002004','Popular',1),
+  ('00000000-0000-0000-0000-000000003032','00000000-0000-0000-0000-000000002004','Curries',2),
+  ('00000000-0000-0000-0000-000000003033','00000000-0000-0000-0000-000000002004','Breads',3),
+  -- Burger Barn
+  ('00000000-0000-0000-0000-000000003041','00000000-0000-0000-0000-000000002005','Popular',1),
+  ('00000000-0000-0000-0000-000000003042','00000000-0000-0000-0000-000000002005','Burgers',2),
+  ('00000000-0000-0000-0000-000000003043','00000000-0000-0000-0000-000000002005','Shakes',3),
+  -- Sugar & Crumb
+  ('00000000-0000-0000-0000-000000003051','00000000-0000-0000-0000-000000002006','Popular',1),
+  ('00000000-0000-0000-0000-000000003052','00000000-0000-0000-0000-000000002006','Cookies',2),
+  ('00000000-0000-0000-0000-000000003053','00000000-0000-0000-0000-000000002006','Cakes',3),
+  -- Dragon Noodle
+  ('00000000-0000-0000-0000-000000003061','00000000-0000-0000-0000-000000002007','Popular',1),
+  ('00000000-0000-0000-0000-000000003062','00000000-0000-0000-0000-000000002007','Noodle Bowls',2),
+  ('00000000-0000-0000-0000-000000003063','00000000-0000-0000-0000-000000002007','Drinks',3),
+  -- Trattoria Verde
+  ('00000000-0000-0000-0000-000000003071','00000000-0000-0000-0000-000000002008','Popular',1),
+  ('00000000-0000-0000-0000-000000003072','00000000-0000-0000-0000-000000002008','Pastas',2),
+  ('00000000-0000-0000-0000-000000003073','00000000-0000-0000-0000-000000002008','Dessert',3),
+  -- Casa Verde
+  ('00000000-0000-0000-0000-000000003081','00000000-0000-0000-0000-000000002009','Popular',1),
+  ('00000000-0000-0000-0000-000000003082','00000000-0000-0000-0000-000000002009','Bowls',2),
+  ('00000000-0000-0000-0000-000000003083','00000000-0000-0000-0000-000000002009','Sides',3),
+  -- Bombay Bites
+  ('00000000-0000-0000-0000-000000003091','00000000-0000-0000-0000-000000002010','Popular',1),
+  ('00000000-0000-0000-0000-000000003092','00000000-0000-0000-0000-000000002010','Plates',2),
+  ('00000000-0000-0000-0000-000000003093','00000000-0000-0000-0000-000000002010','Drinks',3),
+  -- Fry & Co.
+  ('00000000-0000-0000-0000-000000003101','00000000-0000-0000-0000-000000002011','Popular',1),
+  ('00000000-0000-0000-0000-000000003102','00000000-0000-0000-0000-000000002011','Chicken',2),
+  ('00000000-0000-0000-0000-000000003103','00000000-0000-0000-0000-000000002011','Sides',3),
+  -- Gelato Grove
+  ('00000000-0000-0000-0000-000000003111','00000000-0000-0000-0000-000000002012','Popular',1),
+  ('00000000-0000-0000-0000-000000003112','00000000-0000-0000-0000-000000002012','Gelato',2),
+  ('00000000-0000-0000-0000-000000003113','00000000-0000-0000-0000-000000002012','Sundaes',3),
+  -- Green Garden Salads
+  ('00000000-0000-0000-0000-000000003121','00000000-0000-0000-0000-000000002013','Popular',1),
+  ('00000000-0000-0000-0000-000000003122','00000000-0000-0000-0000-000000002013','Bowls',2),
+  ('00000000-0000-0000-0000-000000003123','00000000-0000-0000-0000-000000002013','Drinks',3),
+  -- Seoul Street Kitchen
+  ('00000000-0000-0000-0000-000000003131','00000000-0000-0000-0000-000000002014','Popular',1),
+  ('00000000-0000-0000-0000-000000003132','00000000-0000-0000-0000-000000002014','Bowls',2),
+  ('00000000-0000-0000-0000-000000003133','00000000-0000-0000-0000-000000002014','Sides',3),
+  -- Mediterranean Mezze
+  ('00000000-0000-0000-0000-000000003141','00000000-0000-0000-0000-000000002015','Popular',1),
+  ('00000000-0000-0000-0000-000000003142','00000000-0000-0000-0000-000000002015','Mezze',2),
+  ('00000000-0000-0000-0000-000000003143','00000000-0000-0000-0000-000000002015','Salads',3),
+  -- BBQ Smokehouse
+  ('00000000-0000-0000-0000-000000003151','00000000-0000-0000-0000-000000002016','Popular',1),
+  ('00000000-0000-0000-0000-000000003152','00000000-0000-0000-0000-000000002016','BBQ Plates',2),
+  ('00000000-0000-0000-0000-000000003153','00000000-0000-0000-0000-000000002016','Sides',3),
+  -- Sunrise Breakfast
+  ('00000000-0000-0000-0000-000000003161','00000000-0000-0000-0000-000000002017','Popular',1),
+  ('00000000-0000-0000-0000-000000003162','00000000-0000-0000-0000-000000002017','Breakfast',2),
+  ('00000000-0000-0000-0000-000000003163','00000000-0000-0000-0000-000000002017','Sides & Drinks',3),
+  -- Vegan Vibes
+  ('00000000-0000-0000-0000-000000003171','00000000-0000-0000-0000-000000002018','Popular',1),
+  ('00000000-0000-0000-0000-000000003172','00000000-0000-0000-0000-000000002018','Bowls',2),
+  ('00000000-0000-0000-0000-000000003173','00000000-0000-0000-0000-000000002018','Sides',3),
+  -- Taco Truck Express
+  ('00000000-0000-0000-0000-000000003181','00000000-0000-0000-0000-000000002019','Popular',1),
+  ('00000000-0000-0000-0000-000000003182','00000000-0000-0000-0000-000000002019','Tacos',2),
+  ('00000000-0000-0000-0000-000000003183','00000000-0000-0000-0000-000000002019','Drinks',3);
+
+-- Menu items (8 per restaurant = 96)
+INSERT INTO menu_items (id, restaurant_id, menu_category_id, name, description, price_cents, image_url, unit_info, is_available) VALUES
+  -- Piazza Roma (Italian)
+  ('00000000-0000-0000-0000-000000004001','00000000-0000-0000-0000-000000002001','00000000-0000-0000-0000-000000003001','Margherita Pizza','San Marzano tomato, mozzarella, basil.',1599,'https://source.unsplash.com/800x600/?margherita%20pizza','12 in',true),
+  ('00000000-0000-0000-0000-000000004002','00000000-0000-0000-0000-000000002001','00000000-0000-0000-0000-000000003002','Pepperoni Pizza','Classic pepperoni and mozzarella.',1799,'https://source.unsplash.com/800x600/?pepperoni%20pizza','12 in',true),
+  ('00000000-0000-0000-0000-000000004003','00000000-0000-0000-0000-000000002001','00000000-0000-0000-0000-000000003002','Veggie Pizza','Mushroom, bell pepper, onion, olives.',1799,'https://source.unsplash.com/800x600/?vegetable%20pizza','12 in',true),
+  ('00000000-0000-0000-0000-000000004004','00000000-0000-0000-0000-000000002001','00000000-0000-0000-0000-000000003001','Caesar Salad','Romaine, parmesan, croutons, Caesar dressing.',999,'https://source.unsplash.com/800x600/?caesar%20salad','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004005','00000000-0000-0000-0000-000000002001','00000000-0000-0000-0000-000000003001','Garlic Knots','Six warm knots with garlic butter.',699,'https://source.unsplash.com/800x600/?garlic%20knots','6 pcs',true),
+  ('00000000-0000-0000-0000-000000004006','00000000-0000-0000-0000-000000002001','00000000-0000-0000-0000-000000003003','Sparkling Water','Chilled sparkling water.',249,'https://source.unsplash.com/800x600/?sparkling%20water','12 oz',true),
+  ('00000000-0000-0000-0000-000000004007','00000000-0000-0000-0000-000000002001','00000000-0000-0000-0000-000000003003','Cola','Classic cola.',249,'https://source.unsplash.com/800x600/?cola%20drink','12 oz',true),
+  ('00000000-0000-0000-0000-000000004008','00000000-0000-0000-0000-000000002001','00000000-0000-0000-0000-000000003001','Tiramisu','Espresso-soaked ladyfingers and mascarpone.',799,'https://source.unsplash.com/800x600/?tiramisu','1 slice',true),
+
+  -- Golden Wok (Chinese)
+  ('00000000-0000-0000-0000-000000004101','00000000-0000-0000-0000-000000002002','00000000-0000-0000-0000-000000003011','Kung Pao Chicken','Spicy stir-fry with peanuts and scallions.',1399,'https://source.unsplash.com/800x600/?kung%20pao%20chicken','1 plate',true),
+  ('00000000-0000-0000-0000-000000004102','00000000-0000-0000-0000-000000002002','00000000-0000-0000-0000-000000003013','Beef Chow Mein','Wok-fried noodles with beef and veggies.',1299,'https://source.unsplash.com/800x600/?chow%20mein','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004103','00000000-0000-0000-0000-000000002002','00000000-0000-0000-0000-000000003013','Fried Rice','Egg fried rice with scallions.',899,'https://source.unsplash.com/800x600/?fried%20rice','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004104','00000000-0000-0000-0000-000000002002','00000000-0000-0000-0000-000000003012','Pork Dumplings','Steamed dumplings with dipping sauce.',899,'https://source.unsplash.com/800x600/?dumplings','8 pcs',true),
+  ('00000000-0000-0000-0000-000000004105','00000000-0000-0000-0000-000000002002','00000000-0000-0000-0000-000000003012','Veggie Dumplings','Steamed dumplings with cabbage and chive.',899,'https://source.unsplash.com/800x600/?vegetable%20dumplings','8 pcs',true),
+  ('00000000-0000-0000-0000-000000004106','00000000-0000-0000-0000-000000002002','00000000-0000-0000-0000-000000003011','Hot & Sour Soup','Tangy, spicy soup with tofu and mushrooms.',699,'https://source.unsplash.com/800x600/?hot%20and%20sour%20soup','16 oz',true),
+  ('00000000-0000-0000-0000-000000004107','00000000-0000-0000-0000-000000002002','00000000-0000-0000-0000-000000003011','Orange Chicken','Crispy chicken in sweet citrus sauce.',1299,'https://source.unsplash.com/800x600/?orange%20chicken','1 plate',true),
+  ('00000000-0000-0000-0000-000000004108','00000000-0000-0000-0000-000000002002','00000000-0000-0000-0000-000000003011','Jasmine Tea','Lightly sweetened iced tea.',299,'https://source.unsplash.com/800x600/?iced%20tea','16 oz',true),
+
+  -- Taqueria El Sol (Mexican)
+  ('00000000-0000-0000-0000-000000004201','00000000-0000-0000-0000-000000002003','00000000-0000-0000-0000-000000003022','Carne Asada Taco','Grilled steak, onion, cilantro.',399,'https://source.unsplash.com/800x600/?carne%20asada%20taco','1 taco',true),
+  ('00000000-0000-0000-0000-000000004202','00000000-0000-0000-0000-000000002003','00000000-0000-0000-0000-000000003022','Chicken Taco','Adobo chicken, onion, cilantro.',349,'https://source.unsplash.com/800x600/?chicken%20taco','1 taco',true),
+  ('00000000-0000-0000-0000-000000004203','00000000-0000-0000-0000-000000002003','00000000-0000-0000-0000-000000003021','Burrito Bowl','Rice, beans, salsa, cheese, choice of protein.',1199,'https://source.unsplash.com/800x600/?burrito%20bowl','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004204','00000000-0000-0000-0000-000000002003','00000000-0000-0000-0000-000000003023','Chips & Guac','House-made guacamole with tortilla chips.',799,'https://source.unsplash.com/800x600/?guacamole%20chips','1 order',true),
+  ('00000000-0000-0000-0000-000000004205','00000000-0000-0000-0000-000000002003','00000000-0000-0000-0000-000000003023','Mexican Coke','Cane sugar cola.',349,'https://source.unsplash.com/800x600/?mexican%20coke','12 oz',true),
+  ('00000000-0000-0000-0000-000000004206','00000000-0000-0000-0000-000000002003','00000000-0000-0000-0000-000000003021','Quesadilla','Cheese quesadilla with salsa.',899,'https://source.unsplash.com/800x600/?quesadilla','1 quesadilla',true),
+  ('00000000-0000-0000-0000-000000004207','00000000-0000-0000-0000-000000002003','00000000-0000-0000-0000-000000003021','Chicken Burrito','Beans, rice, salsa, cheese, chicken.',1099,'https://source.unsplash.com/800x600/?chicken%20burrito','1 burrito',true),
+  ('00000000-0000-0000-0000-000000004208','00000000-0000-0000-0000-000000002003','00000000-0000-0000-0000-000000003023','Horchata','Sweet cinnamon rice drink.',399,'https://source.unsplash.com/800x600/?horchata','16 oz',true),
+
+  -- Spice Route Kitchen (Indian)
+  ('00000000-0000-0000-0000-000000004301','00000000-0000-0000-0000-000000002004','00000000-0000-0000-0000-000000003031','Chicken Tikka Masala','Creamy tomato curry with chicken.',1499,'https://source.unsplash.com/800x600/?chicken%20tikka%20masala','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004302','00000000-0000-0000-0000-000000002004','00000000-0000-0000-0000-000000003032','Saag Paneer','Spinach curry with paneer.',1399,'https://source.unsplash.com/800x600/?saag%20paneer','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004303','00000000-0000-0000-0000-000000002004','00000000-0000-0000-0000-000000003032','Chana Masala','Chickpea curry with warm spices.',1299,'https://source.unsplash.com/800x600/?chana%20masala','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004304','00000000-0000-0000-0000-000000002004','00000000-0000-0000-0000-000000003031','Vegetable Biryani','Fragrant rice with vegetables.',1399,'https://source.unsplash.com/800x600/?vegetable%20biryani','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004305','00000000-0000-0000-0000-000000002004','00000000-0000-0000-0000-000000003033','Garlic Naan','Naan brushed with garlic butter.',399,'https://source.unsplash.com/800x600/?garlic%20naan','1 pc',true),
+  ('00000000-0000-0000-0000-000000004306','00000000-0000-0000-0000-000000002004','00000000-0000-0000-0000-000000003033','Plain Naan','Soft tandoor-baked naan.',299,'https://source.unsplash.com/800x600/?naan%20bread','1 pc',true),
+  ('00000000-0000-0000-0000-000000004307','00000000-0000-0000-0000-000000002004','00000000-0000-0000-0000-000000003031','Mango Lassi','Yogurt smoothie with mango.',499,'https://source.unsplash.com/800x600/?mango%20lassi','16 oz',true),
+  ('00000000-0000-0000-0000-000000004308','00000000-0000-0000-0000-000000002004','00000000-0000-0000-0000-000000003031','Samosas','Crispy pastry stuffed with potatoes.',699,'https://source.unsplash.com/800x600/?samosa','2 pcs',true),
+
+  -- Burger Barn (Fast Food)
+  ('00000000-0000-0000-0000-000000004401','00000000-0000-0000-0000-000000002005','00000000-0000-0000-0000-000000003041','Classic Smash Burger','Two patties, cheese, pickles, sauce.',1099,'https://source.unsplash.com/800x600/?smash%20burger','1 burger',true),
+  ('00000000-0000-0000-0000-000000004402','00000000-0000-0000-0000-000000002005','00000000-0000-0000-0000-000000003042','Bacon Cheeseburger','Bacon, cheddar, onions, sauce.',1299,'https://source.unsplash.com/800x600/?bacon%20cheeseburger','1 burger',true),
+  ('00000000-0000-0000-0000-000000004403','00000000-0000-0000-0000-000000002005','00000000-0000-0000-0000-000000003041','Crispy Chicken Sandwich','Buttermilk fried chicken, slaw.',1199,'https://source.unsplash.com/800x600/?crispy%20chicken%20sandwich','1 sandwich',true),
+  ('00000000-0000-0000-0000-000000004404','00000000-0000-0000-0000-000000002005','00000000-0000-0000-0000-000000003041','Fries','Sea-salted fries.',399,'https://source.unsplash.com/800x600/?french%20fries','1 order',true),
+  ('00000000-0000-0000-0000-000000004405','00000000-0000-0000-0000-000000002005','00000000-0000-0000-0000-000000003041','Onion Rings','Crispy battered rings.',499,'https://source.unsplash.com/800x600/?onion%20rings','1 order',true),
+  ('00000000-0000-0000-0000-000000004406','00000000-0000-0000-0000-000000002005','00000000-0000-0000-0000-000000003043','Vanilla Shake','Thick vanilla milkshake.',599,'https://source.unsplash.com/800x600/?vanilla%20milkshake','16 oz',true),
+  ('00000000-0000-0000-0000-000000004407','00000000-0000-0000-0000-000000002005','00000000-0000-0000-0000-000000003043','Chocolate Shake','Rich chocolate milkshake.',599,'https://source.unsplash.com/800x600/?chocolate%20milkshake','16 oz',true),
+  ('00000000-0000-0000-0000-000000004408','00000000-0000-0000-0000-000000002005','00000000-0000-0000-0000-000000003041','Cookie Sundae','Soft serve with cookie crumble.',499,'https://source.unsplash.com/800x600/?ice%20cream%20sundae','1 cup',true),
+
+  -- Sugar & Crumb (Dessert)
+  ('00000000-0000-0000-0000-000000004501','00000000-0000-0000-0000-000000002006','00000000-0000-0000-0000-000000003051','Chocolate Chip Cookie','Classic gooey cookie.',299,'https://source.unsplash.com/800x600/?chocolate%20chip%20cookie','1 pc',true),
+  ('00000000-0000-0000-0000-000000004502','00000000-0000-0000-0000-000000002006','00000000-0000-0000-0000-000000003052','Oatmeal Raisin Cookie','Hearty oats and raisins.',299,'https://source.unsplash.com/800x600/?oatmeal%20cookie','1 pc',true),
+  ('00000000-0000-0000-0000-000000004503','00000000-0000-0000-0000-000000002006','00000000-0000-0000-0000-000000003052','Brownie','Fudgy brownie square.',399,'https://source.unsplash.com/800x600/?brownie','1 pc',true),
+  ('00000000-0000-0000-0000-000000004504','00000000-0000-0000-0000-000000002006','00000000-0000-0000-0000-000000003053','Strawberry Shortcake','Light sponge with strawberries.',699,'https://source.unsplash.com/800x600/?strawberry%20shortcake','1 slice',true),
+  ('00000000-0000-0000-0000-000000004505','00000000-0000-0000-0000-000000002006','00000000-0000-0000-0000-000000003053','Cheesecake','Creamy cheesecake slice.',749,'https://source.unsplash.com/800x600/?cheesecake','1 slice',true),
+  ('00000000-0000-0000-0000-000000004506','00000000-0000-0000-0000-000000002006','00000000-0000-0000-0000-000000003051','Cappuccino','Fresh cappuccino.',449,'https://source.unsplash.com/800x600/?cappuccino','12 oz',true),
+  ('00000000-0000-0000-0000-000000004507','00000000-0000-0000-0000-000000002006','00000000-0000-0000-0000-000000003051','Iced Latte','Chilled espresso and milk.',499,'https://source.unsplash.com/800x600/?iced%20latte','16 oz',true),
+  ('00000000-0000-0000-0000-000000004508','00000000-0000-0000-0000-000000002006','00000000-0000-0000-0000-000000003053','Macarons (6)','Assorted macarons.',1099,'https://source.unsplash.com/800x600/?macarons','6 pcs',true),
+
+  -- Dragon Noodle House (Chinese)
+  ('00000000-0000-0000-0000-000000004601','00000000-0000-0000-0000-000000002007','00000000-0000-0000-0000-000000003061','Spicy Beef Noodle Soup','Chili broth, beef, bok choy.',1499,'https://source.unsplash.com/800x600/?beef%20noodle%20soup','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004602','00000000-0000-0000-0000-000000002007','00000000-0000-0000-0000-000000003062','Dan Dan Noodles','Sesame-chili noodles with pork.',1399,'https://source.unsplash.com/800x600/?dan%20dan%20noodles','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004603','00000000-0000-0000-0000-000000002007','00000000-0000-0000-0000-000000003062','Veggie Lo Mein','Noodles with mixed vegetables.',1299,'https://source.unsplash.com/800x600/?lo%20mein','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004604','00000000-0000-0000-0000-000000002007','00000000-0000-0000-0000-000000003061','Scallion Pancake','Crispy savory pancake.',699,'https://source.unsplash.com/800x600/?scallion%20pancake','1 pc',true),
+  ('00000000-0000-0000-0000-000000004605','00000000-0000-0000-0000-000000002007','00000000-0000-0000-0000-000000003061','Cucumber Salad','Chili oil, garlic, sesame.',599,'https://source.unsplash.com/800x600/?cucumber%20salad','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004606','00000000-0000-0000-0000-000000002007','00000000-0000-0000-0000-000000003063','Brown Sugar Milk Tea','Boba milk tea.',599,'https://source.unsplash.com/800x600/?boba%20milk%20tea','16 oz',true),
+  ('00000000-0000-0000-0000-000000004607','00000000-0000-0000-0000-000000002007','00000000-0000-0000-0000-000000003061','Mapo Tofu','Spicy tofu with minced pork.',1299,'https://source.unsplash.com/800x600/?mapo%20tofu','1 plate',true),
+  ('00000000-0000-0000-0000-000000004608','00000000-0000-0000-0000-000000002007','00000000-0000-0000-0000-000000003061','Pork Soup Dumplings','Juicy soup dumplings.',1099,'https://source.unsplash.com/800x600/?soup%20dumplings','6 pcs',true),
+
+  -- Trattoria Verde (Italian)
+  ('00000000-0000-0000-0000-000000004701','00000000-0000-0000-0000-000000002008','00000000-0000-0000-0000-000000003071','Spaghetti & Meatballs','Classic red sauce and meatballs.',1599,'https://source.unsplash.com/800x600/?spaghetti%20meatballs','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004702','00000000-0000-0000-0000-000000002008','00000000-0000-0000-0000-000000003072','Fettuccine Alfredo','Creamy parmesan alfredo sauce.',1499,'https://source.unsplash.com/800x600/?fettuccine%20alfredo','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004703','00000000-0000-0000-0000-000000002008','00000000-0000-0000-0000-000000003072','Penne Arrabbiata','Spicy tomato sauce, basil.',1399,'https://source.unsplash.com/800x600/?penne%20arrabbiata','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004704','00000000-0000-0000-0000-000000002008','00000000-0000-0000-0000-000000003071','Bruschetta','Tomato, basil, balsamic.',799,'https://source.unsplash.com/800x600/?bruschetta','4 pcs',true),
+  ('00000000-0000-0000-0000-000000004705','00000000-0000-0000-0000-000000002008','00000000-0000-0000-0000-000000003071','Caprese Salad','Tomato, mozzarella, basil.',999,'https://source.unsplash.com/800x600/?caprese%20salad','1 plate',true),
+  ('00000000-0000-0000-0000-000000004706','00000000-0000-0000-0000-000000002008','00000000-0000-0000-0000-000000003073','Tiramisu','Mascarpone, cocoa, espresso.',799,'https://source.unsplash.com/800x600/?tiramisu%20dessert','1 slice',true),
+  ('00000000-0000-0000-0000-000000004707','00000000-0000-0000-0000-000000002008','00000000-0000-0000-0000-000000003073','Panna Cotta','Vanilla custard with berry sauce.',699,'https://source.unsplash.com/800x600/?panna%20cotta','1 cup',true),
+  ('00000000-0000-0000-0000-000000004708','00000000-0000-0000-0000-000000002008','00000000-0000-0000-0000-000000003071','Italian Soda','Sparkling soda with fruit syrup.',399,'https://source.unsplash.com/800x600/?italian%20soda','12 oz',true),
+
+  -- Casa Verde Cantina (Mexican)
+  ('00000000-0000-0000-0000-000000004801','00000000-0000-0000-0000-000000002009','00000000-0000-0000-0000-000000003081','Chicken Bowl','Rice, beans, salsa, chicken.',1199,'https://source.unsplash.com/800x600/?mexican%20bowl','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004802','00000000-0000-0000-0000-000000002009','00000000-0000-0000-0000-000000003082','Steak Bowl','Rice, beans, salsa, steak.',1299,'https://source.unsplash.com/800x600/?steak%20bowl','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004803','00000000-0000-0000-0000-000000002009','00000000-0000-0000-0000-000000003081','Quesadilla','Cheese quesadilla.',899,'https://source.unsplash.com/800x600/?quesadilla%20mexican','1 quesadilla',true),
+  ('00000000-0000-0000-0000-000000004804','00000000-0000-0000-0000-000000002009','00000000-0000-0000-0000-000000003083','Chips','House tortilla chips.',399,'https://source.unsplash.com/800x600/?tortilla%20chips','1 bag',true),
+  ('00000000-0000-0000-0000-000000004805','00000000-0000-0000-0000-000000002009','00000000-0000-0000-0000-000000003083','Guacamole','Fresh guacamole.',599,'https://source.unsplash.com/800x600/?guacamole','1 cup',true),
+  ('00000000-0000-0000-0000-000000004806','00000000-0000-0000-0000-000000002009','00000000-0000-0000-0000-000000003083','Salsa & Chips','Salsa roja with chips.',499,'https://source.unsplash.com/800x600/?salsa%20chips','1 order',true),
+  ('00000000-0000-0000-0000-000000004807','00000000-0000-0000-0000-000000002009','00000000-0000-0000-0000-000000003081','Churros','Cinnamon sugar churros.',599,'https://source.unsplash.com/800x600/?churros','4 pcs',true),
+  ('00000000-0000-0000-0000-000000004808','00000000-0000-0000-0000-000000002009','00000000-0000-0000-0000-000000003083','Jarritos','Fruit soda.',349,'https://source.unsplash.com/800x600/?jarritos','12 oz',true),
+
+  -- Bombay Bites (Indian)
+  ('00000000-0000-0000-0000-000000004901','00000000-0000-0000-0000-000000002010','00000000-0000-0000-0000-000000003091','Butter Chicken','Creamy tomato curry.',1499,'https://source.unsplash.com/800x600/?butter%20chicken','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004902','00000000-0000-0000-0000-000000002010','00000000-0000-0000-0000-000000003092','Paneer Tikka','Grilled paneer cubes.',1299,'https://source.unsplash.com/800x600/?paneer%20tikka','1 plate',true),
+  ('00000000-0000-0000-0000-000000004903','00000000-0000-0000-0000-000000002010','00000000-0000-0000-0000-000000003092','Dal Tadka','Lentils tempered with spices.',1199,'https://source.unsplash.com/800x600/?dal%20tadka','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004904','00000000-0000-0000-0000-000000002010','00000000-0000-0000-0000-000000003092','Chicken Biryani','Spiced rice with chicken.',1399,'https://source.unsplash.com/800x600/?chicken%20biryani','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004905','00000000-0000-0000-0000-000000002010','00000000-0000-0000-0000-000000003091','Samosa Chaat','Samosas topped with chutneys.',799,'https://source.unsplash.com/800x600/?samosa%20chaat','1 bowl',true),
+  ('00000000-0000-0000-0000-000000004906','00000000-0000-0000-0000-000000002010','00000000-0000-0000-0000-000000003093','Mango Lassi','Yogurt mango drink.',499,'https://source.unsplash.com/800x600/?mango%20lassi%20drink','16 oz',true),
+  ('00000000-0000-0000-0000-000000004907','00000000-0000-0000-0000-000000002010','00000000-0000-0000-0000-000000003093','Masala Chai','Spiced tea with milk.',349,'https://source.unsplash.com/800x600/?masala%20chai','12 oz',true),
+  ('00000000-0000-0000-0000-000000004908','00000000-0000-0000-0000-000000002010','00000000-0000-0000-0000-000000003091','Gulab Jamun','Sweet milk dumplings in syrup.',599,'https://source.unsplash.com/800x600/?gulab%20jamun','2 pcs',true),
+
+  -- Fry & Co. (Fast Food)
+  ('00000000-0000-0000-0000-000000005001','00000000-0000-0000-0000-000000002011','00000000-0000-0000-0000-000000003101','Spicy Chicken Sandwich','Spicy fried chicken, pickles.',1199,'https://source.unsplash.com/800x600/?spicy%20chicken%20sandwich','1 sandwich',true),
+  ('00000000-0000-0000-0000-000000005002','00000000-0000-0000-0000-000000002011','00000000-0000-0000-0000-000000003102','Chicken Tenders','Crispy tenders.',999,'https://source.unsplash.com/800x600/?chicken%20tenders','5 pcs',true),
+  ('00000000-0000-0000-0000-000000005003','00000000-0000-0000-0000-000000002011','00000000-0000-0000-0000-000000003102','Classic Chicken Sandwich','Crispy chicken, mayo.',1099,'https://source.unsplash.com/800x600/?chicken%20sandwich','1 sandwich',true),
+  ('00000000-0000-0000-0000-000000005004','00000000-0000-0000-0000-000000002011','00000000-0000-0000-0000-000000003103','Cajun Fries','Seasoned fries.',449,'https://source.unsplash.com/800x600/?seasoned%20fries','1 order',true),
+  ('00000000-0000-0000-0000-000000005005','00000000-0000-0000-0000-000000002011','00000000-0000-0000-0000-000000003103','Mac & Cheese','Creamy mac.',599,'https://source.unsplash.com/800x600/?mac%20and%20cheese','1 cup',true),
+  ('00000000-0000-0000-0000-000000005006','00000000-0000-0000-0000-000000002011','00000000-0000-0000-0000-000000003103','Coleslaw','Fresh slaw.',299,'https://source.unsplash.com/800x600/?coleslaw','1 cup',true),
+  ('00000000-0000-0000-0000-000000005007','00000000-0000-0000-0000-000000002011','00000000-0000-0000-0000-000000003101','Chicken Wrap','Grilled chicken wrap.',999,'https://source.unsplash.com/800x600/?chicken%20wrap','1 wrap',true),
+  ('00000000-0000-0000-0000-000000005008','00000000-0000-0000-0000-000000002011','00000000-0000-0000-0000-000000003103','Lemonade','Fresh lemonade.',349,'https://source.unsplash.com/800x600/?lemonade','16 oz',true),
+
+  -- Gelato Grove (Dessert)
+  ('00000000-0000-0000-0000-000000005101','00000000-0000-0000-0000-000000002012','00000000-0000-0000-0000-000000003111','Classic Sundae','Vanilla gelato with toppings.',699,'https://source.unsplash.com/800x600/?gelato%20sundae','1 cup',true),
+  ('00000000-0000-0000-0000-000000005102','00000000-0000-0000-0000-000000002012','00000000-0000-0000-0000-000000003112','Pistachio Gelato','Nutty pistachio gelato.',599,'https://source.unsplash.com/800x600/?pistachio%20gelato','1 scoop',true),
+  ('00000000-0000-0000-0000-000000005103','00000000-0000-0000-0000-000000002012','00000000-0000-0000-0000-000000003112','Stracciatella Gelato','Chocolate chip gelato.',599,'https://source.unsplash.com/800x600/?stracciatella%20gelato','1 scoop',true),
+  ('00000000-0000-0000-0000-000000005104','00000000-0000-0000-0000-000000002012','00000000-0000-0000-0000-000000003112','Mango Sorbet','Dairy-free mango sorbet.',549,'https://source.unsplash.com/800x600/?mango%20sorbet','1 scoop',true),
+  ('00000000-0000-0000-0000-000000005105','00000000-0000-0000-0000-000000002012','00000000-0000-0000-0000-000000003113','Chocolate Brownie Sundae','Chocolate gelato and brownie.',799,'https://source.unsplash.com/800x600/?brownie%20ice%20cream','1 cup',true),
+  ('00000000-0000-0000-0000-000000005106','00000000-0000-0000-0000-000000002012','00000000-0000-0000-0000-000000003113','Caramel Sundae','Caramel sauce and nuts.',749,'https://source.unsplash.com/800x600/?caramel%20ice%20cream','1 cup',true),
+  ('00000000-0000-0000-0000-000000005107','00000000-0000-0000-0000-000000002012','00000000-0000-0000-0000-000000003111','Affogato','Espresso poured over gelato.',699,'https://source.unsplash.com/800x600/?affogato','1 cup',true),
+  ('00000000-0000-0000-0000-000000005108','00000000-0000-0000-0000-000000002012','00000000-0000-0000-0000-000000003111','Sparkling Lemon','Sparkling citrus drink.',299,'https://source.unsplash.com/800x600/?sparkling%20lemonade','12 oz',true),
+
+  -- Green Garden Salads (Healthy)
+  ('00000000-0000-0000-0000-000000005201','00000000-0000-0000-0000-000000002013','00000000-0000-0000-0000-000000003121','Build-Your-Own Salad','Choose greens, toppings, dressing.',1099,'https://source.unsplash.com/800x600/?salad%20bowl','1 bowl',true),
+  ('00000000-0000-0000-0000-000000005202','00000000-0000-0000-0000-000000002013','00000000-0000-0000-0000-000000003121','Chicken Caesar Salad','Romaine, parmesan, croutons.',1199,'https://source.unsplash.com/800x600/?caesar%20salad','1 bowl',true),
+  ('00000000-0000-0000-0000-000000005203','00000000-0000-0000-0000-000000002013','00000000-0000-0000-0000-000000003122','Quinoa Power Bowl','Quinoa, veggies, tahini.',1299,'https://source.unsplash.com/800x600/?quinoa%20bowl','1 bowl',true),
+  ('00000000-0000-0000-0000-000000005204','00000000-0000-0000-0000-000000002013','00000000-0000-0000-0000-000000003122','Avocado Toast','Sourdough, avocado, chili flakes.',899,'https://source.unsplash.com/800x600/?avocado%20toast','1 toast',true),
+  ('00000000-0000-0000-0000-000000005205','00000000-0000-0000-0000-000000002013','00000000-0000-0000-0000-000000003123','Greek Yogurt Parfait','Yogurt, berries, granola.',699,'https://source.unsplash.com/800x600/?yogurt%20parfait','1 cup',true),
+  ('00000000-0000-0000-0000-000000005206','00000000-0000-0000-0000-000000002013','00000000-0000-0000-0000-000000003123','Fresh Fruit Cup','Seasonal fruit mix.',599,'https://source.unsplash.com/800x600/?fruit%20cup','1 cup',true),
+  ('00000000-0000-0000-0000-000000005207','00000000-0000-0000-0000-000000002013','00000000-0000-0000-0000-000000003123','Cold-Pressed Juice','Daily juice blend.',649,'https://source.unsplash.com/800x600/?green%20juice','12 oz',true),
+  ('00000000-0000-0000-0000-000000005208','00000000-0000-0000-0000-000000002013','00000000-0000-0000-0000-000000003123','Sparkling Water','Lime sparkling water.',249,'https://source.unsplash.com/800x600/?sparkling%20water','12 oz',true),
+
+  -- Seoul Street Kitchen (Korean)
+  ('00000000-0000-0000-0000-000000005301','00000000-0000-0000-0000-000000002014','00000000-0000-0000-0000-000000003131','Bibimbap','Rice bowl with veggies and egg.',1299,'https://source.unsplash.com/800x600/?bibimbap','1 bowl',true),
+  ('00000000-0000-0000-0000-000000005302','00000000-0000-0000-0000-000000002014','00000000-0000-0000-0000-000000003131','Bulgogi Bowl','Marinated beef over rice.',1399,'https://source.unsplash.com/800x600/?bulgogi','1 bowl',true),
+  ('00000000-0000-0000-0000-000000005303','00000000-0000-0000-0000-000000002014','00000000-0000-0000-0000-000000003132','Kimchi Fried Rice','Spicy kimchi fried rice.',1199,'https://source.unsplash.com/800x600/?kimchi%20fried%20rice','1 bowl',true),
+  ('00000000-0000-0000-0000-000000005304','00000000-0000-0000-0000-000000002014','00000000-0000-0000-0000-000000003132','Japchae','Sweet potato noodles, veggies.',1299,'https://source.unsplash.com/800x600/?japchae','1 bowl',true),
+  ('00000000-0000-0000-0000-000000005305','00000000-0000-0000-0000-000000002014','00000000-0000-0000-0000-000000003133','Korean Fried Chicken','Crispy chicken bites.',1299,'https://source.unsplash.com/800x600/?korean%20fried%20chicken','1 basket',true),
+  ('00000000-0000-0000-0000-000000005306','00000000-0000-0000-0000-000000002014','00000000-0000-0000-0000-000000003133','Mandu Dumplings','Pan-fried dumplings.',999,'https://source.unsplash.com/800x600/?mandu%20dumplings','6 pcs',true),
+  ('00000000-0000-0000-0000-000000005307','00000000-0000-0000-0000-000000002014','00000000-0000-0000-0000-000000003133','Kimchi','House kimchi side.',399,'https://source.unsplash.com/800x600/?kimchi','1 cup',true),
+  ('00000000-0000-0000-0000-000000005308','00000000-0000-0000-0000-000000002014','00000000-0000-0000-0000-000000003133','Barley Tea','Iced barley tea.',299,'https://source.unsplash.com/800x600/?barley%20tea','16 oz',true),
+
+  -- Mediterranean Mezze (Mediterranean)
+  ('00000000-0000-0000-0000-000000005401','00000000-0000-0000-0000-000000002015','00000000-0000-0000-0000-000000003141','Chicken Shawarma Wrap','Garlic sauce, pickles.',1099,'https://source.unsplash.com/800x600/?shawarma%20wrap','1 wrap',true),
+  ('00000000-0000-0000-0000-000000005402','00000000-0000-0000-0000-000000002015','00000000-0000-0000-0000-000000003141','Falafel Wrap','Crispy falafel, tahini.',999,'https://source.unsplash.com/800x600/?falafel%20wrap','1 wrap',true),
+  ('00000000-0000-0000-0000-000000005403','00000000-0000-0000-0000-000000002015','00000000-0000-0000-0000-000000003142','Hummus & Pita','Classic hummus with warm pita.',799,'https://source.unsplash.com/800x600/?hummus%20pita','1 set',true),
+  ('00000000-0000-0000-0000-000000005404','00000000-0000-0000-0000-000000002015','00000000-0000-0000-0000-000000003142','Baba Ganoush','Smoky eggplant dip.',849,'https://source.unsplash.com/800x600/?baba%20ganoush','1 cup',true),
+  ('00000000-0000-0000-0000-000000005405','00000000-0000-0000-0000-000000002015','00000000-0000-0000-0000-000000003143','Greek Salad','Feta, olives, cucumber.',999,'https://source.unsplash.com/800x600/?greek%20salad','1 bowl',true),
+  ('00000000-0000-0000-0000-000000005406','00000000-0000-0000-0000-000000002015','00000000-0000-0000-0000-000000003143','Lentil Soup','Hearty lentil soup.',799,'https://source.unsplash.com/800x600/?lentil%20soup','1 bowl',true),
+  ('00000000-0000-0000-0000-000000005407','00000000-0000-0000-0000-000000002015','00000000-0000-0000-0000-000000003143','Baklava','Honey and nut pastry.',649,'https://source.unsplash.com/800x600/?baklava','1 pc',true),
+  ('00000000-0000-0000-0000-000000005408','00000000-0000-0000-0000-000000002015','00000000-0000-0000-0000-000000003143','Mint Lemonade','Fresh mint lemonade.',399,'https://source.unsplash.com/800x600/?mint%20lemonade','16 oz',true),
+
+  -- BBQ Smokehouse (BBQ)
+  ('00000000-0000-0000-0000-000000005501','00000000-0000-0000-0000-000000002016','00000000-0000-0000-0000-000000003151','Pulled Pork Sandwich','Smoky pulled pork, slaw.',1199,'https://source.unsplash.com/800x600/?pulled%20pork%20sandwich','1 sandwich',true),
+  ('00000000-0000-0000-0000-000000005502','00000000-0000-0000-0000-000000002016','00000000-0000-0000-0000-000000003151','Brisket Plate','Sliced brisket with sides.',1699,'https://source.unsplash.com/800x600/?brisket%20bbq','1 plate',true),
+  ('00000000-0000-0000-0000-000000005503','00000000-0000-0000-0000-000000002016','00000000-0000-0000-0000-000000003152','St. Louis Ribs','Half rack ribs.',1899,'https://source.unsplash.com/800x600/?bbq%20ribs','1/2 rack',true),
+  ('00000000-0000-0000-0000-000000005504','00000000-0000-0000-0000-000000002016','00000000-0000-0000-0000-000000003152','Smoked Sausage','Smoked sausage links.',1099,'https://source.unsplash.com/800x600/?smoked%20sausage','2 links',true),
+  ('00000000-0000-0000-0000-000000005505','00000000-0000-0000-0000-000000002016','00000000-0000-0000-0000-000000003153','Mac & Cheese','Creamy mac and cheese.',599,'https://source.unsplash.com/800x600/?mac%20and%20cheese','1 cup',true),
+  ('00000000-0000-0000-0000-000000005506','00000000-0000-0000-0000-000000002016','00000000-0000-0000-0000-000000003153','Coleslaw','Tangy slaw.',299,'https://source.unsplash.com/800x600/?coleslaw','1 cup',true),
+  ('00000000-0000-0000-0000-000000005507','00000000-0000-0000-0000-000000002016','00000000-0000-0000-0000-000000003153','Cornbread','Sweet cornbread square.',299,'https://source.unsplash.com/800x600/?cornbread','1 pc',true),
+  ('00000000-0000-0000-0000-000000005508','00000000-0000-0000-0000-000000002016','00000000-0000-0000-0000-000000003151','Sweet Tea','Iced sweet tea.',299,'https://source.unsplash.com/800x600/?iced%20tea','16 oz',true),
+
+  -- Sunrise Breakfast (Breakfast)
+  ('00000000-0000-0000-0000-000000005601','00000000-0000-0000-0000-000000002017','00000000-0000-0000-0000-000000003161','Bacon Egg & Cheese','Breakfast sandwich.',799,'https://source.unsplash.com/800x600/?bacon%20egg%20cheese','1 sandwich',true),
+  ('00000000-0000-0000-0000-000000005602','00000000-0000-0000-0000-000000002017','00000000-0000-0000-0000-000000003161','Avocado Toast','Avocado toast with lemon.',899,'https://source.unsplash.com/800x600/?avocado%20toast','1 toast',true),
+  ('00000000-0000-0000-0000-000000005603','00000000-0000-0000-0000-000000002017','00000000-0000-0000-0000-000000003162','Buttermilk Pancakes','Stack of pancakes.',899,'https://source.unsplash.com/800x600/?pancakes','3 pcs',true),
+  ('00000000-0000-0000-0000-000000005604','00000000-0000-0000-0000-000000002017','00000000-0000-0000-0000-000000003162','French Toast','Cinnamon french toast.',949,'https://source.unsplash.com/800x600/?french%20toast','2 slices',true),
+  ('00000000-0000-0000-0000-000000005605','00000000-0000-0000-0000-000000002017','00000000-0000-0000-0000-000000003163','Hash Browns','Crispy hash browns.',349,'https://source.unsplash.com/800x600/?hash%20browns','1 order',true),
+  ('00000000-0000-0000-0000-000000005606','00000000-0000-0000-0000-000000002017','00000000-0000-0000-0000-000000003163','Breakfast Potatoes','Seasoned potatoes.',399,'https://source.unsplash.com/800x600/?breakfast%20potatoes','1 cup',true),
+  ('00000000-0000-0000-0000-000000005607','00000000-0000-0000-0000-000000002017','00000000-0000-0000-0000-000000003163','Orange Juice','Fresh OJ.',349,'https://source.unsplash.com/800x600/?orange%20juice','12 oz',true),
+  ('00000000-0000-0000-0000-000000005608','00000000-0000-0000-0000-000000002017','00000000-0000-0000-0000-000000003161','Coffee','Hot coffee.',249,'https://source.unsplash.com/800x600/?coffee','12 oz',true),
+
+  -- Vegan Vibes (Vegan)
+  ('00000000-0000-0000-0000-000000005701','00000000-0000-0000-0000-000000002018','00000000-0000-0000-0000-000000003171','Vegan Burger','Plant-based patty with toppings.',1199,'https://source.unsplash.com/800x600/?vegan%20burger','1 burger',true),
+  ('00000000-0000-0000-0000-000000005702','00000000-0000-0000-0000-000000002018','00000000-0000-0000-0000-000000003171','Crispy Tofu Sandwich','Tofu cutlet, slaw.',1099,'https://source.unsplash.com/800x600/?tofu%20sandwich','1 sandwich',true),
+  ('00000000-0000-0000-0000-000000005703','00000000-0000-0000-0000-000000002018','00000000-0000-0000-0000-000000003172','Chickpea Curry Bowl','Curry with basmati rice.',1299,'https://source.unsplash.com/800x600/?chickpea%20curry','1 bowl',true),
+  ('00000000-0000-0000-0000-000000005704','00000000-0000-0000-0000-000000002018','00000000-0000-0000-0000-000000003172','Vegan Ramen','Miso broth, veggies.',1399,'https://source.unsplash.com/800x600/?vegan%20ramen','1 bowl',true),
+  ('00000000-0000-0000-0000-000000005705','00000000-0000-0000-0000-000000002018','00000000-0000-0000-0000-000000003173','Sweet Potato Fries','Baked sweet potato fries.',499,'https://source.unsplash.com/800x600/?sweet%20potato%20fries','1 order',true),
+  ('00000000-0000-0000-0000-000000005706','00000000-0000-0000-0000-000000002018','00000000-0000-0000-0000-000000003173','Side Salad','Mixed greens side.',399,'https://source.unsplash.com/800x600/?side%20salad','1 bowl',true),
+  ('00000000-0000-0000-0000-000000005707','00000000-0000-0000-0000-000000002018','00000000-0000-0000-0000-000000003173','Chocolate Chip Cookie','Vegan cookie.',299,'https://source.unsplash.com/800x600/?vegan%20cookie','1 pc',true),
+  ('00000000-0000-0000-0000-000000005708','00000000-0000-0000-0000-000000002018','00000000-0000-0000-0000-000000003171','Kombucha','Sparkling tea.',449,'https://source.unsplash.com/800x600/?kombucha','12 oz',true),
+
+  -- Taco Truck Express (Mexican)
+  ('00000000-0000-0000-0000-000000005801','00000000-0000-0000-0000-000000002019','00000000-0000-0000-0000-000000003181','Carne Asada Taco','Grilled steak taco.',399,'https://source.unsplash.com/800x600/?carne%20asada%20taco','1 taco',true),
+  ('00000000-0000-0000-0000-000000005802','00000000-0000-0000-0000-000000002019','00000000-0000-0000-0000-000000003181','Al Pastor Taco','Pork taco with pineapple.',379,'https://source.unsplash.com/800x600/?al%20pastor%20taco','1 taco',true),
+  ('00000000-0000-0000-0000-000000005803','00000000-0000-0000-0000-000000002019','00000000-0000-0000-0000-000000003182','Street Corn','Elote with cotija.',499,'https://source.unsplash.com/800x600/?elote','1 cup',true),
+  ('00000000-0000-0000-0000-000000005804','00000000-0000-0000-0000-000000002019','00000000-0000-0000-0000-000000003182','Chips & Salsa','Classic chips and salsa.',399,'https://source.unsplash.com/800x600/?chips%20salsa','1 order',true),
+  ('00000000-0000-0000-0000-000000005805','00000000-0000-0000-0000-000000002019','00000000-0000-0000-0000-000000003183','Horchata','Sweet rice drink.',349,'https://source.unsplash.com/800x600/?horchata','16 oz',true),
+  ('00000000-0000-0000-0000-000000005806','00000000-0000-0000-0000-000000002019','00000000-0000-0000-0000-000000003183','Jarritos','Fruit soda.',349,'https://source.unsplash.com/800x600/?jarritos','12 oz',true),
+  ('00000000-0000-0000-0000-000000005807','00000000-0000-0000-0000-000000002019','00000000-0000-0000-0000-000000003181','Churro Bites','Cinnamon churro bites.',499,'https://source.unsplash.com/800x600/?churros','1 cup',true),
+  ('00000000-0000-0000-0000-000000005808','00000000-0000-0000-0000-000000002019','00000000-0000-0000-0000-000000003181','Chicken Taco','Grilled chicken taco.',379,'https://source.unsplash.com/800x600/?chicken%20taco','1 taco',true);
+
+
+-- Modifier groups/options (at least one item with modifiers)
+-- Pizza size modifiers for Margherita
+INSERT INTO modifier_groups (id, menu_item_id, name, modifier_type, is_required, min_selected, max_selected, sort_order) VALUES
+  ('00000000-0000-0000-0000-000000006001','00000000-0000-0000-0000-000000004001','Choose a size','SINGLE',true,1,1,1);
+
+INSERT INTO modifier_options (id, modifier_group_id, name, price_delta_cents, sort_order) VALUES
+  ('00000000-0000-0000-0000-000000006101','00000000-0000-0000-0000-000000006001','10 in',0,1),
+  ('00000000-0000-0000-0000-000000006102','00000000-0000-0000-0000-000000006001','12 in',200,2),
+  ('00000000-0000-0000-0000-000000006103','00000000-0000-0000-0000-000000006001','16 in',600,3);
+
+-- Spice level modifiers for Kung Pao Chicken
+INSERT INTO modifier_groups (id, menu_item_id, name, modifier_type, is_required, min_selected, max_selected, sort_order) VALUES
+  ('00000000-0000-0000-0000-000000006002','00000000-0000-0000-0000-000000004101','Spice level','SINGLE',true,1,1,1);
+
+INSERT INTO modifier_options (id, modifier_group_id, name, price_delta_cents, sort_order) VALUES
+  ('00000000-0000-0000-0000-000000006201','00000000-0000-0000-0000-000000006002','Mild',0,1),
+  ('00000000-0000-0000-0000-000000006202','00000000-0000-0000-0000-000000006002','Medium',0,2),
+  ('00000000-0000-0000-0000-000000006203','00000000-0000-0000-0000-000000006002','Hot',0,3);
+
+
+-- Promo codes (must match requirements list)
+INSERT INTO promo_codes (id, code, description, discount_type, discount_value, min_subtotal_cents, max_discount_cents, starts_at, ends_at, usage_limit, used_count, is_active) VALUES
+  ('00000000-0000-0000-0000-000000007001','SAVE10','Save 10% on orders over $20','PERCENT',10,2000,1000,now() - interval '30 days',now() + interval '365 days',NULL,0,true),
+  ('00000000-0000-0000-0000-000000007002','FIRSTORDER','15% off your first order over $15','PERCENT',15,1500,1500,now() - interval '30 days',now() + interval '365 days',NULL,0,true),
+  ('00000000-0000-0000-0000-000000007003','FREE5','$5 off orders over $25','FIXED',500,2500,NULL,now() - interval '30 days',now() + interval '365 days',NULL,0,true),
+  ('00000000-0000-0000-0000-000000007004','WELCOME15','15% off orders over $30','PERCENT',15,3000,2000,now() - interval '30 days',now() + interval '365 days',NULL,0,true),
+  ('00000000-0000-0000-0000-000000007005','SHIPFREE','Free delivery (implemented as $3 off) over $20','FIXED',300,2000,300,now() - interval '30 days',now() + interval '365 days',NULL,0,true);
+
+-- Cart for demo user (empty)
+INSERT INTO carts (id, user_id, restaurant_id, fulfillment_type, promo_code_id, special_instructions) VALUES
+  ('00000000-0000-0000-0000-000000008001','00000000-0000-0000-0000-000000000001',NULL,'DELIVERY',NULL,NULL);
+
+-- Favorites for demo user
+INSERT INTO favorites (user_id, restaurant_id) VALUES
+  ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000002001'),
+  ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000002006'),
+  ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000002003');
+
+-- Recent searches
+INSERT INTO recent_searches (id, user_id, query, created_at) VALUES
+  ('00000000-0000-0000-0000-000000009001','00000000-0000-0000-0000-000000000001','pizza', now() - interval '2 days'),
+  ('00000000-0000-0000-0000-000000009002','00000000-0000-0000-0000-000000000001','tacos', now() - interval '1 days'),
+  ('00000000-0000-0000-0000-000000009003','00000000-0000-0000-0000-000000000001','dumplings', now() - interval '3 hours');
+
+COMMIT;

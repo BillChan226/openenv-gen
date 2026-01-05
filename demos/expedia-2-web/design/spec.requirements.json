@@ -1,0 +1,269 @@
+{
+  "project": {
+    "name": "Expedia-Style Travel Booking Platform",
+    "type": "full_stack_web_app",
+    "description": "An Expedia-inspired travel booking platform supporting flights, hotels, cars, and package deals with cart/checkout and trip management.",
+    "testing_urls": {
+      "frontend": "http://localhost:8000",
+      "backend_api": "http://localhost:3000"
+    }
+  },
+  "tech_stack": {
+    "frontend": {
+      "framework": "React",
+      "bundler": "Vite",
+      "styling": "TailwindCSS"
+    },
+    "backend": {
+      "runtime": "Node.js",
+      "framework": "Express"
+    },
+    "database": {
+      "engine": "PostgreSQL"
+    },
+    "auth": {
+      "type": "JWT",
+      "password_hash": "bcrypt"
+    }
+  },
+  "non_functional_requirements": {
+    "responsive": true,
+    "security": {
+      "password_hashing": true,
+      "jwt_required_for": [
+        "profile",
+        "saved_payment_methods",
+        "cart",
+        "checkout/orders",
+        "trip_management",
+        "favorites"
+      ]
+    },
+    "api": {
+      "style": "REST",
+      "content_type": "application/json",
+      "auth_header": "Authorization: Bearer <token>",
+      "pagination": {
+        "default_limit": 20,
+        "max_limit": 100
+      }
+    }
+  },
+  "seed_data": {
+    "counts": {
+      "flights_min": 50,
+      "hotels_min": 30,
+      "cars_min": 20
+    },
+    "test_user": {
+      "email": "admin@expedia.com",
+      "password": "admin123",
+      "full_name": "Admin User"
+    }
+  },
+  "domains": {
+    "locations": {
+      "require_autocomplete": true,
+      "iconified_suggestions": true,
+      "supported_types": ["city", "airport", "region"],
+      "examples": [
+        {"code": "NYC", "label": "New York, NY", "type": "city"},
+        {"code": "LAX", "label": "Los Angeles (LAX)", "type": "airport"}
+      ]
+    },
+    "money": {
+      "storage": "integer_cents",
+      "currency": "USD",
+      "display": "formatted"
+    },
+    "dates": {
+      "format": "YYYY-MM-DD",
+      "datetime_format": "ISO-8601"
+    }
+  },
+  "features": {
+    "auth": {
+      "registration": {
+        "fields": ["email", "password", "full_name"],
+        "email_unique": true
+      },
+      "login": {
+        "fields": ["email", "password"],
+        "returns": ["token", "user"]
+      },
+      "profile_management": {
+        "editable_fields": ["full_name", "phone"],
+        "read_only_fields": ["email"],
+        "saved_payment_methods": {
+          "supported": true,
+          "fields": ["brand", "last4", "exp_month", "exp_year", "billing_zip"],
+          "note": "Store only tokenized/placeholder payment info; do not store full card numbers."
+        }
+      },
+      "booking_history": true
+    },
+    "flights": {
+      "search": {
+        "inputs": ["origin", "destination", "depart_date", "return_date", "passengers"],
+        "trip_types": ["one_way", "round_trip"],
+        "filters": ["price", "airline", "stops", "departure_time"],
+        "sort": ["price", "duration", "departure_time"]
+      },
+      "details": {
+        "fields": [
+          "airline",
+          "flight_number",
+          "origin",
+          "destination",
+          "depart_at",
+          "arrive_at",
+          "duration_minutes",
+          "stops",
+          "layovers"
+        ]
+      },
+      "seat_class": {
+        "supported": true,
+        "values": ["economy", "business", "first"]
+      },
+      "booking_flow": ["view_results", "view_details", "select_seat_class", "add_to_cart", "checkout"]
+    },
+    "hotels": {
+      "search": {
+        "inputs": ["location", "check_in", "check_out", "guests", "rooms"],
+        "filters": ["star_rating", "price_range", "amenities", "distance"],
+        "sort": ["price", "rating", "distance"]
+      },
+      "details": {
+        "photos_gallery": true,
+        "fields": ["name", "description", "amenities", "star_rating", "review_rating", "review_count"],
+        "room_types": {
+          "supported": true,
+          "fields": ["name", "bed_configuration", "max_guests", "price_per_night_cents"]
+        },
+        "map_view": {
+          "supported": true,
+          "fields": ["lat", "lng"],
+          "note": "Use a lightweight embedded map (e.g., Leaflet/OpenStreetMap) or a static map placeholder if keys are unavailable."
+        }
+      },
+      "vip_access_badges": true,
+      "favorites": true
+    },
+    "cars": {
+      "search": {
+        "inputs": ["pickup_location", "dropoff_location", "pickup_date", "dropoff_date"],
+        "filters": ["car_type", "price", "company"],
+        "sort": ["price", "seats"]
+      },
+      "details": {
+        "fields": ["company", "model", "car_type", "seats", "transmission", "fuel_type", "price_per_day_cents"]
+      },
+      "extras": {
+        "supported": true,
+        "values": ["gps", "child_seat", "insurance"]
+      }
+    },
+    "packages": {
+      "supported": true,
+      "bundle_types": ["flight_hotel", "flight_hotel_car"],
+      "pricing": {
+        "discount_supported": true,
+        "compare_vs_individual": true
+      }
+    },
+    "cart_checkout": {
+      "cart": {
+        "multi_item": true,
+        "item_types": ["flight", "hotel", "car", "package"],
+        "operations": ["add", "update", "remove", "list"],
+        "price_breakdown": ["subtotal", "taxes", "fees", "discounts", "total"]
+      },
+      "promo_codes": {
+        "supported": true,
+        "behavior": "apply to cart total (pre-tax or post-tax per spec)"
+      },
+      "payment": {
+        "secure_form": true,
+        "note": "Simulate payment processing server-side; return success/failure deterministically for testing."
+      },
+      "order_creation": true
+    },
+    "trip_management": {
+      "views": ["upcoming", "past"],
+      "download_confirmation": true,
+      "cancel_modify": {
+        "cancel": true,
+        "modify": true,
+        "note": "Modification can be limited to basic fields (dates/guest counts) depending on implementation complexity."
+      }
+    }
+  },
+  "ui_requirements": {
+    "design_style": "Modern Expedia-inspired",
+    "color_scheme": {
+      "primary": "#1668E3",
+      "accent": "#F4B400",
+      "background": "#FFFFFF",
+      "card": "#FFFFFF"
+    },
+    "layout": {
+      "navigation": {
+        "tabs": ["Stays", "Flights", "Cars", "Packages"],
+        "global_actions": ["Favorites", "Trips", "Cart", "Profile/Login"]
+      },
+      "components": {
+        "date_picker": "interactive calendar",
+        "location_autocomplete": true,
+        "hotel_image_carousel": true,
+        "favorites_heart_icon": true,
+        "vip_access_badge": true
+      }
+    },
+    "pages": [
+      "Home (tabbed search)",
+      "Flights Search Results",
+      "Flight Details",
+      "Hotels Search Results",
+      "Hotel Details",
+      "Cars Search Results",
+      "Car Details",
+      "Packages Search/Results",
+      "Cart",
+      "Checkout",
+      "Trips (Upcoming/Past)",
+      "Favorites",
+      "Profile",
+      "Login",
+      "Register"
+    ]
+  },
+  "acceptance_criteria": {
+    "auth": [
+      "User can register and login",
+      "JWT token required for protected routes",
+      "Test user admin@expedia.com/admin123 works"
+    ],
+    "search_booking": [
+      "Flights/hotels/cars searchable with filters and sorts",
+      "Details pages show required fields",
+      "Items can be added to cart and checked out"
+    ],
+    "trips": [
+      "Orders appear in Trips",
+      "User can view booking details",
+      "Cancel/modify works at least for basic fields"
+    ],
+    "ui": [
+      "Matches Expedia-inspired screenshots closely",
+      "Responsive layout",
+      "No placeholder scaffold text"
+    ]
+  },
+  "out_of_scope_or_simplifications": [
+    "Real payment processing (use simulated payments)",
+    "Real airline/hotel availability integrations (use seeded data)",
+    "Complex seat maps (seat class selection only)",
+    "External map provider keys (use OSM/Leaflet or static placeholders if needed)"
+  ]
+}

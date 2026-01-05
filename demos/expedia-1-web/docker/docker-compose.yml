@@ -1,0 +1,59 @@
+# NOTE:
+# This project can run WITHOUT Docker (e.g., in environments where the Docker daemon
+# is unavailable). Use `npm install` + `npm start` in app/backend and app/frontend.
+#
+# If you do have Docker available, this compose file will run the full stack.
+
+services:
+  db:
+    build:
+      context: ../app/database
+    environment:
+      POSTGRES_USER: expedia
+      POSTGRES_PASSWORD: expedia
+      POSTGRES_DB: expedia
+    ports:
+      - "5432:5432"
+    # Ensure the DB is reachable from other containers and the host.
+    command: ["postgres", "-c", "listen_addresses=*", "-c", "port=5432"]
+    healthcheck:
+      # Use the container's own healthcheck; avoid hard-coding host/port.
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ../app/backend
+    environment:
+      NODE_ENV: development
+      PORT: 8080
+      # When running in Docker, connect to the db service
+      DATABASE_URL: postgres://expedia:expedia@db:5432/expedia
+      # Allow requests from frontend on port 3001
+      CORS_ORIGIN: "http://localhost:3001,http://localhost:8080"
+      # Enable DB bootstrap and seed for initial setup
+      BOOTSTRAP_DB: "true"
+      SEED_DB: "true"
+      # Allow auth to work even if DB is temporarily unavailable
+      ALLOW_NO_DB_AUTH: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ../app/frontend
+    environment:
+      # All ports passed as environment variables
+      VITE_API_PROXY_TARGET: http://backend:8080
+      VITE_BACKEND_PORT: 8080
+      VITE_PORT: 3001
+      PORT: 3001
+    depends_on:
+      - backend
+    ports:
+      - "3001:3001"

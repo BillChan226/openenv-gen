@@ -1,0 +1,866 @@
+{
+  "schema_version": "1.0.0",
+  "database": "postgresql",
+  "conventions": {
+    "id_type": "uuid",
+    "timestamp_type": "timestamptz",
+    "money": {
+      "amount_type": "int",
+      "amount_unit": "cents",
+      "currency_type": "char(3)",
+      "default_currency": "USD"
+    }
+  },
+  "enums": {
+    "location_type": ["airport", "city", "region", "place"],
+    "cart_item_type": ["flight", "hotel", "car", "package"],
+    "booking_type": ["flight", "hotel", "car", "package"],
+    "booking_status": ["confirmed", "cancelled", "modified"],
+    "booking_item_type": ["flight", "hotel", "car"],
+    "car_type": ["economy", "compact", "midsize", "suv", "luxury", "van"],
+    "transmission": ["automatic", "manual"],
+    "fuel_type": ["gas", "diesel", "hybrid", "electric"],
+    "promo_type": ["percent", "fixed"],
+    "payment_status": ["succeeded", "failed"],
+    "favorite_type": ["hotel"],
+    "car_extra_pricing_model": ["per_day", "per_rental"]
+  },
+  "tables": [
+    {
+      "name": "users",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "email", "type": "varchar(255)", "constraints": ["not_null", "unique"] },
+        { "name": "password_hash", "type": "varchar(255)", "constraints": ["not_null"] },
+        { "name": "name", "type": "varchar(120)", "constraints": ["not_null"] },
+        { "name": "phone", "type": "varchar(30)", "constraints": [] },
+        { "name": "created_at", "type": "timestamptz", "constraints": ["not_null"], "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "constraints": ["not_null"], "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "idx_users_email", "columns": ["email"], "unique": true }
+      ],
+      "relationships": []
+    },
+    {
+      "name": "payment_methods",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "users", "column": "id", "on_delete": "cascade" } },
+        { "name": "brand", "type": "varchar(30)", "constraints": ["not_null"] },
+        { "name": "last4", "type": "char(4)", "constraints": ["not_null"] },
+        { "name": "exp_month", "type": "int", "constraints": ["not_null"] },
+        { "name": "exp_year", "type": "int", "constraints": ["not_null"] },
+        { "name": "token", "type": "varchar(255)", "constraints": ["not_null"] },
+        { "name": "billing_name", "type": "varchar(120)", "constraints": [] },
+        { "name": "created_at", "type": "timestamptz", "constraints": ["not_null"], "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "idx_payment_methods_user_id", "columns": ["user_id"], "unique": false }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "users", "fk": "user_id" }
+      ]
+    },
+    {
+      "name": "locations",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "type", "type": "location_type", "constraints": ["not_null"] },
+        { "name": "code", "type": "varchar(10)", "constraints": [] },
+        { "name": "name", "type": "varchar(120)", "constraints": ["not_null"] },
+        { "name": "country", "type": "varchar(80)", "constraints": ["not_null"] },
+        { "name": "region", "type": "varchar(80)", "constraints": [] },
+        { "name": "lat", "type": "numeric(9,6)", "constraints": [] },
+        { "name": "lng", "type": "numeric(9,6)", "constraints": [] }
+      ],
+      "indexes": [
+        { "name": "idx_locations_type", "columns": ["type"], "unique": false },
+        { "name": "idx_locations_code", "columns": ["code"], "unique": false },
+        {
+          "name": "idx_locations_name_trgm",
+          "columns": ["name"],
+          "unique": false,
+          "method": "gin",
+          "operator_class": "gin_trgm_ops",
+          "note": "Requires pg_trgm extension for fast autocomplete"
+        }
+      ],
+      "relationships": []
+    },
+    {
+      "name": "flights",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "airline", "type": "varchar(80)", "constraints": ["not_null"] },
+        { "name": "flight_number", "type": "varchar(20)", "constraints": ["not_null"] },
+        { "name": "origin_location_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "locations", "column": "id", "on_delete": "restrict" } },
+        { "name": "destination_location_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "locations", "column": "id", "on_delete": "restrict" } },
+        { "name": "depart_at", "type": "timestamptz", "constraints": ["not_null"] },
+        { "name": "arrive_at", "type": "timestamptz", "constraints": ["not_null"] },
+        { "name": "duration_minutes", "type": "int", "constraints": ["not_null"] },
+        { "name": "stops_count", "type": "int", "constraints": ["not_null"], "default": 0 },
+        { "name": "base_price_cents", "type": "int", "constraints": ["not_null"] },
+        { "name": "currency", "type": "char(3)", "constraints": ["not_null"], "default": "'USD'" }
+      ],
+      "indexes": [
+        { "name": "idx_flights_route_depart", "columns": ["origin_location_id", "destination_location_id", "depart_at"], "unique": false },
+        { "name": "idx_flights_airline", "columns": ["airline"], "unique": false }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "locations", "fk": "origin_location_id", "as": "origin" },
+        { "type": "belongs_to", "table": "locations", "fk": "destination_location_id", "as": "destination" }
+      ]
+    },
+    {
+      "name": "flight_segments",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "flight_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "flights", "column": "id", "on_delete": "cascade" } },
+        { "name": "segment_index", "type": "int", "constraints": ["not_null"] },
+        { "name": "origin_location_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "locations", "column": "id", "on_delete": "restrict" } },
+        { "name": "destination_location_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "locations", "column": "id", "on_delete": "restrict" } },
+        { "name": "depart_at", "type": "timestamptz", "constraints": ["not_null"] },
+        { "name": "arrive_at", "type": "timestamptz", "constraints": ["not_null"] },
+        { "name": "carrier", "type": "varchar(80)", "constraints": ["not_null"] },
+        { "name": "flight_number", "type": "varchar(20)", "constraints": ["not_null"] },
+        { "name": "layover_minutes_after", "type": "int", "constraints": [] }
+      ],
+      "indexes": [
+        { "name": "idx_flight_segments_flight_id", "columns": ["flight_id"], "unique": false },
+        { "name": "uq_flight_segments_flight_index", "columns": ["flight_id", "segment_index"], "unique": true }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "flights", "fk": "flight_id" }
+      ]
+    },
+    {
+      "name": "hotels",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "name", "type": "varchar(160)", "constraints": ["not_null"] },
+        { "name": "location_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "locations", "column": "id", "on_delete": "restrict" } },
+        { "name": "address", "type": "varchar(255)", "constraints": ["not_null"] },
+        { "name": "lat", "type": "numeric(9,6)", "constraints": ["not_null"] },
+        { "name": "lng", "type": "numeric(9,6)", "constraints": ["not_null"] },
+        { "name": "star_rating", "type": "numeric(2,1)", "constraints": ["not_null"] },
+        { "name": "vip_access", "type": "boolean", "constraints": ["not_null"], "default": false },
+        { "name": "description", "type": "text", "constraints": ["not_null"] },
+        { "name": "amenities", "type": "jsonb", "constraints": ["not_null"], "default": "'[]'::jsonb" },
+        { "name": "created_at", "type": "timestamptz", "constraints": ["not_null"], "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "idx_hotels_location_id", "columns": ["location_id"], "unique": false },
+        { "name": "idx_hotels_star_rating", "columns": ["star_rating"], "unique": false },
+        { "name": "idx_hotels_vip_access", "columns": ["vip_access"], "unique": false }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "locations", "fk": "location_id" }
+      ]
+    },
+    {
+      "name": "hotel_photos",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "hotel_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "hotels", "column": "id", "on_delete": "cascade" } },
+        { "name": "url", "type": "text", "constraints": ["not_null"] },
+        { "name": "alt", "type": "varchar(160)", "constraints": [] },
+        { "name": "sort_order", "type": "int", "constraints": ["not_null"], "default": 0 }
+      ],
+      "indexes": [
+        { "name": "idx_hotel_photos_hotel_id", "columns": ["hotel_id"], "unique": false },
+        { "name": "idx_hotel_photos_sort", "columns": ["hotel_id", "sort_order"], "unique": false }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "hotels", "fk": "hotel_id" }
+      ]
+    },
+    {
+      "name": "room_types",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "hotel_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "hotels", "column": "id", "on_delete": "cascade" } },
+        { "name": "name", "type": "varchar(160)", "constraints": ["not_null"] },
+        { "name": "bed_configuration", "type": "varchar(160)", "constraints": ["not_null"] },
+        { "name": "max_guests", "type": "int", "constraints": ["not_null"] },
+        { "name": "refundable", "type": "boolean", "constraints": ["not_null"], "default": true },
+        { "name": "price_per_night_cents", "type": "int", "constraints": ["not_null"] },
+        { "name": "currency", "type": "char(3)", "constraints": ["not_null"], "default": "'USD'" },
+        { "name": "inventory", "type": "int", "constraints": ["not_null"], "default": 10 }
+      ],
+      "indexes": [
+        { "name": "idx_room_types_hotel_id", "columns": ["hotel_id"], "unique": false }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "hotels", "fk": "hotel_id" }
+      ]
+    },
+    {
+      "name": "reviews",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "hotel_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "hotels", "column": "id", "on_delete": "cascade" } },
+        { "name": "author_name", "type": "varchar(120)", "constraints": ["not_null"] },
+        { "name": "rating", "type": "int", "constraints": ["not_null"] },
+        { "name": "title", "type": "varchar(160)", "constraints": [] },
+        { "name": "comment", "type": "text", "constraints": [] },
+        { "name": "created_at", "type": "timestamptz", "constraints": ["not_null"], "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "idx_reviews_hotel_id", "columns": ["hotel_id"], "unique": false },
+        { "name": "idx_reviews_rating", "columns": ["rating"], "unique": false }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "hotels", "fk": "hotel_id" }
+      ]
+    },
+    {
+      "name": "cars",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "company", "type": "varchar(120)", "constraints": ["not_null"] },
+        { "name": "model", "type": "varchar(120)", "constraints": ["not_null"] },
+        { "name": "car_type", "type": "car_type", "constraints": ["not_null"] },
+        { "name": "seats", "type": "int", "constraints": ["not_null"] },
+        { "name": "transmission", "type": "transmission", "constraints": ["not_null"] },
+        { "name": "fuel_type", "type": "fuel_type", "constraints": ["not_null"] },
+        { "name": "price_per_day_cents", "type": "int", "constraints": ["not_null"] },
+        { "name": "currency", "type": "char(3)", "constraints": ["not_null"], "default": "'USD'" },
+        { "name": "pickup_location_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "locations", "column": "id", "on_delete": "restrict" } },
+        { "name": "dropoff_location_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "locations", "column": "id", "on_delete": "restrict" } },
+        { "name": "inventory", "type": "int", "constraints": ["not_null"], "default": 10 }
+      ],
+      "indexes": [
+        { "name": "idx_cars_pickup_location_id", "columns": ["pickup_location_id"], "unique": false },
+        { "name": "idx_cars_company", "columns": ["company"], "unique": false },
+        { "name": "idx_cars_car_type", "columns": ["car_type"], "unique": false }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "locations", "fk": "pickup_location_id", "as": "pickup_location" },
+        { "type": "belongs_to", "table": "locations", "fk": "dropoff_location_id", "as": "dropoff_location" }
+      ]
+    },
+    {
+      "name": "car_extras",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "code", "type": "varchar(40)", "constraints": ["not_null", "unique"] },
+        { "name": "name", "type": "varchar(120)", "constraints": ["not_null"] },
+        { "name": "pricing_model", "type": "car_extra_pricing_model", "constraints": ["not_null"] },
+        { "name": "price_cents", "type": "int", "constraints": ["not_null"] },
+        { "name": "currency", "type": "char(3)", "constraints": ["not_null"], "default": "'USD'" }
+      ],
+      "indexes": [
+        { "name": "idx_car_extras_code", "columns": ["code"], "unique": true }
+      ],
+      "relationships": []
+    },
+    {
+      "name": "promo_codes",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "code", "type": "varchar(40)", "constraints": ["not_null", "unique"] },
+        { "name": "type", "type": "promo_type", "constraints": ["not_null"] },
+        { "name": "value", "type": "int", "constraints": ["not_null"], "note": "percent: 1-100, fixed: cents" },
+        { "name": "min_subtotal_cents", "type": "int", "constraints": ["not_null"], "default": 0 },
+        { "name": "starts_at", "type": "timestamptz", "constraints": [] },
+        { "name": "ends_at", "type": "timestamptz", "constraints": [] },
+        { "name": "max_redemptions", "type": "int", "constraints": [] },
+        { "name": "redemptions_count", "type": "int", "constraints": ["not_null"], "default": 0 },
+        { "name": "active", "type": "boolean", "constraints": ["not_null"], "default": true }
+      ],
+      "indexes": [
+        { "name": "idx_promo_codes_code", "columns": ["code"], "unique": true },
+        { "name": "idx_promo_codes_active", "columns": ["active"], "unique": false }
+      ],
+      "relationships": []
+    },
+    {
+      "name": "carts",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "constraints": ["not_null", "unique", "fk"], "references": { "table": "users", "column": "id", "on_delete": "cascade" } },
+        { "name": "promo_code_id", "type": "uuid", "constraints": ["fk"], "references": { "table": "promo_codes", "column": "id", "on_delete": "set_null" } },
+        { "name": "created_at", "type": "timestamptz", "constraints": ["not_null"], "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "constraints": ["not_null"], "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "idx_carts_user_id", "columns": ["user_id"], "unique": true },
+        { "name": "idx_carts_promo_code_id", "columns": ["promo_code_id"], "unique": false }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "users", "fk": "user_id" },
+        { "type": "belongs_to", "table": "promo_codes", "fk": "promo_code_id", "optional": true }
+      ]
+    },
+    {
+      "name": "cart_items",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "cart_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "carts", "column": "id", "on_delete": "cascade" } },
+        { "name": "type", "type": "cart_item_type", "constraints": ["not_null"] },
+        { "name": "reference_id", "type": "uuid", "constraints": ["not_null"], "note": "ID of flight/hotel/room_type/car or package_bundle" },
+        { "name": "quantity", "type": "int", "constraints": ["not_null"], "default": 1 },
+        { "name": "start_date", "type": "date", "constraints": [] },
+        { "name": "end_date", "type": "date", "constraints": [] },
+        { "name": "metadata", "type": "jsonb", "constraints": ["not_null"], "default": "'{}'::jsonb" },
+        { "name": "price_cents", "type": "int", "constraints": ["not_null"], "note": "line total for this cart item" },
+        { "name": "currency", "type": "char(3)", "constraints": ["not_null"], "default": "'USD'" },
+        { "name": "created_at", "type": "timestamptz", "constraints": ["not_null"], "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "idx_cart_items_cart_id", "columns": ["cart_id"], "unique": false },
+        { "name": "idx_cart_items_type", "columns": ["type"], "unique": false }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "carts", "fk": "cart_id" }
+      ]
+    },
+    {
+      "name": "package_bundles",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "flight_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "flights", "column": "id", "on_delete": "restrict" } },
+        { "name": "hotel_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "hotels", "column": "id", "on_delete": "restrict" } },
+        { "name": "car_id", "type": "uuid", "constraints": ["fk"], "references": { "table": "cars", "column": "id", "on_delete": "restrict" } },
+        { "name": "discount_percent", "type": "int", "constraints": ["not_null"], "default": 10 },
+        { "name": "created_at", "type": "timestamptz", "constraints": ["not_null"], "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "idx_package_bundles_flight_id", "columns": ["flight_id"], "unique": false },
+        { "name": "idx_package_bundles_hotel_id", "columns": ["hotel_id"], "unique": false }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "flights", "fk": "flight_id" },
+        { "type": "belongs_to", "table": "hotels", "fk": "hotel_id" },
+        { "type": "belongs_to", "table": "cars", "fk": "car_id", "optional": true }
+      ]
+    },
+    {
+      "name": "bookings",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "users", "column": "id", "on_delete": "cascade" } },
+        { "name": "type", "type": "booking_type", "constraints": ["not_null"] },
+        { "name": "status", "type": "booking_status", "constraints": ["not_null"], "default": "confirmed" },
+        { "name": "total_cents", "type": "int", "constraints": ["not_null"] },
+        { "name": "currency", "type": "char(3)", "constraints": ["not_null"], "default": "'USD'" },
+        { "name": "details", "type": "jsonb", "constraints": ["not_null"], "default": "'{}'::jsonb" },
+        { "name": "created_at", "type": "timestamptz", "constraints": ["not_null"], "default": "now()" },
+        { "name": "updated_at", "type": "timestamptz", "constraints": ["not_null"], "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "idx_bookings_user_id", "columns": ["user_id"], "unique": false },
+        { "name": "idx_bookings_status", "columns": ["status"], "unique": false },
+        { "name": "idx_bookings_created_at", "columns": ["created_at"], "unique": false }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "users", "fk": "user_id" }
+      ]
+    },
+    {
+      "name": "booking_items",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "booking_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "bookings", "column": "id", "on_delete": "cascade" } },
+        { "name": "type", "type": "booking_item_type", "constraints": ["not_null"] },
+        { "name": "reference_id", "type": "uuid", "constraints": ["not_null"] },
+        { "name": "start_date", "type": "date", "constraints": [] },
+        { "name": "end_date", "type": "date", "constraints": [] },
+        { "name": "metadata", "type": "jsonb", "constraints": ["not_null"], "default": "'{}'::jsonb" },
+        { "name": "line_total_cents", "type": "int", "constraints": ["not_null"] },
+        { "name": "currency", "type": "char(3)", "constraints": ["not_null"], "default": "'USD'" }
+      ],
+      "indexes": [
+        { "name": "idx_booking_items_booking_id", "columns": ["booking_id"], "unique": false },
+        { "name": "idx_booking_items_type", "columns": ["type"], "unique": false }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "bookings", "fk": "booking_id" }
+      ]
+    },
+    {
+      "name": "payment_transactions",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "booking_id", "type": "uuid", "constraints": ["not_null", "unique", "fk"], "references": { "table": "bookings", "column": "id", "on_delete": "cascade" } },
+        { "name": "user_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "users", "column": "id", "on_delete": "cascade" } },
+        { "name": "amount_cents", "type": "int", "constraints": ["not_null"] },
+        { "name": "currency", "type": "char(3)", "constraints": ["not_null"], "default": "'USD'" },
+        { "name": "status", "type": "payment_status", "constraints": ["not_null"] },
+        { "name": "payment_method_id", "type": "uuid", "constraints": ["fk"], "references": { "table": "payment_methods", "column": "id", "on_delete": "set_null" } },
+        { "name": "provider", "type": "varchar(40)", "constraints": ["not_null"], "default": "'demo'" },
+        { "name": "provider_reference", "type": "varchar(120)", "constraints": [] },
+        { "name": "created_at", "type": "timestamptz", "constraints": ["not_null"], "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "idx_payment_transactions_user_id", "columns": ["user_id"], "unique": false },
+        { "name": "idx_payment_transactions_booking_id", "columns": ["booking_id"], "unique": true }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "bookings", "fk": "booking_id" },
+        { "type": "belongs_to", "table": "users", "fk": "user_id" },
+        { "type": "belongs_to", "table": "payment_methods", "fk": "payment_method_id", "optional": true }
+      ]
+    },
+    {
+      "name": "favorites",
+      "columns": [
+        { "name": "id", "type": "uuid", "constraints": ["pk"], "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "uuid", "constraints": ["not_null", "fk"], "references": { "table": "users", "column": "id", "on_delete": "cascade" } },
+        { "name": "type", "type": "favorite_type", "constraints": ["not_null"] },
+        { "name": "reference_id", "type": "uuid", "constraints": ["not_null"] },
+        { "name": "created_at", "type": "timestamptz", "constraints": ["not_null"], "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "uq_favorites_user_type_ref", "columns": ["user_id", "type", "reference_id"], "unique": true },
+        { "name": "idx_favorites_user_id", "columns": ["user_id"], "unique": false }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "table": "users", "fk": "user_id" }
+      ]
+    }
+  ],
+  "business_rules": {
+    "flight": {
+      "max_passengers": 9,
+      "fare_classes": ["economy", "business", "first"],
+      "fare_multipliers": { "economy": 1.0, "business": 1.6, "first": 2.2 }
+    },
+    "taxes_and_fees": {
+      "tax_rate": 0.08,
+      "service_fee_cents": 1299
+    },
+    "cancellation_policy": {
+      "hotel": { "refundable_window_hours": 24 },
+      "car": { "refundable_window_hours": 24 },
+      "flight": { "refundable_window_hours": 24 }
+    }
+  },
+  "seed_data": {
+    "users": [
+      {
+        "id": "11111111-1111-1111-1111-111111111111",
+        "email": "admin@expedia.com",
+        "password_hash": "bcrypt:admin123",
+        "name": "Admin User",
+        "phone": "+1-555-0100",
+        "created_at": "2025-01-01T00:00:00Z",
+        "updated_at": "2025-01-01T00:00:00Z"
+      }
+    ],
+    "payment_methods": [
+      {
+        "id": "22222222-2222-2222-2222-222222222222",
+        "user_id": "11111111-1111-1111-1111-111111111111",
+        "brand": "visa",
+        "last4": "4242",
+        "exp_month": 12,
+        "exp_year": 2030,
+        "token": "pm_demo_visa_4242",
+        "billing_name": "Admin User",
+        "created_at": "2025-01-01T00:00:00Z"
+      }
+    ],
+    "locations": [
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+        "type": "airport",
+        "code": "SFO",
+        "name": "San Francisco International Airport",
+        "country": "United States",
+        "region": "CA",
+        "lat": 37.621313,
+        "lng": -122.378955
+      },
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2",
+        "type": "airport",
+        "code": "LAX",
+        "name": "Los Angeles International Airport",
+        "country": "United States",
+        "region": "CA",
+        "lat": 33.941589,
+        "lng": -118.40853
+      },
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3",
+        "type": "city",
+        "code": "NYC",
+        "name": "New York",
+        "country": "United States",
+        "region": "NY",
+        "lat": 40.712776,
+        "lng": -74.005974
+      },
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa4",
+        "type": "city",
+        "code": "LAS",
+        "name": "Las Vegas",
+        "country": "United States",
+        "region": "NV",
+        "lat": 36.169941,
+        "lng": -115.139832
+      },
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa5",
+        "type": "city",
+        "code": "SEA",
+        "name": "Seattle",
+        "country": "United States",
+        "region": "WA",
+        "lat": 47.606209,
+        "lng": -122.332069
+      },
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa6",
+        "type": "city",
+        "code": "MIA",
+        "name": "Miami",
+        "country": "United States",
+        "region": "FL",
+        "lat": 25.761681,
+        "lng": -80.191788
+      },
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa7",
+        "type": "city",
+        "code": "CHI",
+        "name": "Chicago",
+        "country": "United States",
+        "region": "IL",
+        "lat": 41.878113,
+        "lng": -87.629799
+      },
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa8",
+        "type": "city",
+        "code": "BOS",
+        "name": "Boston",
+        "country": "United States",
+        "region": "MA",
+        "lat": 42.360081,
+        "lng": -71.058884
+      },
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa9",
+        "type": "region",
+        "code": null,
+        "name": "Bay Area",
+        "country": "United States",
+        "region": "CA",
+        "lat": 37.774929,
+        "lng": -122.419418
+      },
+      {
+        "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa10",
+        "type": "place",
+        "code": null,
+        "name": "Disneyland Resort",
+        "country": "United States",
+        "region": "CA",
+        "lat": 33.812092,
+        "lng": -117.918976
+      }
+    ],
+    "flights": [
+      {
+        "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb001",
+        "airline": "United",
+        "flight_number": "UA101",
+        "origin_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+        "destination_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2",
+        "depart_at": "2026-02-10T15:00:00Z",
+        "arrive_at": "2026-02-10T16:35:00Z",
+        "duration_minutes": 95,
+        "stops_count": 0,
+        "base_price_cents": 12900,
+        "currency": "USD"
+      },
+      {
+        "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb002",
+        "airline": "Delta",
+        "flight_number": "DL220",
+        "origin_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2",
+        "destination_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+        "depart_at": "2026-02-17T18:00:00Z",
+        "arrive_at": "2026-02-17T19:40:00Z",
+        "duration_minutes": 100,
+        "stops_count": 0,
+        "base_price_cents": 13500,
+        "currency": "USD"
+      },
+      {
+        "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb003",
+        "airline": "American",
+        "flight_number": "AA330",
+        "origin_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3",
+        "destination_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa4",
+        "depart_at": "2026-03-05T13:00:00Z",
+        "arrive_at": "2026-03-05T18:10:00Z",
+        "duration_minutes": 310,
+        "stops_count": 1,
+        "base_price_cents": 18900,
+        "currency": "USD"
+      },
+      {
+        "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb004",
+        "airline": "Southwest",
+        "flight_number": "WN455",
+        "origin_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa5",
+        "destination_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa6",
+        "depart_at": "2026-03-12T16:00:00Z",
+        "arrive_at": "2026-03-12T22:20:00Z",
+        "duration_minutes": 380,
+        "stops_count": 1,
+        "base_price_cents": 21000,
+        "currency": "USD"
+      },
+      {
+        "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb005",
+        "airline": "JetBlue",
+        "flight_number": "B6123",
+        "origin_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa8",
+        "destination_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa6",
+        "depart_at": "2026-04-01T12:30:00Z",
+        "arrive_at": "2026-04-01T16:10:00Z",
+        "duration_minutes": 220,
+        "stops_count": 0,
+        "base_price_cents": 17500,
+        "currency": "USD"
+      }
+    ],
+    "flight_segments": [
+      {
+        "id": "cccccccc-cccc-cccc-cccc-cccccccc0001",
+        "flight_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb003",
+        "segment_index": 0,
+        "origin_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3",
+        "destination_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa7",
+        "depart_at": "2026-03-05T13:00:00Z",
+        "arrive_at": "2026-03-05T15:10:00Z",
+        "carrier": "American",
+        "flight_number": "AA120",
+        "layover_minutes_after": 55
+      },
+      {
+        "id": "cccccccc-cccc-cccc-cccc-cccccccc0002",
+        "flight_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbb003",
+        "segment_index": 1,
+        "origin_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa7",
+        "destination_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa4",
+        "depart_at": "2026-03-05T16:05:00Z",
+        "arrive_at": "2026-03-05T18:10:00Z",
+        "carrier": "American",
+        "flight_number": "AA121",
+        "layover_minutes_after": null
+      }
+    ],
+    "hotels": [
+      {
+        "id": "dddddddd-dddd-dddd-dddd-ddddddddd001",
+        "name": "Harbor View Hotel",
+        "location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+        "address": "123 Embarcadero, San Francisco, CA",
+        "lat": 37.7952,
+        "lng": -122.3937,
+        "star_rating": 4.5,
+        "vip_access": true,
+        "description": "Modern waterfront hotel near downtown attractions.",
+        "amenities": ["Free WiFi", "Breakfast available", "Fitness center", "Pool"],
+        "created_at": "2025-01-01T00:00:00Z"
+      },
+      {
+        "id": "dddddddd-dddd-dddd-dddd-ddddddddd002",
+        "name": "Sunset Boulevard Suites",
+        "location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2",
+        "address": "456 Sunset Blvd, Los Angeles, CA",
+        "lat": 34.0983,
+        "lng": -118.3267,
+        "star_rating": 4.0,
+        "vip_access": false,
+        "description": "Comfortable suites with easy access to Hollywood.",
+        "amenities": ["Free WiFi", "Parking", "Pet friendly"],
+        "created_at": "2025-01-01T00:00:00Z"
+      },
+      {
+        "id": "dddddddd-dddd-dddd-dddd-ddddddddd003",
+        "name": "Central Park Boutique",
+        "location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3",
+        "address": "789 5th Ave, New York, NY",
+        "lat": 40.7644,
+        "lng": -73.9742,
+        "star_rating": 5.0,
+        "vip_access": true,
+        "description": "Luxury boutique hotel steps from Central Park.",
+        "amenities": ["Free WiFi", "Spa", "Gym", "Concierge"],
+        "created_at": "2025-01-01T00:00:00Z"
+      }
+    ],
+    "hotel_photos": [
+      {
+        "id": "eeeeeeee-eeee-eeee-eeee-eeeeeeee0001",
+        "hotel_id": "dddddddd-dddd-dddd-dddd-ddddddddd001",
+        "url": "https://images.unsplash.com/photo-1501117716987-c8e1ecb2101f?auto=format&fit=crop&w=1200&q=60",
+        "alt": "Harbor View Hotel exterior",
+        "sort_order": 0
+      },
+      {
+        "id": "eeeeeeee-eeee-eeee-eeee-eeeeeeee0002",
+        "hotel_id": "dddddddd-dddd-dddd-dddd-ddddddddd001",
+        "url": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=60",
+        "alt": "Harbor View Hotel room",
+        "sort_order": 1
+      },
+      {
+        "id": "eeeeeeee-eeee-eeee-eeee-eeeeeeee0003",
+        "hotel_id": "dddddddd-dddd-dddd-dddd-ddddddddd001",
+        "url": "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1200&q=60",
+        "alt": "Harbor View Hotel lobby",
+        "sort_order": 2
+      }
+    ],
+    "room_types": [
+      {
+        "id": "ffffffff-ffff-ffff-ffff-ffffffff0001",
+        "hotel_id": "dddddddd-dddd-dddd-dddd-ddddddddd001",
+        "name": "Standard King",
+        "bed_configuration": "1 King Bed",
+        "max_guests": 2,
+        "refundable": true,
+        "price_per_night_cents": 18900,
+        "currency": "USD",
+        "inventory": 10
+      },
+      {
+        "id": "ffffffff-ffff-ffff-ffff-ffffffff0002",
+        "hotel_id": "dddddddd-dddd-dddd-dddd-ddddddddd001",
+        "name": "Deluxe Double",
+        "bed_configuration": "2 Double Beds",
+        "max_guests": 4,
+        "refundable": false,
+        "price_per_night_cents": 21900,
+        "currency": "USD",
+        "inventory": 6
+      }
+    ],
+    "reviews": [
+      {
+        "id": "99999999-9999-9999-9999-999999990001",
+        "hotel_id": "dddddddd-dddd-dddd-dddd-ddddddddd001",
+        "author_name": "Jamie",
+        "rating": 9,
+        "title": "Great location",
+        "comment": "Loved the views and walkability.",
+        "created_at": "2025-02-01T00:00:00Z"
+      },
+      {
+        "id": "99999999-9999-9999-9999-999999990002",
+        "hotel_id": "dddddddd-dddd-dddd-dddd-ddddddddd001",
+        "author_name": "Taylor",
+        "rating": 8,
+        "title": "Nice stay",
+        "comment": "Clean rooms and friendly staff.",
+        "created_at": "2025-02-10T00:00:00Z"
+      }
+    ],
+    "cars": [
+      {
+        "id": "12121212-1212-1212-1212-121212120001",
+        "company": "Hertz",
+        "model": "Toyota Corolla",
+        "car_type": "compact",
+        "seats": 5,
+        "transmission": "automatic",
+        "fuel_type": "gas",
+        "price_per_day_cents": 4500,
+        "currency": "USD",
+        "pickup_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2",
+        "dropoff_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2",
+        "inventory": 10
+      },
+      {
+        "id": "12121212-1212-1212-1212-121212120002",
+        "company": "Avis",
+        "model": "Ford Explorer",
+        "car_type": "suv",
+        "seats": 7,
+        "transmission": "automatic",
+        "fuel_type": "gas",
+        "price_per_day_cents": 8900,
+        "currency": "USD",
+        "pickup_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+        "dropoff_location_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1",
+        "inventory": 6
+      }
+    ],
+    "car_extras": [
+      {
+        "id": "13131313-1313-1313-1313-131313130001",
+        "code": "gps",
+        "name": "GPS Navigation",
+        "pricing_model": "per_day",
+        "price_cents": 799,
+        "currency": "USD"
+      },
+      {
+        "id": "13131313-1313-1313-1313-131313130002",
+        "code": "child_seat",
+        "name": "Child Seat",
+        "pricing_model": "per_rental",
+        "price_cents": 2500,
+        "currency": "USD"
+      },
+      {
+        "id": "13131313-1313-1313-1313-131313130003",
+        "code": "insurance",
+        "name": "Damage Waiver",
+        "pricing_model": "per_day",
+        "price_cents": 1999,
+        "currency": "USD"
+      }
+    ],
+    "promo_codes": [
+      {
+        "id": "14141414-1414-1414-1414-141414140001",
+        "code": "WELCOME10",
+        "type": "percent",
+        "value": 10,
+        "min_subtotal_cents": 10000,
+        "starts_at": "2025-01-01T00:00:00Z",
+        "ends_at": "2027-01-01T00:00:00Z",
+        "max_redemptions": 1000,
+        "redemptions_count": 0,
+        "active": true
+      },
+      {
+        "id": "14141414-1414-1414-1414-141414140002",
+        "code": "SAVE25",
+        "type": "fixed",
+        "value": 2500,
+        "min_subtotal_cents": 15000,
+        "starts_at": "2025-01-01T00:00:00Z",
+        "ends_at": "2026-12-31T00:00:00Z",
+        "max_redemptions": 500,
+        "redemptions_count": 0,
+        "active": true
+      }
+    ],
+    "carts": [
+      {
+        "id": "15151515-1515-1515-1515-151515150001",
+        "user_id": "11111111-1111-1111-1111-111111111111",
+        "promo_code_id": null,
+        "created_at": "2025-01-01T00:00:00Z",
+        "updated_at": "2025-01-01T00:00:00Z"
+      }
+    ],
+    "cart_items": [],
+    "package_bundles": [],
+    "bookings": [],
+    "booking_items": [],
+    "payment_transactions": [],
+    "favorites": []
+  }
+}

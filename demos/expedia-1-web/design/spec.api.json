@@ -1,0 +1,941 @@
+{
+  "schema_version": "1.0.0",
+  "conventions": {
+    "base_url": "/api",
+    "content_type": "application/json",
+    "auth_header": "Authorization: Bearer <token>",
+    "list_response_wrapper": "items",
+    "single_response_wrapper": "item",
+    "error_format": {
+      "error": {
+        "code": "STRING_MACHINE_READABLE",
+        "message": "Human readable message",
+        "details": {}
+      }
+    },
+    "pagination": {
+      "style": "offset",
+      "params": { "limit": "int", "offset": "int" },
+      "defaults": { "limit": 20, "offset": 0 },
+      "max_limit": 100
+    },
+    "sorting": {
+      "param": "sort",
+      "format": "field:direction",
+      "direction": ["asc", "desc"]
+    },
+    "filtering": {
+      "format": "query_params",
+      "multi_value": "comma_separated"
+    },
+    "date_time": {
+      "date": "YYYY-MM-DD",
+      "timestamptz": "ISO-8601"
+    }
+  },
+  "auth": {
+    "jwt": {
+      "issuer": "voyager",
+      "audience": "voyager-web",
+      "expires_in_seconds": 7200
+    },
+    "password_policy": {
+      "min_length": 8,
+      "requirement_note": "For MVP: min 8 chars; backend may enforce stronger policy."
+    },
+    "rate_limit": {
+      "login_per_ip_per_15m": 20,
+      "register_per_ip_per_15m": 10
+    }
+  },
+  "models": {
+    "User": {
+      "fields": {
+        "id": "uuid",
+        "email": "string",
+        "name": "string",
+        "phone": "string|null",
+        "created_at": "timestamptz",
+        "updated_at": "timestamptz"
+      }
+    },
+    "PaymentMethod": {
+      "fields": {
+        "id": "uuid",
+        "user_id": "uuid",
+        "brand": "string",
+        "last4": "string",
+        "exp_month": "int",
+        "exp_year": "int",
+        "token": "string",
+        "billing_name": "string|null",
+        "created_at": "timestamptz"
+      }
+    },
+    "Location": {
+      "fields": {
+        "id": "uuid",
+        "type": "airport|city|region|place",
+        "code": "string|null",
+        "name": "string",
+        "country": "string",
+        "region": "string|null",
+        "lat": "number|null",
+        "lng": "number|null"
+      }
+    },
+    "Flight": {
+      "fields": {
+        "id": "uuid",
+        "airline": "string",
+        "flight_number": "string",
+        "origin_location_id": "uuid",
+        "destination_location_id": "uuid",
+        "depart_at": "timestamptz",
+        "arrive_at": "timestamptz",
+        "duration_minutes": "int",
+        "stops_count": "int",
+        "base_price_cents": "int",
+        "currency": "string"
+      }
+    },
+    "FlightSegment": {
+      "fields": {
+        "id": "uuid",
+        "flight_id": "uuid",
+        "segment_index": "int",
+        "origin_location_id": "uuid",
+        "destination_location_id": "uuid",
+        "depart_at": "timestamptz",
+        "arrive_at": "timestamptz",
+        "carrier": "string",
+        "flight_number": "string",
+        "layover_minutes_after": "int|null"
+      }
+    },
+    "Hotel": {
+      "fields": {
+        "id": "uuid",
+        "name": "string",
+        "location_id": "uuid",
+        "address": "string",
+        "lat": "number",
+        "lng": "number",
+        "star_rating": "number",
+        "vip_access": "boolean",
+        "description": "string",
+        "amenities": "string[]",
+        "created_at": "timestamptz"
+      }
+    },
+    "HotelPhoto": {
+      "fields": {
+        "id": "uuid",
+        "hotel_id": "uuid",
+        "url": "string",
+        "alt": "string|null",
+        "sort_order": "int"
+      }
+    },
+    "RoomType": {
+      "fields": {
+        "id": "uuid",
+        "hotel_id": "uuid",
+        "name": "string",
+        "bed_configuration": "string",
+        "max_guests": "int",
+        "refundable": "boolean",
+        "price_per_night_cents": "int",
+        "currency": "string",
+        "inventory": "int"
+      }
+    },
+    "Review": {
+      "fields": {
+        "id": "uuid",
+        "hotel_id": "uuid",
+        "author_name": "string",
+        "rating": "int",
+        "title": "string|null",
+        "comment": "string|null",
+        "created_at": "timestamptz"
+      }
+    },
+    "Car": {
+      "fields": {
+        "id": "uuid",
+        "company": "string",
+        "model": "string",
+        "car_type": "economy|compact|midsize|suv|luxury|van",
+        "seats": "int",
+        "transmission": "automatic|manual",
+        "fuel_type": "gas|diesel|hybrid|electric",
+        "price_per_day_cents": "int",
+        "currency": "string",
+        "pickup_location_id": "uuid",
+        "dropoff_location_id": "uuid",
+        "inventory": "int"
+      }
+    },
+    "CarExtra": {
+      "fields": {
+        "id": "uuid",
+        "code": "string",
+        "name": "string",
+        "pricing_model": "per_day|per_rental",
+        "price_cents": "int",
+        "currency": "string"
+      }
+    },
+    "PromoCode": {
+      "fields": {
+        "id": "uuid",
+        "code": "string",
+        "type": "percent|fixed",
+        "value": "int",
+        "min_subtotal_cents": "int",
+        "starts_at": "timestamptz|null",
+        "ends_at": "timestamptz|null",
+        "max_redemptions": "int|null",
+        "redemptions_count": "int",
+        "active": "boolean"
+      }
+    },
+    "Cart": {
+      "fields": {
+        "id": "uuid",
+        "user_id": "uuid",
+        "promo_code_id": "uuid|null",
+        "created_at": "timestamptz",
+        "updated_at": "timestamptz"
+      }
+    },
+    "CartItem": {
+      "fields": {
+        "id": "uuid",
+        "cart_id": "uuid",
+        "type": "flight|hotel|car|package",
+        "reference_id": "uuid",
+        "quantity": "int",
+        "start_date": "date|null",
+        "end_date": "date|null",
+        "metadata": "object",
+        "price_cents": "int",
+        "currency": "string",
+        "created_at": "timestamptz"
+      }
+    },
+    "PackageBundle": {
+      "fields": {
+        "id": "uuid",
+        "flight_id": "uuid",
+        "hotel_id": "uuid",
+        "car_id": "uuid|null",
+        "discount_percent": "int",
+        "created_at": "timestamptz"
+      }
+    },
+    "Booking": {
+      "fields": {
+        "id": "uuid",
+        "user_id": "uuid",
+        "type": "flight|hotel|car|package",
+        "status": "confirmed|cancelled|modified",
+        "total_cents": "int",
+        "currency": "string",
+        "details": "object",
+        "created_at": "timestamptz",
+        "updated_at": "timestamptz"
+      }
+    },
+    "BookingItem": {
+      "fields": {
+        "id": "uuid",
+        "booking_id": "uuid",
+        "type": "flight|hotel|car",
+        "reference_id": "uuid",
+        "start_date": "date|null",
+        "end_date": "date|null",
+        "metadata": "object",
+        "line_total_cents": "int",
+        "currency": "string"
+      }
+    },
+    "PaymentTransaction": {
+      "fields": {
+        "id": "uuid",
+        "booking_id": "uuid",
+        "user_id": "uuid",
+        "amount_cents": "int",
+        "currency": "string",
+        "status": "succeeded|failed",
+        "payment_method_id": "uuid|null",
+        "provider": "string",
+        "provider_reference": "string|null",
+        "created_at": "timestamptz"
+      }
+    },
+    "Favorite": {
+      "fields": {
+        "id": "uuid",
+        "user_id": "uuid",
+        "type": "hotel",
+        "reference_id": "uuid",
+        "created_at": "timestamptz"
+      }
+    }
+  },
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/auth/register",
+      "auth_required": false,
+      "request": {
+        "body": {
+          "email": "string",
+          "password": "string",
+          "name": "string",
+          "phone": "string|null"
+        }
+      },
+      "responses": {
+        "200": {
+          "body": {
+            "item": {
+              "user": "User",
+              "access_token": "string",
+              "expires_in": "int"
+            }
+          }
+        },
+        "400": { "body": "error_format" },
+        "409": { "body": "error_format" }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "auth_required": false,
+      "request": {
+        "body": {
+          "email": "string",
+          "password": "string"
+        }
+      },
+      "responses": {
+        "200": {
+          "body": {
+            "item": {
+              "user": "User",
+              "access_token": "string",
+              "expires_in": "int"
+            }
+          }
+        },
+        "401": { "body": "error_format" }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/me",
+      "auth_required": true,
+      "responses": {
+        "200": { "body": { "item": { "user": "User" } } },
+        "401": { "body": "error_format" }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/logout",
+      "auth_required": true,
+      "responses": {
+        "200": { "body": { "item": { "success": true } } },
+        "401": { "body": "error_format" }
+      }
+    },
+
+    {
+      "method": "GET",
+      "path": "/users/me",
+      "auth_required": true,
+      "responses": { "200": { "body": { "item": { "user": "User" } } } }
+    },
+    {
+      "method": "PATCH",
+      "path": "/users/me",
+      "auth_required": true,
+      "request": {
+        "body": {
+          "name": "string",
+          "email": "string",
+          "phone": "string|null"
+        }
+      },
+      "responses": {
+        "200": { "body": { "item": { "user": "User" } } },
+        "409": { "body": "error_format" }
+      }
+    },
+
+    {
+      "method": "GET",
+      "path": "/payment-methods",
+      "auth_required": true,
+      "responses": { "200": { "body": { "items": "PaymentMethod[]" } } }
+    },
+    {
+      "method": "POST",
+      "path": "/payment-methods",
+      "auth_required": true,
+      "request": {
+        "body": {
+          "brand": "string",
+          "last4": "string",
+          "exp_month": "int",
+          "exp_year": "int",
+          "token": "string",
+          "billing_name": "string|null"
+        }
+      },
+      "responses": { "200": { "body": { "item": { "payment_method": "PaymentMethod" } } } }
+    },
+    {
+      "method": "DELETE",
+      "path": "/payment-methods/:id",
+      "auth_required": true,
+      "responses": {
+        "200": { "body": { "item": { "success": true } } },
+        "404": { "body": "error_format" }
+      }
+    },
+
+    {
+      "method": "GET",
+      "path": "/locations",
+      "auth_required": false,
+      "request": {
+        "query": {
+          "q": "string (min 2 chars)",
+          "type": "airport|city|region|place (optional)",
+          "limit": "int (optional, default 8)"
+        }
+      },
+      "responses": { "200": { "body": { "items": "Location[]" } } }
+    },
+
+    {
+      "method": "GET",
+      "path": "/flights",
+      "auth_required": false,
+      "request": {
+        "query": {
+          "origin_id": "uuid",
+          "destination_id": "uuid",
+          "depart_date": "date",
+          "return_date": "date|null",
+          "trip_type": "one_way|round_trip",
+          "passengers": "int (1-9)",
+          "seat_class": "economy|business|first (optional for pricing preview)",
+          "airlines": "string (comma-separated)",
+          "stops": "int (comma-separated, e.g., 0,1)",
+          "depart_time_min": "string HH:MM (optional)",
+          "depart_time_max": "string HH:MM (optional)",
+          "price_min": "int cents (optional)",
+          "price_max": "int cents (optional)",
+          "sort": "price|duration|depart_at:asc|desc",
+          "limit": "int",
+          "offset": "int"
+        }
+      },
+      "responses": {
+        "200": {
+          "body": {
+            "items": [
+              {
+                "itinerary_id": "uuid",
+                "trip_type": "one_way|round_trip",
+                "outbound": {
+                  "flight": "Flight",
+                  "segments": "FlightSegment[]"
+                },
+                "inbound": {
+                  "flight": "Flight|null",
+                  "segments": "FlightSegment[]"
+                },
+                "pricing": {
+                  "passengers": "int",
+                  "seat_class": "economy|business|first",
+                  "subtotal_cents": "int",
+                  "taxes_cents": "int",
+                  "fees_cents": "int",
+                  "total_cents": "int",
+                  "currency": "string"
+                }
+              }
+            ]
+          }
+        },
+        "400": { "body": "error_format" }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/flights/:id",
+      "auth_required": false,
+      "responses": {
+        "200": {
+          "body": {
+            "item": {
+              "flight": "Flight",
+              "segments": "FlightSegment[]",
+              "fare_options": [
+                {
+                  "seat_class": "economy|business|first",
+                  "multiplier": "number",
+                  "price_per_passenger_cents": "int",
+                  "currency": "string",
+                  "features": {
+                    "carry_on": "boolean",
+                    "checked_bag": "boolean",
+                    "changeable": "boolean",
+                    "refundable": "boolean"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "404": { "body": "error_format" }
+      }
+    },
+
+    {
+      "method": "GET",
+      "path": "/hotels",
+      "auth_required": false,
+      "request": {
+        "query": {
+          "location_id": "uuid",
+          "check_in": "date",
+          "check_out": "date",
+          "guests": "int",
+          "rooms": "int",
+          "star_min": "number",
+          "star_max": "number",
+          "amenities": "string (comma-separated)",
+          "price_min": "int cents",
+          "price_max": "int cents",
+          "distance_max_km": "number",
+          "sort": "price|star_rating|review_score:asc|desc",
+          "map_bounds": "string (optional: south,west,north,east)",
+          "limit": "int",
+          "offset": "int"
+        }
+      },
+      "responses": {
+        "200": {
+          "body": {
+            "items": [
+              {
+                "hotel": "Hotel",
+                "pricing": {
+                  "nights": "int",
+                  "price_per_night_cents": "int",
+                  "subtotal_cents": "int",
+                  "taxes_cents": "int",
+                  "fees_cents": "int",
+                  "total_cents": "int",
+                  "currency": "string"
+                },
+                "review_summary": {
+                  "average": "number",
+                  "count": "int"
+                },
+                "distance_km": "number",
+                "thumbnail_url": "string|null"
+              }
+            ]
+          }
+        },
+        "400": { "body": "error_format" }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/hotels/:id",
+      "auth_required": false,
+      "request": {
+        "query": {
+          "check_in": "date (optional)",
+          "check_out": "date (optional)",
+          "guests": "int (optional)",
+          "rooms": "int (optional)"
+        }
+      },
+      "responses": {
+        "200": {
+          "body": {
+            "item": {
+              "hotel": "Hotel",
+              "photos": "HotelPhoto[]",
+              "room_types": "RoomType[]",
+              "review_summary": { "average": "number", "count": "int" }
+            }
+          }
+        },
+        "404": { "body": "error_format" }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/hotels/:id/reviews",
+      "auth_required": false,
+      "request": {
+        "query": { "limit": "int", "offset": "int" }
+      },
+      "responses": { "200": { "body": { "items": "Review[]" } } }
+    },
+
+    {
+      "method": "GET",
+      "path": "/cars",
+      "auth_required": false,
+      "request": {
+        "query": {
+          "pickup_location_id": "uuid",
+          "dropoff_location_id": "uuid",
+          "pickup_date": "date",
+          "dropoff_date": "date",
+          "car_type": "economy|compact|midsize|suv|luxury|van (optional, comma-separated)",
+          "company": "string (optional, comma-separated)",
+          "price_min": "int cents",
+          "price_max": "int cents",
+          "sort": "price|company:asc|desc",
+          "limit": "int",
+          "offset": "int"
+        }
+      },
+      "responses": {
+        "200": {
+          "body": {
+            "items": [
+              {
+                "car": "Car",
+                "pricing": {
+                  "days": "int",
+                  "subtotal_cents": "int",
+                  "taxes_cents": "int",
+                  "fees_cents": "int",
+                  "total_cents": "int",
+                  "currency": "string"
+                }
+              }
+            ]
+          }
+        },
+        "400": { "body": "error_format" }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/cars/:id",
+      "auth_required": false,
+      "responses": {
+        "200": {
+          "body": {
+            "item": {
+              "car": "Car",
+              "extras": "CarExtra[]"
+            }
+          }
+        },
+        "404": { "body": "error_format" }
+      }
+    },
+
+    {
+      "method": "POST",
+      "path": "/packages/quote",
+      "auth_required": false,
+      "request": {
+        "body": {
+          "flight_id": "uuid",
+          "hotel_id": "uuid",
+          "car_id": "uuid|null",
+          "hotel_check_in": "date",
+          "hotel_check_out": "date",
+          "car_pickup_date": "date|null",
+          "car_dropoff_date": "date|null",
+          "passengers": "int (1-9)",
+          "seat_class": "economy|business|first"
+        }
+      },
+      "responses": {
+        "200": {
+          "body": {
+            "item": {
+              "bundle": {
+                "flight_id": "uuid",
+                "hotel_id": "uuid",
+                "car_id": "uuid|null",
+                "discount_percent": "int"
+              },
+              "pricing": {
+                "individual_total_cents": "int",
+                "discount_cents": "int",
+                "package_total_cents": "int",
+                "currency": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+
+    {
+      "method": "GET",
+      "path": "/cart",
+      "auth_required": true,
+      "responses": {
+        "200": {
+          "body": {
+            "item": {
+              "cart": "Cart",
+              "items": "CartItem[]",
+              "totals": {
+                "subtotal_cents": "int",
+                "taxes_cents": "int",
+                "fees_cents": "int",
+                "discount_cents": "int",
+                "grand_total_cents": "int",
+                "currency": "string",
+                "promo": {
+                  "code": "string|null",
+                  "promo_code_id": "uuid|null"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/cart/items",
+      "auth_required": true,
+      "request": {
+        "body": {
+          "type": "flight|hotel|car|package",
+          "reference_id": "uuid",
+          "quantity": "int (default 1)",
+          "start_date": "date|null",
+          "end_date": "date|null",
+          "metadata": "object"
+        }
+      },
+      "responses": {
+        "200": { "body": { "item": { "cart_item": "CartItem" } } },
+        "400": { "body": "error_format" }
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/cart/items/:id",
+      "auth_required": true,
+      "responses": { "200": { "body": { "item": { "success": true } } } }
+    },
+    {
+      "method": "POST",
+      "path": "/cart/apply-promo",
+      "auth_required": true,
+      "request": { "body": { "code": "string" } },
+      "responses": {
+        "200": { "body": { "item": { "applied": true, "promo": "PromoCode" } } },
+        "400": { "body": "error_format" }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/cart/remove-promo",
+      "auth_required": true,
+      "responses": { "200": { "body": { "item": { "removed": true } } } }
+    },
+
+    {
+      "method": "POST",
+      "path": "/checkout",
+      "auth_required": true,
+      "request": {
+        "body": {
+          "traveler": {
+            "full_name": "string",
+            "email": "string",
+            "phone": "string|null"
+          },
+          "billing_address": {
+            "line1": "string|null",
+            "city": "string|null",
+            "region": "string|null",
+            "postal_code": "string|null",
+            "country": "string|null"
+          },
+          "payment": {
+            "payment_method_id": "uuid|null",
+            "card": {
+              "number": "string|null",
+              "exp_month": "int|null",
+              "exp_year": "int|null",
+              "cvc": "string|null",
+              "name": "string|null"
+            },
+            "simulate": {
+              "force_status": "succeeded|failed (optional)",
+              "fail_on_card_last4": "string (optional, e.g., 0000)"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "body": {
+            "item": {
+              "payment_transaction": "PaymentTransaction",
+              "bookings": "Booking[]"
+            }
+          }
+        },
+        "400": { "body": "error_format" },
+        "402": { "body": "error_format" }
+      }
+    },
+
+    {
+      "method": "GET",
+      "path": "/bookings",
+      "auth_required": true,
+      "request": {
+        "query": {
+          "status": "confirmed|cancelled|modified (optional)",
+          "type": "flight|hotel|car|package (optional)",
+          "limit": "int",
+          "offset": "int"
+        }
+      },
+      "responses": { "200": { "body": { "items": "Booking[]" } } }
+    },
+    {
+      "method": "GET",
+      "path": "/bookings/:id",
+      "auth_required": true,
+      "responses": {
+        "200": {
+          "body": {
+            "item": {
+              "booking": "Booking",
+              "items": "BookingItem[]",
+              "payment": "PaymentTransaction|null"
+            }
+          }
+        },
+        "404": { "body": "error_format" }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/bookings/:id/cancel",
+      "auth_required": true,
+      "responses": {
+        "200": { "body": { "item": { "booking": "Booking" } } },
+        "400": { "body": "error_format" },
+        "404": { "body": "error_format" }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/bookings/:id/modify",
+      "auth_required": true,
+      "request": {
+        "body": {
+          "changes": "object",
+          "confirm": "boolean (default false)"
+        }
+      },
+      "responses": {
+        "200": {
+          "body": {
+            "item": {
+              "preview": {
+                "allowed": "boolean",
+                "price_difference_cents": "int",
+                "new_total_cents": "int",
+                "currency": "string"
+              },
+              "booking": "Booking|null"
+            }
+          }
+        },
+        "400": { "body": "error_format" }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/bookings/:id/confirmation",
+      "auth_required": true,
+      "request": { "query": { "format": "pdf|html (default pdf)" } },
+      "responses": {
+        "200": {
+          "body": {
+            "item": {
+              "download_url": "string",
+              "content_type": "application/pdf|text/html"
+            }
+          }
+        }
+      }
+    },
+
+    {
+      "method": "GET",
+      "path": "/favorites",
+      "auth_required": true,
+      "request": { "query": { "type": "hotel (optional)" } },
+      "responses": { "200": { "body": { "items": "Favorite[]" } } }
+    },
+    {
+      "method": "POST",
+      "path": "/favorites",
+      "auth_required": true,
+      "request": { "body": { "type": "hotel", "reference_id": "uuid" } },
+      "responses": { "200": { "body": { "item": { "favorite": "Favorite" } } } }
+    },
+    {
+      "method": "DELETE",
+      "path": "/favorites/:id",
+      "auth_required": true,
+      "responses": { "200": { "body": { "item": { "success": true } } } }
+    },
+
+    {
+      "method": "GET",
+      "path": "/admin/seed-status",
+      "auth_required": false,
+      "responses": {
+        "200": {
+          "body": {
+            "item": {
+              "counts": {
+                "locations": "int",
+                "flights": "int",
+                "hotels": "int",
+                "cars": "int",
+                "reviews": "int",
+                "promo_codes": "int"
+              }
+            }
+          }
+        }
+      },
+      "note": "Optional helper endpoint for QA; can be omitted in production."
+    }
+  ]
+}

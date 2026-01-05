@@ -1,0 +1,234 @@
+{
+  "$schema": "https://example.com/spec.ui.schema.json",
+  "app": {
+    "name": "FoodHub",
+    "style_reference": {
+      "must_match": true,
+      "images": [
+        {"path": "screenshot/doordash/home.png", "notes": "App shell: left sidebar + top header, category pills, promo banners, store cards"},
+        {"path": "screenshot/doordash/item_detail.png", "notes": "Store page with circular category icons and product grid; item detail modal"},
+        {"path": "screenshot/doordash/goods.png", "notes": "Product detail modal style: large image, stepper, add-to-cart"}
+      ]
+    },
+    "theme": {
+      "primary": "#FF3008",
+      "text": "#111111",
+      "muted_text": "#6B6B6B",
+      "bg": "#FFFFFF",
+      "surface": "#FFFFFF",
+      "surface_alt": "#F7F7F7",
+      "border": "#E9E9E9",
+      "success": "#0A8080"
+    },
+    "layout": {
+      "shell": "AppShell with LeftSidebar + TopHeader + main outlet",
+      "max_content_width": 1200,
+      "grid": {"gutter": 16, "radius": 16}
+    }
+  },
+  "required_packages": {
+    "dependencies": {
+      "react-router-dom": "^6.26.0",
+      "axios": "^1.6.7",
+      "clsx": "^2.1.0",
+      "lucide-react": "^0.344.0"
+    }
+  },
+  "state_management": {
+    "auth": "AuthContext (token in localStorage)",
+    "cart": "CartContext (server-authoritative; refresh on mutations)",
+    "ui": "local component state + simple modal context"
+  },
+  "routing": {
+    "base": "/",
+    "routes": [
+      {"path": "/", "page": "HomePage", "layout": "AppShell"},
+      {"path": "/grocery", "page": "GroceryPage", "layout": "AppShell"},
+      {"path": "/retail", "page": "RetailPage", "layout": "AppShell"},
+      {"path": "/pharmacy", "page": "PharmacyPage", "layout": "AppShell"},
+      {"path": "/restaurants/:restaurantId", "page": "RestaurantPage", "layout": "AppShell"},
+      {"path": "/orders", "page": "OrdersPage", "layout": "AppShell", "auth_required": true},
+      {"path": "/orders/:orderId", "page": "OrderDetailPage", "layout": "AppShell", "auth_required": true},
+      {"path": "/favorites", "page": "FavoritesPage", "layout": "AppShell", "auth_required": true},
+      {"path": "/checkout", "page": "CheckoutPage", "layout": "AppShell", "auth_required": true},
+      {"path": "/login", "page": "LoginPage", "layout": "Minimal"},
+      {"path": "/register", "page": "RegisterPage", "layout": "Minimal"},
+      {"path": "/profile", "page": "ProfilePage", "layout": "AppShell", "auth_required": true}
+    ]
+  },
+  "pages": {
+    "HomePage": {
+      "file": "app/frontend/src/pages/HomePage.jsx",
+      "sections": [
+        "CategoryPillsRow (emoji pills)",
+        "PromoBanners (2 cards)",
+        "StoreGrid (restaurant cards)",
+        "Optional: Featured carousel"
+      ],
+      "data_dependencies": [
+        "GET /api/restaurant-categories",
+        "GET /api/restaurants (filters/sort)",
+        "GET /api/search/suggestions (typeahead)",
+        "GET /api/cart (badge count)"
+      ]
+    },
+    "RestaurantPage": {
+      "file": "app/frontend/src/pages/RestaurantPage.jsx",
+      "sections": [
+        "HeroHeader (cover image, name, rating, fee/time)",
+        "CircularCategoryIcons (menu categories)",
+        "ProductGrid (menu items)",
+        "StickyBottomBar (minimum order + view cart)"
+      ],
+      "interactions": [
+        "Open ItemDetailModal on product click",
+        "Inline + button on product card adds 1",
+        "If cart mismatch -> show ClearCartConfirmModal"
+      ],
+      "data_dependencies": [
+        "GET /api/restaurants/:id",
+        "GET /api/restaurants/:id/menu",
+        "GET /api/cart"
+      ]
+    },
+    "CheckoutPage": {
+      "file": "app/frontend/src/pages/CheckoutPage.jsx",
+      "sections": [
+        "AddressSelector",
+        "DeliveryPickupToggle",
+        "PaymentMethodSelector",
+        "PromoCodeInput",
+        "OrderSummary (subtotal, delivery fee, service fee 5%, total)",
+        "PlaceOrderButton"
+      ],
+      "data_dependencies": [
+        "GET /api/cart",
+        "GET /api/profile/addresses",
+        "GET /api/profile/payment-methods",
+        "POST /api/orders"
+      ]
+    },
+    "OrdersPage": {
+      "file": "app/frontend/src/pages/OrdersPage.jsx",
+      "sections": ["OrdersList"],
+      "data_dependencies": ["GET /api/orders"]
+    },
+    "OrderDetailPage": {
+      "file": "app/frontend/src/pages/OrderDetailPage.jsx",
+      "sections": ["OrderTrackingHeader", "ItemsList", "ReorderButton"],
+      "data_dependencies": ["GET /api/orders/:orderId", "POST /api/orders/:orderId/reorder"]
+    },
+    "FavoritesPage": {
+      "file": "app/frontend/src/pages/FavoritesPage.jsx",
+      "sections": ["FavoritesGrid"],
+      "data_dependencies": ["GET /api/favorites", "POST/DELETE /api/favorites"]
+    },
+    "ProfilePage": {
+      "file": "app/frontend/src/pages/ProfilePage.jsx",
+      "sections": ["UserCard", "Addresses", "PaymentMethods"],
+      "data_dependencies": ["GET /api/auth/me", "GET/POST /api/profile/addresses", "GET/POST /api/profile/payment-methods"]
+    },
+    "LoginPage": {"file": "app/frontend/src/pages/LoginPage.jsx", "sections": ["LoginForm"], "data_dependencies": ["POST /api/auth/login"]},
+    "RegisterPage": {"file": "app/frontend/src/pages/RegisterPage.jsx", "sections": ["RegisterForm"], "data_dependencies": ["POST /api/auth/register"]}
+  },
+  "components": {
+    "AppShell": {
+      "file": "app/frontend/src/components/layout/AppShell.jsx",
+      "export_style": "default",
+      "parts": ["LeftSidebar", "TopHeader", "CartDrawer", "Outlet"]
+    },
+    "LeftSidebar": {
+      "file": "app/frontend/src/components/layout/LeftSidebar.jsx",
+      "export_style": "default",
+      "nav_items": [
+        {"key": "home", "label": "Home", "icon": "Home", "to": "/"},
+        {"key": "grocery", "label": "Grocery", "icon": "ShoppingBag", "to": "/grocery"},
+        {"key": "retail", "label": "Retail", "icon": "Store", "to": "/retail"},
+        {"key": "pharmacy", "label": "Pharmacy", "icon": "Plus", "to": "/pharmacy"},
+        {"key": "orders", "label": "Orders", "icon": "Receipt", "to": "/orders"},
+        {"key": "favorites", "label": "Favorites", "icon": "Heart", "to": "/favorites"},
+        {"key": "profile", "label": "Profile", "icon": "User", "to": "/profile"}
+      ]
+    },
+    "TopHeader": {
+      "file": "app/frontend/src/components/layout/TopHeader.jsx",
+      "export_style": "default",
+      "elements": ["BrandLogo", "SearchBar", "LocationSelector", "DeliveryPickupToggle", "CartButton", "AuthMenu"]
+    },
+    "SearchBar": {
+      "file": "app/frontend/src/components/search/SearchBar.jsx",
+      "export_style": "default",
+      "behavior": "debounced typeahead -> /api/search/suggestions; optionally save recent searches when executed"
+    },
+    "CategoryPills": {
+      "file": "app/frontend/src/components/home/CategoryPills.jsx",
+      "export_style": "default",
+      "style": "rounded pills with emoji; active pill uses primary #FF3008"
+    },
+    "PromoBanners": {
+      "file": "app/frontend/src/components/home/PromoBanners.jsx",
+      "export_style": "default",
+      "style": "2 gradient cards with CTA buttons"
+    },
+    "RestaurantCard": {
+      "file": "app/frontend/src/components/restaurants/RestaurantCard.jsx",
+      "export_style": "default",
+      "style": "image top, meta row (rating, time, fee), heart icon"
+    },
+    "ProductCard": {
+      "file": "app/frontend/src/components/menu/ProductCard.jsx",
+      "export_style": "default",
+      "style": "image, name, unitInfo, price; plus overlay button"
+    },
+    "ItemDetailModal": {
+      "file": "app/frontend/src/components/menu/ItemDetailModal.jsx",
+      "export_style": "default",
+      "elements": ["CloseButton", "LargeImage", "Title", "Price", "UnitInfo", "StockBadge", "QuantityStepper", "ModifierGroups", "Notes", "AddToCartButton"]
+    },
+    "CartDrawer": {
+      "file": "app/frontend/src/components/cart/CartDrawer.jsx",
+      "export_style": "default",
+      "elements": ["CartItems", "PromoCodeInput", "FeeBreakdown", "CheckoutCTA"],
+      "fee_breakdown": ["subtotal", "delivery fee", "service fee (5%)", "discount", "total"]
+    },
+    "QuantityStepper": {
+      "file": "app/frontend/src/components/ui/QuantityStepper.jsx",
+      "export_style": "named",
+      "props": ["value", "min", "max", "onChange"]
+    },
+    "Button": {
+      "file": "app/frontend/src/components/ui/Button.jsx",
+      "export_style": "named",
+      "props": ["children", "variant", "size", "disabled", "onClick", "type"]
+    },
+    "Chip": {
+      "file": "app/frontend/src/components/ui/Chip.jsx",
+      "export_style": "named",
+      "props": ["children", "active", "onClick"]
+    },
+    "Modal": {
+      "file": "app/frontend/src/components/ui/Modal.jsx",
+      "export_style": "named",
+      "props": ["open", "title", "onClose", "children"]
+    },
+    "Price": {
+      "file": "app/frontend/src/components/ui/Price.jsx",
+      "export_style": "named",
+      "props": ["cents", "superscriptCents", "className"]
+    }
+  },
+  "ui_behavior_rules": {
+    "single_restaurant_cart": {
+      "on_mismatch": "Show modal: 'Start a new cart?' with actions: Clear cart + add item OR Cancel.",
+      "api_error": "409 CART_RESTAURANT_MISMATCH"
+    },
+    "cart_badge": "Badge shows sum(quantity) from cart.pricing.itemCount",
+    "loading_states": "Show skeleton cards for store grid and product grid",
+    "empty_states": [
+      "No restaurants found",
+      "Cart is empty",
+      "No favorites yet",
+      "No orders yet"
+    ]
+  }
+}

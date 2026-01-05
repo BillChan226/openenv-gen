@@ -1,0 +1,574 @@
+{
+  "$schema": "https://example.com/spec.api.schema.json",
+  "service": {
+    "name": "FoodHub API",
+    "base_url": "http://localhost:3000",
+    "version": "1.0.0"
+  },
+  "naming_conventions": {
+    "database": "snake_case",
+    "api_request": "camelCase",
+    "api_response": "camelCase",
+    "transform_rules": [
+      "created_at -> createdAt",
+      "delivery_fee_cents -> deliveryFeeCents",
+      "minimum_order_cents -> minimumOrderCents",
+      "price_cents -> priceCents",
+      "service_fee_cents -> serviceFeeCents",
+      "total_cents -> totalCents"
+    ]
+  },
+  "auth": {
+    "type": "jwt_bearer",
+    "header": "Authorization",
+    "token_prefix": "Bearer ",
+    "jwt": {
+      "expires_in": "7d",
+      "claims": ["sub", "email"]
+    }
+  },
+  "response_conventions": {
+    "single": {"success": true, "data": {}},
+    "list": {"success": true, "data": {"items": [], "pagination": {"limit": 20, "offset": 0, "total": 0}}},
+    "error": {"success": false, "error": {"code": "STRING", "message": "STRING", "details": {}}}
+  },
+  "errors": [
+    {"code": "UNAUTHORIZED", "http": 401},
+    {"code": "FORBIDDEN", "http": 403},
+    {"code": "NOT_FOUND", "http": 404},
+    {"code": "VALIDATION_ERROR", "http": 400},
+    {"code": "CART_RESTAURANT_MISMATCH", "http": 409},
+    {"code": "MINIMUM_ORDER_NOT_MET", "http": 409}
+  ],
+  "pricing_rules": {
+    "service_fee_percent": 5,
+    "service_fee_rounding": "round_half_up",
+    "service_fee_formula": "service_fee_cents = floor((subtotal_cents * 5 + 50) / 100)",
+    "total_formula": "total_cents = subtotal_cents + delivery_fee_cents + service_fee_cents - discount_cents"
+  },
+  "schemas": {
+    "User": {
+      "type": "object",
+      "fields": {
+        "id": "uuid",
+        "email": "string",
+        "fullName": "string",
+        "phone": "string|null",
+        "createdAt": "iso_datetime"
+      }
+    },
+    "RestaurantCategory": {
+      "type": "object",
+      "fields": {"id": "uuid", "name": "string", "emoji": "string", "sortOrder": "number"}
+    },
+    "Restaurant": {
+      "type": "object",
+      "fields": {
+        "id": "uuid",
+        "categoryId": "uuid",
+        "category": "RestaurantCategory",
+        "name": "string",
+        "description": "string|null",
+        "priceRange": "number",
+        "rating": "number",
+        "reviewsCount": "number",
+        "distanceMiles": "number",
+        "deliveryTimeMin": "number",
+        "deliveryFeeCents": "number",
+        "minimumOrderCents": "number",
+        "coverImageUrl": "string|null",
+        "heroImageUrl": "string|null",
+        "isActive": "boolean"
+      }
+    },
+    "MenuCategory": {"type": "object", "fields": {"id": "uuid", "restaurantId": "uuid", "name": "string", "sortOrder": "number"}},
+    "ModifierOption": {"type": "object", "fields": {"id": "uuid", "modifierGroupId": "uuid", "name": "string", "priceDeltaCents": "number", "sortOrder": "number"}},
+    "ModifierGroup": {
+      "type": "object",
+      "fields": {
+        "id": "uuid",
+        "menuItemId": "uuid",
+        "name": "string",
+        "modifierType": "SINGLE|MULTI",
+        "isRequired": "boolean",
+        "minSelected": "number",
+        "maxSelected": "number",
+        "sortOrder": "number",
+        "options": "ModifierOption[]"
+      }
+    },
+    "MenuItem": {
+      "type": "object",
+      "fields": {
+        "id": "uuid",
+        "restaurantId": "uuid",
+        "menuCategoryId": "uuid|null",
+        "name": "string",
+        "description": "string|null",
+        "priceCents": "number",
+        "imageUrl": "string|null",
+        "unitInfo": "string|null",
+        "isAvailable": "boolean",
+        "modifierGroups": "ModifierGroup[]"
+      }
+    },
+    "CartItem": {
+      "type": "object",
+      "fields": {
+        "id": "uuid",
+        "menuItemId": "uuid",
+        "menuItem": "MenuItem",
+        "quantity": "number",
+        "unitPriceCents": "number",
+        "modifierTotalCents": "number",
+        "notes": "string|null",
+        "selectedModifierOptionIds": "uuid[]",
+        "lineTotalCents": "number"
+      }
+    },
+    "Cart": {
+      "type": "object",
+      "fields": {
+        "id": "uuid",
+        "restaurantId": "uuid|null",
+        "restaurant": "Restaurant|null",
+        "fulfillmentType": "DELIVERY|PICKUP",
+        "promoCode": "string|null",
+        "specialInstructions": "string|null",
+        "items": "CartItem[]",
+        "pricing": {
+          "subtotalCents": "number",
+          "deliveryFeeCents": "number",
+          "serviceFeeCents": "number",
+          "discountCents": "number",
+          "totalCents": "number",
+          "itemCount": "number"
+        }
+      }
+    },
+    "PromoCode": {
+      "type": "object",
+      "fields": {
+        "id": "uuid",
+        "code": "string",
+        "description": "string|null",
+        "discountType": "PERCENT|FIXED",
+        "discountValue": "number",
+        "minSubtotalCents": "number",
+        "maxDiscountCents": "number|null",
+        "isActive": "boolean"
+      }
+    },
+    "Order": {
+      "type": "object",
+      "fields": {
+        "id": "uuid",
+        "restaurantId": "uuid",
+        "status": "CONFIRMED|PREPARING|ON_THE_WAY|DELIVERED|CANCELLED",
+        "fulfillmentType": "DELIVERY|PICKUP",
+        "placedAt": "iso_datetime",
+        "etaMinutes": "number|null",
+        "driverName": "string|null",
+        "driverPhone": "string|null",
+        "subtotalCents": "number",
+        "deliveryFeeCents": "number",
+        "serviceFeeCents": "number",
+        "discountCents": "number",
+        "totalCents": "number"
+      }
+    }
+  },
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/health",
+      "auth": false,
+      "description": "Health check.",
+      "responses": {
+        "200": {"response_format": {"success": true, "data": {"status": "ok"}}}
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/register",
+      "auth": false,
+      "request": {
+        "body": {"email": "string", "password": "string", "fullName": "string", "phone": "string?"}
+      },
+      "responses": {
+        "201": {
+          "response_format": {
+            "success": true,
+            "data": {"user": "User", "token": "jwt"}
+          }
+        },
+        "400": {"response_format": {"success": false, "error": {"code": "VALIDATION_ERROR", "message": "..."}}}
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "auth": false,
+      "request": {"body": {"email": "string", "password": "string"}},
+      "responses": {
+        "200": {"response_format": {"success": true, "data": {"user": "User", "token": "jwt"}}},
+        "401": {"response_format": {"success": false, "error": {"code": "UNAUTHORIZED", "message": "Invalid credentials"}}}
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "auth": true,
+      "responses": {"200": {"response_format": {"success": true, "data": {"user": "User"}}}}
+    },
+    {
+      "method": "GET",
+      "path": "/api/restaurant-categories",
+      "auth": false,
+      "query": {"includeEmpty": "boolean? (default true)"},
+      "responses": {
+        "200": {
+          "response_format": {
+            "success": true,
+            "data": {
+              "items": ["RestaurantCategory"],
+              "pagination": {"limit": 100, "offset": 0, "total": "integer"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/restaurants",
+      "auth": false,
+      "description": "Browse restaurants with filters/sorting.",
+      "query": {
+        "q": "string? (search name)",
+        "categoryId": "uuid?",
+        "minRating": "number?",
+        "maxDeliveryTimeMin": "number?",
+        "maxDistanceMiles": "number?",
+        "priceRange": "1|2|3|4?",
+        "sort": "rating|deliveryTime|distance?",
+        "order": "asc|desc?",
+        "limit": "number? default 20",
+        "offset": "number? default 0"
+      },
+      "responses": {
+        "200": {
+          "response_format": {
+            "success": true,
+            "data": {
+              "items": ["Restaurant"],
+              "pagination": {"limit": "integer", "offset": "integer", "total": "integer"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/restaurants/:restaurantId",
+      "auth": false,
+      "responses": {"200": {"response_format": {"success": true, "data": {"restaurant": "Restaurant"}}}, "404": {"response_format": {"success": false, "error": {"code": "NOT_FOUND", "message": "Restaurant not found"}}}}
+    },
+    {
+      "method": "GET",
+      "path": "/api/restaurants/:restaurantId/menu",
+      "auth": false,
+      "description": "Restaurant menu including categories and items. Items include modifier groups/options.",
+      "responses": {
+        "200": {
+          "response_format": {
+            "success": true,
+            "data": {
+              "restaurantId": "uuid",
+              "menuCategories": ["MenuCategory"],
+              "items": ["MenuItem"]
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/search/suggestions",
+      "auth": false,
+      "query": {"q": "string (min 1)", "limit": "number? default 8"},
+      "responses": {
+        "200": {
+          "response_format": {
+            "success": true,
+            "data": {
+              "items": [
+                {
+                  "type": "restaurant|dish",
+                  "id": "uuid",
+                  "label": "string",
+                  "subtitle": "string?"
+                }
+              ],
+              "pagination": {"limit": "integer", "offset": 0, "total": "integer"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/me/recent-searches",
+      "auth": true,
+      "query": {"limit": "number? default 10"},
+      "responses": {
+        "200": {"response_format": {"success": true, "data": {"items": [{"id": "uuid", "query": "string", "createdAt": "iso_datetime"}], "pagination": {"limit": "integer", "offset": 0, "total": "integer"}}}}
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/users/me/recent-searches",
+      "auth": true,
+      "request": {"body": {"query": "string"}},
+      "responses": {"201": {"response_format": {"success": true, "data": {"saved": true}}}}
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile/addresses",
+      "auth": true,
+      "responses": {
+        "200": {
+          "response_format": {
+            "success": true,
+            "data": {
+              "items": [
+                {
+                  "id": "uuid",
+                  "label": "string",
+                  "line1": "string",
+                  "line2": "string|null",
+                  "city": "string",
+                  "state": "string",
+                  "postalCode": "string",
+                  "isDefault": "boolean"
+                }
+              ],
+              "pagination": {"limit": 100, "offset": 0, "total": "integer"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/profile/addresses",
+      "auth": true,
+      "request": {
+        "body": {"label": "string", "line1": "string", "line2": "string?", "city": "string", "state": "string", "postalCode": "string", "isDefault": "boolean?"}
+      },
+      "responses": {"201": {"response_format": {"success": true, "data": {"addressId": "uuid"}}}}
+    },
+    {
+      "method": "GET",
+      "path": "/api/profile/payment-methods",
+      "auth": true,
+      "responses": {
+        "200": {
+          "response_format": {
+            "success": true,
+            "data": {
+              "items": [
+                {
+                  "id": "uuid",
+                  "brand": "VISA|MASTERCARD|AMEX|DISCOVER|OTHER",
+                  "last4": "string",
+                  "expMonth": "number",
+                  "expYear": "number",
+                  "isDefault": "boolean"
+                }
+              ],
+              "pagination": {"limit": 100, "offset": 0, "total": "integer"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/profile/payment-methods",
+      "auth": true,
+      "request": {"body": {"brand": "string", "last4": "string", "expMonth": "number", "expYear": "number", "billingZip": "string?", "isDefault": "boolean?"}},
+      "responses": {"201": {"response_format": {"success": true, "data": {"paymentMethodId": "uuid"}}}}
+    },
+    {
+      "method": "GET",
+      "path": "/api/favorites",
+      "auth": true,
+      "responses": {
+        "200": {
+          "response_format": {
+            "success": true,
+            "data": {"items": ["Restaurant"], "pagination": {"limit": 100, "offset": 0, "total": "integer"}}
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/favorites",
+      "auth": true,
+      "request": {"body": {"restaurantId": "uuid"}},
+      "responses": {"200": {"response_format": {"success": true, "data": {"favorited": true}}}}
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/favorites/:restaurantId",
+      "auth": true,
+      "responses": {"200": {"response_format": {"success": true, "data": {"favorited": false}}}}
+    },
+    {
+      "method": "GET",
+      "path": "/api/promo-codes",
+      "auth": false,
+      "query": {"activeOnly": "boolean? default true"},
+      "responses": {"200": {"response_format": {"success": true, "data": {"items": ["PromoCode"], "pagination": {"limit": 100, "offset": 0, "total": "integer"}}}}}
+    },
+    {
+      "method": "GET",
+      "path": "/api/cart",
+      "auth": true,
+      "description": "Get current cart with computed pricing.",
+      "responses": {"200": {"response_format": {"success": true, "data": {"cart": "Cart"}}}}
+    },
+    {
+      "method": "POST",
+      "path": "/api/cart/items",
+      "auth": true,
+      "description": "Add item to cart. Enforces single-restaurant cart.",
+      "request": {
+        "body": {
+          "menuItemId": "uuid",
+          "quantity": "number default 1",
+          "selectedModifierOptionIds": "uuid[] default []",
+          "notes": "string?"
+        }
+      },
+      "responses": {
+        "200": {
+          "response_format": {
+            "success": true,
+            "data": {"cart": "Cart", "addedItemId": "uuid"}
+          }
+        },
+        "409": {
+          "response_format": {
+            "success": false,
+            "error": {
+              "code": "CART_RESTAURANT_MISMATCH",
+              "message": "Cart contains items from another restaurant.",
+              "details": {"cart": "Cart"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/cart/items/:cartItemId",
+      "auth": true,
+      "request": {"body": {"quantity": "number?", "notes": "string?", "selectedModifierOptionIds": "uuid[]?"}},
+      "responses": {"200": {"response_format": {"success": true, "data": {"cart": "Cart"}}}}
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/cart/items/:cartItemId",
+      "auth": true,
+      "responses": {"200": {"response_format": {"success": true, "data": {"cart": "Cart"}}}}
+    },
+    {
+      "method": "POST",
+      "path": "/api/cart/apply-promo",
+      "auth": true,
+      "request": {"body": {"code": "string"}},
+      "responses": {
+        "200": {"response_format": {"success": true, "data": {"cart": "Cart"}}},
+        "400": {"response_format": {"success": false, "error": {"code": "VALIDATION_ERROR", "message": "Invalid promo code"}}}
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/cart/clear",
+      "auth": true,
+      "responses": {"200": {"response_format": {"success": true, "data": {"cart": "Cart"}}}}
+    },
+    {
+      "method": "POST",
+      "path": "/api/orders",
+      "auth": true,
+      "description": "Create an order from the current cart.",
+      "request": {
+        "body": {
+          "addressId": "uuid",
+          "paymentMethodId": "uuid",
+          "fulfillmentType": "DELIVERY|PICKUP",
+          "scheduledFor": "iso_datetime?",
+          "specialInstructions": "string?"
+        }
+      },
+      "responses": {
+        "201": {"response_format": {"success": true, "data": {"orderId": "uuid"}}},
+        "409": {"response_format": {"success": false, "error": {"code": "MINIMUM_ORDER_NOT_MET", "message": "Subtotal below restaurant minimum.", "details": {"minimumOrderCents": "integer"}}}}
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/orders",
+      "auth": true,
+      "query": {"status": "string?", "limit": "number? default 20", "offset": "number? default 0"},
+      "responses": {
+        "200": {
+          "response_format": {
+            "success": true,
+            "data": {"items": ["Order"], "pagination": {"limit": "integer", "offset": "integer", "total": "integer"}}
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/orders/:orderId",
+      "auth": true,
+      "responses": {
+        "200": {
+          "response_format": {
+            "success": true,
+            "data": {
+              "order": "Order",
+              "restaurant": "Restaurant",
+              "items": [
+                {
+                  "id": "uuid",
+                  "name": "string",
+                  "unitPriceCents": "number",
+                  "modifierTotalCents": "number",
+                  "quantity": "number",
+                  "notes": "string|null",
+                  "modifiers": [{"id": "uuid", "name": "string", "priceDeltaCents": "number"}]
+                }
+              ]
+            }
+          }
+        },
+        "404": {"response_format": {"success": false, "error": {"code": "NOT_FOUND", "message": "Order not found"}}}
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/orders/:orderId/reorder",
+      "auth": true,
+      "description": "Clears cart and repopulates it from a past order (single-restaurant safe).",
+      "responses": {
+        "200": {"response_format": {"success": true, "data": {"cart": "Cart"}}}
+      }
+    }
+  ]
+}

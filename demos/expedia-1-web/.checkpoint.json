@@ -1,0 +1,57 @@
+{
+  "version": "1.0",
+  "name": "expedia",
+  "description": "Build a full-featured Expedia-style travel booking platform with the following capabilities:\n\n## Core Features\n\n### 1. User Authentication\n- Email/password registration and login\n- JWT-based authentication\n- User profile management (name, email, phone, saved payment methods)\n- Booking history view\n\n### 2. Flight Search & Booking\n- Search flights by origin, destination, dates, passengers\n- Round-trip and one-way search options\n- Filter by: price, airline, stops, departure time\n- Sort results by price, duration, departure time\n- Flight details: airline, flight number, departure/arrival times, duration, layovers\n- Seat class selection (Economy, Business, First)\n- Add to cart and checkout\n\n### 3. Hotel Search & Booking  \n- Search hotels by location, check-in/out dates, guests, rooms\n- Filter by: star rating, price range, amenities, distance\n- Hotel details: photos gallery, description, amenities, room types\n- Room selection with different bed configurations\n- Guest reviews and ratings display\n- Map view with hotel locations\n\n### 4. Car Rental\n- Search by pickup/dropoff location and dates\n- Filter by: car type, price, company\n- Car details: model, seats, transmission, fuel type\n- Add extras: GPS, child seat, insurance\n\n### 5. Package Deals\n- Bundle flight + hotel + car with discounts\n- Compare package vs individual pricing\n\n### 6. Shopping Cart & Checkout\n- Multi-item cart (flights, hotels, cars)\n- Price breakdown with taxes and fees\n- Promo code application\n- Secure payment form\n\n### 7. Trip Management\n- View upcoming and past trips\n- Download booking confirmations\n- Cancel or modify bookings\n\n## UI Requirements\n- Modern design inspired by Expedia reference screenshots\n- Responsive layout\n- Dark blue (#1668E3) and yellow/orange accent color scheme\n- White background with clean cards\n- Interactive date picker with calendar\n- Autocomplete for locations with icons\n- Image carousels for hotels\n- Tab navigation for Stays/Flights/Cars/Packages\n- Heart icons for favorites\n- VIP Access badges\n\n## Tech Stack\n- Frontend: React, Vite, TailwindCSS\n- Backend: Node.js/Express, PostgreSQL\n- Auth: JWT with bcrypt\n\n## Sample Data\n- 50+ flights, 30+ hotels, 20+ cars\n- Test user: admin@expedia.com / admin123",
+  "domain_type": "web_app",
+  "started_at": "2026-01-01T05:09:57.699572",
+  "last_updated": "2026-01-01T07:57:48.430741",
+  "status": "complete",
+  "current_phase": "docker",
+  "phases": {
+    "requirements": {
+      "name": "requirements",
+      "status": "complete",
+      "started_at": "2026-01-01T05:09:57.722388",
+      "completed_at": "2026-01-01T05:11:38.593225",
+      "iteration": 0,
+      "planned_files": [],
+      "generated_files": [],
+      "issues": [],
+      "fixes": []
+    },
+    "design": {
+      "name": "design",
+      "status": "complete",
+      "started_at": "2026-01-01T05:11:38.594498",
+      "completed_at": "2026-01-01T05:19:07.541442",
+      "iteration": 0,
+      "planned_files": [],
+      "generated_files": [],
+      "issues": [],
+      "fixes": []
+    },
+    "code": {
+      "name": "code",
+      "status": "complete",
+      "started_at": "2026-01-01T05:19:07.544513",
+      "completed_at": "2026-01-01T05:22:57.492027",
+      "iteration": 0,
+      "planned_files": [],
+      "generated_files": [],
+      "issues": [],
+      "fixes": []
+    },
+    "docker": {
+      "name": "docker",
+      "status": "complete",
+      "started_at": "2026-01-01T05:22:57.494288",
+      "completed_at": "2026-01-01T05:22:57.496113",
+      "iteration": 0,
+      "planned_files": [],
+      "generated_files": [],
+      "issues": [],
+      "fixes": []
+    }
+  },
+  "files": {}
+}

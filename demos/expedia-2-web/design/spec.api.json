@@ -1,0 +1,778 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "expedia_style_travel_booking_api",
+  "base_url": "http://localhost:3000",
+  "content_type": "application/json",
+  "auth": {
+    "type": "bearer_jwt",
+    "header": "Authorization",
+    "format": "Bearer <token>"
+  },
+  "pagination": {
+    "default_limit": 20,
+    "max_limit": 100,
+    "style": "limit_offset"
+  },
+  "error_format": {
+    "schema": {
+      "error": {
+        "code": "string",
+        "message": "string",
+        "details": "object|null"
+      }
+    },
+    "examples": {
+      "validation": { "error": { "code": "VALIDATION_ERROR", "message": "Invalid input", "details": { "field": "email" } } },
+      "auth": { "error": { "code": "UNAUTHORIZED", "message": "Missing or invalid token", "details": null } }
+    }
+  },
+  "schemas": {
+    "User": {
+      "type": "object",
+      "required": ["id", "email", "full_name", "phone", "created_at"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "email": { "type": "string" },
+        "full_name": { "type": "string" },
+        "phone": { "type": ["string", "null"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Location": {
+      "type": "object",
+      "required": ["id", "code", "label", "type"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "code": { "type": "string" },
+        "label": { "type": "string" },
+        "type": { "type": "string", "enum": ["city", "airport", "region"] },
+        "country_code": { "type": ["string", "null"] },
+        "region": { "type": ["string", "null"] },
+        "lat": { "type": ["number", "null"] },
+        "lng": { "type": ["number", "null"] }
+      }
+    },
+    "Flight": {
+      "type": "object",
+      "required": [
+        "id",
+        "airline",
+        "flight_number",
+        "origin",
+        "destination",
+        "depart_at",
+        "arrive_at",
+        "duration_minutes",
+        "stops",
+        "seat_class",
+        "price_cents"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "airline": {
+          "type": "object",
+          "required": ["id", "code", "name"],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "code": { "type": "string" },
+            "name": { "type": "string" }
+          }
+        },
+        "flight_number": { "type": "string" },
+        "origin": { "$ref": "#/schemas/Location" },
+        "destination": { "$ref": "#/schemas/Location" },
+        "depart_at": { "type": "string", "format": "date-time" },
+        "arrive_at": { "type": "string", "format": "date-time" },
+        "duration_minutes": { "type": "integer" },
+        "stops": { "type": "integer" },
+        "seat_class": { "type": "string", "enum": ["economy", "business", "first"] },
+        "price_cents": { "type": "integer" },
+        "refundable": { "type": "boolean" },
+        "baggage_included": { "type": "boolean" }
+      }
+    },
+    "Hotel": {
+      "type": "object",
+      "required": ["id", "name", "location", "nightly_base_price_cents"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "description": { "type": ["string", "null"] },
+        "address": { "type": ["string", "null"] },
+        "location": { "$ref": "#/schemas/Location" },
+        "star_rating": { "type": ["number", "null"] },
+        "review_rating": { "type": ["number", "null"] },
+        "review_count": { "type": "integer" },
+        "nightly_base_price_cents": { "type": "integer" },
+        "is_vip_access": { "type": "boolean" },
+        "lat": { "type": ["number", "null"] },
+        "lng": { "type": ["number", "null"] },
+        "photos": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["url", "sort_order"],
+            "properties": {
+              "url": { "type": "string" },
+              "sort_order": { "type": "integer" }
+            }
+          }
+        },
+        "amenities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["code", "label"],
+            "properties": {
+              "code": { "type": "string" },
+              "label": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "HotelRoom": {
+      "type": "object",
+      "required": ["id", "hotel_id", "name", "max_guests", "price_per_night_cents", "inventory"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "hotel_id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string" },
+        "bed_configuration": { "type": ["string", "null"] },
+        "max_guests": { "type": "integer" },
+        "price_per_night_cents": { "type": "integer" },
+        "inventory": { "type": "integer" }
+      }
+    },
+    "Car": {
+      "type": "object",
+      "required": [
+        "id",
+        "company",
+        "pickup_location",
+        "dropoff_location",
+        "model",
+        "car_type",
+        "seats",
+        "transmission",
+        "fuel_type",
+        "base_price_per_day_cents"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "company": {
+          "type": "object",
+          "required": ["id", "name"],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "name": { "type": "string" }
+          }
+        },
+        "pickup_location": { "$ref": "#/schemas/Location" },
+        "dropoff_location": { "$ref": "#/schemas/Location" },
+        "model": { "type": "string" },
+        "car_type": { "type": "string" },
+        "seats": { "type": "integer" },
+        "transmission": { "type": "string" },
+        "fuel_type": { "type": "string" },
+        "base_price_per_day_cents": { "type": "integer" }
+      }
+    },
+    "Package": {
+      "type": "object",
+      "required": ["id", "bundle_type", "flight", "hotel", "discount_cents"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "bundle_type": { "type": "string", "enum": ["flight_hotel", "flight_hotel_car"] },
+        "flight": { "$ref": "#/schemas/Flight" },
+        "hotel": { "$ref": "#/schemas/Hotel" },
+        "car": { "anyOf": [{ "$ref": "#/schemas/Car" }, { "type": "null" }] },
+        "discount_cents": { "type": "integer" },
+        "computed_total_cents": { "type": "integer", "comment": "Optional convenience field." }
+      }
+    },
+    "Favorite": {
+      "type": "object",
+      "required": ["id", "item_type", "created_at"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "item_type": { "type": "string", "enum": ["hotel", "flight", "car", "package"] },
+        "hotel": { "anyOf": [{ "$ref": "#/schemas/Hotel" }, { "type": "null" }] },
+        "flight": { "anyOf": [{ "$ref": "#/schemas/Flight" }, { "type": "null" }] },
+        "car": { "anyOf": [{ "$ref": "#/schemas/Car" }, { "type": "null" }] },
+        "package": { "anyOf": [{ "$ref": "#/schemas/Package" }, { "type": "null" }] },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "CartItem": {
+      "type": "object",
+      "required": ["id", "item_type", "subtotal_cents", "taxes_cents", "fees_cents", "total_cents", "created_at"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "item_type": { "type": "string", "enum": ["flight", "hotel", "car", "package"] },
+        "flight": { "anyOf": [{ "$ref": "#/schemas/Flight" }, { "type": "null" }] },
+        "hotel": { "anyOf": [{ "$ref": "#/schemas/Hotel" }, { "type": "null" }] },
+        "hotel_room": { "anyOf": [{ "$ref": "#/schemas/HotelRoom" }, { "type": "null" }] },
+        "car": { "anyOf": [{ "$ref": "#/schemas/Car" }, { "type": "null" }] },
+        "package": { "anyOf": [{ "$ref": "#/schemas/Package" }, { "type": "null" }] },
+        "start_date": { "type": ["string", "null"], "format": "date" },
+        "end_date": { "type": ["string", "null"], "format": "date" },
+        "passengers": { "type": ["integer", "null"] },
+        "guests": { "type": ["integer", "null"] },
+        "rooms": { "type": ["integer", "null"] },
+        "extras": { "type": ["object", "null"] },
+        "subtotal_cents": { "type": "integer" },
+        "taxes_cents": { "type": "integer" },
+        "fees_cents": { "type": "integer" },
+        "total_cents": { "type": "integer" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Cart": {
+      "type": "object",
+      "required": ["id", "items", "pricing"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "promo_code": { "type": ["string", "null"], "comment": "Promo code string if applied." },
+        "items": { "type": "array", "items": { "$ref": "#/schemas/CartItem" } },
+        "pricing": {
+          "type": "object",
+          "required": ["subtotal_cents", "taxes_cents", "fees_cents", "discounts_cents", "total_cents"],
+          "properties": {
+            "subtotal_cents": { "type": "integer" },
+            "taxes_cents": { "type": "integer" },
+            "fees_cents": { "type": "integer" },
+            "discounts_cents": { "type": "integer" },
+            "total_cents": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "Order": {
+      "type": "object",
+      "required": ["id", "status", "confirmation_code", "pricing", "created_at"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled"] },
+        "payment_status": { "type": "string", "enum": ["unpaid", "paid", "failed"] },
+        "confirmation_code": { "type": "string" },
+        "cancelled_at": { "type": ["string", "null"], "format": "date-time" },
+        "refund_total_cents": { "type": "integer", "comment": "Deterministic simulation; can equal pricing.total_cents for refundable seeds." },
+        "items": { "type": "array", "items": { "type": "object" } },
+        "pricing": {
+          "type": "object",
+          "required": ["subtotal_cents", "taxes_cents", "fees_cents", "discounts_cents", "total_cents"],
+          "properties": {
+            "subtotal_cents": { "type": "integer" },
+            "taxes_cents": { "type": "integer" },
+            "fees_cents": { "type": "integer" },
+            "discounts_cents": { "type": "integer" },
+            "total_cents": { "type": "integer" }
+          }
+        },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/health",
+      "summary": "Health check",
+      "auth_required": false,
+      "responses": {
+        "200": {
+          "schema": { "status": "string" },
+          "example": { "status": "ok" }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/register",
+      "summary": "Register a new user",
+      "auth_required": false,
+      "request": {
+        "schema": {
+          "email": "string",
+          "password": "string",
+          "full_name": "string"
+        }
+      },
+      "responses": {
+        "201": {
+          "schema": { "token": "string", "user": { "$ref": "#/schemas/User" } }
+        },
+        "400": { "schema": { "$ref": "#/error_format/schema" } }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "summary": "Login",
+      "auth_required": false,
+      "request": {
+        "schema": {
+          "email": "string",
+          "password": "string"
+        }
+      },
+      "responses": {
+        "200": {
+          "schema": { "token": "string", "user": { "$ref": "#/schemas/User" } }
+        },
+        "401": { "schema": { "$ref": "#/error_format/schema" } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/auth/me",
+      "summary": "Get current user",
+      "auth_required": true,
+      "responses": {
+        "200": { "schema": { "user": { "$ref": "#/schemas/User" } } },
+        "401": { "schema": { "$ref": "#/error_format/schema" } }
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/users/me",
+      "summary": "Update profile (full_name, phone)",
+      "auth_required": true,
+      "request": {
+        "schema": {
+          "full_name": "string?",
+          "phone": "string?"
+        }
+      },
+      "responses": {
+        "200": { "schema": { "user": { "$ref": "#/schemas/User" } } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/users/me/payment-methods",
+      "summary": "List saved payment methods",
+      "auth_required": true,
+      "responses": {
+        "200": {
+          "schema": {
+            "items": [
+              {
+                "id": "uuid",
+                "brand": "string",
+                "last4": "string",
+                "exp_month": "integer",
+                "exp_year": "integer",
+                "billing_zip": "string|null",
+                "created_at": "date-time"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/users/me/payment-methods",
+      "summary": "Add a payment method (placeholder)",
+      "auth_required": true,
+      "request": {
+        "schema": {
+          "brand": "string",
+          "last4": "string",
+          "exp_month": "integer",
+          "exp_year": "integer",
+          "billing_zip": "string?"
+        }
+      },
+      "responses": {
+        "201": {
+          "schema": {
+            "payment_method": {
+              "id": "uuid",
+              "brand": "string",
+              "last4": "string",
+              "exp_month": "integer",
+              "exp_year": "integer",
+              "billing_zip": "string|null",
+              "created_at": "date-time"
+            }
+          }
+        }
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/users/me/payment-methods/{payment_method_id}",
+      "summary": "Remove a payment method",
+      "auth_required": true,
+      "path_params": {
+        "payment_method_id": "uuid"
+      },
+      "responses": {
+        "204": { "schema": {} }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/locations",
+      "summary": "Autocomplete locations",
+      "auth_required": false,
+      "query_params": {
+        "q": "string (min 1)",
+        "limit": "integer (<=100, default 10)"
+      },
+      "responses": {
+        "200": {
+          "schema": { "items": [{ "$ref": "#/schemas/Location" }] }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/flights",
+      "summary": "Search flights",
+      "auth_required": false,
+      "query_params": {
+        "origin": "string (location code)",
+        "destination": "string (location code)",
+        "depart_date": "YYYY-MM-DD",
+        "return_date": "YYYY-MM-DD?",
+        "trip_type": "one_way|round_trip (default one_way)",
+        "passengers": "integer (default 1)",
+        "seat_class": "economy|business|first (default economy)",
+        "min_price_cents": "integer?",
+        "max_price_cents": "integer?",
+        "airline": "string? (airline code)",
+        "stops": "integer?",
+        "sort": "price|duration|departure_time (default price)",
+        "limit": "integer (<=100)",
+        "offset": "integer"
+      },
+      "responses": {
+        "200": {
+          "schema": {
+            "items": [{ "$ref": "#/schemas/Flight" }],
+            "total": "integer",
+            "limit": "integer",
+            "offset": "integer"
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/flights/{flight_id}",
+      "summary": "Flight details",
+      "auth_required": false,
+      "path_params": { "flight_id": "uuid" },
+      "responses": {
+        "200": { "schema": { "flight": { "$ref": "#/schemas/Flight" } } },
+        "404": { "schema": { "$ref": "#/error_format/schema" } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/hotels",
+      "summary": "Search hotels",
+      "auth_required": false,
+      "query_params": {
+        "location": "string (location code)",
+        "check_in": "YYYY-MM-DD",
+        "check_out": "YYYY-MM-DD",
+        "guests": "integer (default 2)",
+        "rooms": "integer (default 1)",
+        "min_price_cents": "integer?",
+        "max_price_cents": "integer?",
+        "star_rating": "number?",
+        "amenities": "string? (comma-separated amenity codes)",
+        "sort": "price|rating|distance (default price)",
+        "limit": "integer (<=100)",
+        "offset": "integer"
+      },
+      "responses": {
+        "200": {
+          "schema": {
+            "items": [{ "$ref": "#/schemas/Hotel" }],
+            "total": "integer",
+            "limit": "integer",
+            "offset": "integer"
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/hotels/{hotel_id}",
+      "summary": "Hotel details (includes photos and amenities)",
+      "auth_required": false,
+      "path_params": { "hotel_id": "uuid" },
+      "responses": {
+        "200": { "schema": { "hotel": { "$ref": "#/schemas/Hotel" }, "rooms": [{ "$ref": "#/schemas/HotelRoom" }] } },
+        "404": { "schema": { "$ref": "#/error_format/schema" } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/cars",
+      "summary": "Search cars",
+      "auth_required": false,
+      "query_params": {
+        "pickup_location": "string (location code)",
+        "dropoff_location": "string (location code)",
+        "pickup_date": "YYYY-MM-DD",
+        "dropoff_date": "YYYY-MM-DD",
+        "car_type": "string?",
+        "company": "string?",
+        "min_price_cents": "integer?",
+        "max_price_cents": "integer?",
+        "sort": "price|seats (default price)",
+        "limit": "integer (<=100)",
+        "offset": "integer"
+      },
+      "responses": {
+        "200": { "schema": { "items": [{ "$ref": "#/schemas/Car" }], "total": "integer", "limit": "integer", "offset": "integer" } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/cars/{car_id}",
+      "summary": "Car details",
+      "auth_required": false,
+      "path_params": { "car_id": "uuid" },
+      "responses": {
+        "200": { "schema": { "car": { "$ref": "#/schemas/Car" } } },
+        "404": { "schema": { "$ref": "#/error_format/schema" } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/packages",
+      "summary": "Search packages",
+      "auth_required": false,
+      "query_params": {
+        "bundle_type": "flight_hotel|flight_hotel_car?",
+        "origin": "string? (location code)",
+        "destination": "string? (location code)",
+        "depart_date": "YYYY-MM-DD?",
+        "return_date": "YYYY-MM-DD?",
+        "check_in": "YYYY-MM-DD?",
+        "check_out": "YYYY-MM-DD?",
+        "limit": "integer (<=100)",
+        "offset": "integer"
+      },
+      "responses": {
+        "200": { "schema": { "items": [{ "$ref": "#/schemas/Package" }], "total": "integer", "limit": "integer", "offset": "integer" } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/packages/{package_id}",
+      "summary": "Package details",
+      "auth_required": false,
+      "path_params": { "package_id": "uuid" },
+      "responses": {
+        "200": { "schema": { "package": { "$ref": "#/schemas/Package" } } },
+        "404": { "schema": { "$ref": "#/error_format/schema" } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/favorites",
+      "summary": "List favorites",
+      "auth_required": true,
+      "query_params": { "item_type": "hotel|flight|car|package?" },
+      "responses": {
+        "200": { "schema": { "items": [{ "$ref": "#/schemas/Favorite" }] } }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/favorites",
+      "summary": "Add favorite",
+      "auth_required": true,
+      "request": {
+        "schema": {
+          "item_type": "hotel|flight|car|package",
+          "item_id": "uuid"
+        }
+      },
+      "responses": {
+        "201": { "schema": { "favorite": { "$ref": "#/schemas/Favorite" } } },
+        "400": { "schema": { "$ref": "#/error_format/schema" } }
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/favorites/{favorite_id}",
+      "summary": "Remove favorite",
+      "auth_required": true,
+      "path_params": { "favorite_id": "uuid" },
+      "responses": {
+        "204": { "schema": {} }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/cart",
+      "summary": "Get current cart",
+      "auth_required": true,
+      "responses": {
+        "200": { "schema": { "cart": { "$ref": "#/schemas/Cart" } } }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/cart/items",
+      "summary": "Add item to cart",
+      "auth_required": true,
+      "request": {
+        "schema": {
+          "item_type": "flight|hotel|car|package",
+          "flight_id": "uuid?",
+          "hotel_id": "uuid?",
+          "hotel_room_id": "uuid?",
+          "car_id": "uuid?",
+          "package_id": "uuid?",
+          "start_date": "YYYY-MM-DD?",
+          "end_date": "YYYY-MM-DD?",
+          "passengers": "integer?",
+          "guests": "integer?",
+          "rooms": "integer?",
+          "extras": "object?"
+        }
+      },
+      "responses": {
+        "201": { "schema": { "cart": { "$ref": "#/schemas/Cart" } } },
+        "400": { "schema": { "$ref": "#/error_format/schema" } }
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/cart/items/{cart_item_id}",
+      "summary": "Update a cart item (dates/counts/extras)",
+      "auth_required": true,
+      "path_params": { "cart_item_id": "uuid" },
+      "request": {
+        "schema": {
+          "start_date": "YYYY-MM-DD?",
+          "end_date": "YYYY-MM-DD?",
+          "passengers": "integer?",
+          "guests": "integer?",
+          "rooms": "integer?",
+          "extras": "object?"
+        }
+      },
+      "responses": {
+        "200": { "schema": { "cart": { "$ref": "#/schemas/Cart" } } }
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/cart/items/{cart_item_id}",
+      "summary": "Remove cart item",
+      "auth_required": true,
+      "path_params": { "cart_item_id": "uuid" },
+      "responses": {
+        "204": { "schema": {} }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/cart/apply-promo",
+      "summary": "Apply promo code",
+      "auth_required": true,
+      "request": { "schema": { "code": "string" } },
+      "responses": {
+        "200": { "schema": { "cart": { "$ref": "#/schemas/Cart" } } },
+        "400": { "schema": { "$ref": "#/error_format/schema" } }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/checkout",
+      "summary": "Checkout current cart and create order",
+      "auth_required": true,
+      "request": {
+        "schema": {
+          "payment_method_id": "uuid?",
+          "payment": {
+            "cardholder_name": "string?",
+            "card_number": "string? (test only)",
+            "exp_month": "integer?",
+            "exp_year": "integer?",
+            "cvc": "string?",
+            "billing_zip": "string?"
+          }
+        }
+      },
+      "responses": {
+        "201": { "schema": { "order": { "$ref": "#/schemas/Order" } } },
+        "402": { "schema": { "$ref": "#/error_format/schema" } }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/trips",
+      "summary": "List trips (orders) for current user",
+      "auth_required": true,
+      "query_params": {
+        "view": "upcoming|past (default upcoming)",
+        "limit": "integer (<=100)",
+        "offset": "integer"
+      },
+      "responses": {
+        "200": {
+          "schema": {
+            "items": [{ "$ref": "#/schemas/Order" }],
+            "total": "integer",
+            "limit": "integer",
+            "offset": "integer"
+          }
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/trips/{order_id}",
+      "summary": "Trip details",
+      "auth_required": true,
+      "path_params": { "order_id": "uuid" },
+      "responses": {
+        "200": { "schema": { "order": { "$ref": "#/schemas/Order" } } },
+        "404": { "schema": { "$ref": "#/error_format/schema" } }
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/trips/{order_id}/cancel",
+      "summary": "Cancel an order",
+      "auth_required": true,
+      "notes": "Keep cancellation simple: set order.status='cancelled' and order.cancelled_at=now(). Also set order_items.cancelled_at=now() for all items in the order (no partial cancellations). Refund simulation is deterministic via order.refund_total_cents.",
+      "path_params": { "order_id": "uuid" },
+      "responses": {
+        "200": { "schema": { "order": { "$ref": "#/schemas/Order" } } },
+        "400": { "schema": { "$ref": "#/error_format/schema" } }
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/trips/{order_id}/items/{order_item_id}",
+      "summary": "Modify a trip item (limited fields)",
+      "auth_required": true,
+      "path_params": { "order_id": "uuid", "order_item_id": "uuid" },
+      "request": {
+        "schema": {
+          "start_date": "YYYY-MM-DD?",
+          "end_date": "YYYY-MM-DD?",
+          "guests": "integer?",
+          "rooms": "integer?"
+        }
+      },
+      "responses": {
+        "200": { "schema": { "order": { "$ref": "#/schemas/Order" } } }
+      }
+    }
+  ]
+}

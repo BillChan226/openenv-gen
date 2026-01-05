@@ -1,0 +1,491 @@
+{
+  "project": {
+    "name": "FoodHub",
+    "type": "fullstack_web_app",
+    "domain": "food_delivery",
+    "inspiration": ["DoorDash", "Uber Eats"],
+    "testing_urls": {
+      "frontend": "http://localhost:8000",
+      "backend_api": "http://localhost:3000"
+    }
+  },
+  "design_system": {
+    "primary_color": "#FF3008",
+    "style_reference_images": [
+      {
+        "path": "screenshot/doordash/home.png",
+        "must_match": true,
+        "notes": "Homepage layout: left sidebar nav, top header with search/location/toggle/cart, category pills, promo banners, restaurant cards"
+      },
+      {
+        "path": "screenshot/doordash/item_detail.png",
+        "must_match": true,
+        "notes": "Store page: circular category icons, promo banner, product grid"
+      },
+      {
+        "path": "screenshot/doordash/goods.png",
+        "must_match": true,
+        "notes": "Product detail modal: large image, quantity selector, add to cart"
+      }
+    ],
+    "layout": {
+      "app_shell": {
+        "left_sidebar": true,
+        "top_header": true,
+        "main_content": true
+      },
+      "components": {
+        "left_sidebar_nav": {
+          "items": [
+            {"key": "home", "label": "Home", "icon": "home"},
+            {"key": "grocery", "label": "Grocery", "icon": "shopping-bag"},
+            {"key": "retail", "label": "Retail", "icon": "store"},
+            {"key": "pharmacy", "label": "Pharmacy", "icon": "plus"},
+            {"key": "orders", "label": "Orders", "icon": "receipt"},
+            {"key": "favorites", "label": "Favorites", "icon": "heart"},
+            {"key": "profile", "label": "Profile", "icon": "user"}
+          ]
+        },
+        "top_header": {
+          "elements": [
+            "brand_logo",
+            "search_bar",
+            "location_selector",
+            "delivery_pickup_toggle",
+            "cart_icon_with_badge",
+            "auth_menu (login/register or user menu)"
+          ]
+        },
+        "category_pills": {
+          "style": "pill tags",
+          "includes_emoji": true
+        },
+        "promo_banners": {
+          "style": "gradient cards",
+          "count_on_home": 2
+        },
+        "store_cards": {
+          "fields": [
+            "cover_image",
+            "name",
+            "rating_stars",
+            "distance_miles",
+            "delivery_time_min",
+            "delivery_fee_cents",
+            "price_range"
+          ]
+        },
+        "store_page": {
+          "circular_category_icons": true,
+          "product_grid": true,
+          "bottom_sticky_minimum_order_bar": true
+        },
+        "product_card": {
+          "image": true,
+          "plus_overlay_button": true,
+          "price_with_dollar_superscript": true,
+          "unit_size": true,
+          "name": true
+        },
+        "product_detail_modal": {
+          "elements": [
+            "close_x",
+            "large_image",
+            "title",
+            "price",
+            "unit_info",
+            "stock_badge",
+            "quantity_stepper",
+            "customization_options",
+            "special_instructions",
+            "add_to_cart_primary_button",
+            "recommendations_carousel"
+          ]
+        },
+        "cart_experience": {
+          "cart_sidebar_or_modal": true,
+          "promo_code_input": true,
+          "fee_breakdown": ["subtotal", "delivery_fee", "service_fee(5%)", "total"],
+          "item_quantity_controls": true
+        }
+      }
+    },
+    "accessibility": {
+      "basic_a11y": true,
+      "inputs_labeled": true,
+      "buttons_have_accessible_names": true
+    }
+  },
+  "core_features": {
+    "auth": {
+      "methods": ["email_password"],
+      "jwt": true,
+      "bcrypt": true,
+      "profile": {
+        "delivery_addresses": true,
+        "payment_methods": true
+      }
+    },
+    "restaurant_browsing": {
+      "categories": ["Chinese", "Italian", "Fast Food", "Mexican", "Indian", "Dessert"],
+      "homepage_featured": true,
+      "filters": ["rating", "delivery_time", "price_range", "distance"],
+      "sort": ["rating", "delivery_time", "distance"]
+    },
+    "search": {
+      "search_restaurants": true,
+      "search_dishes": true,
+      "suggestions": true,
+      "recent_searches": true,
+      "category_quick_filters": true
+    },
+    "restaurant_page": {
+      "header_cover_image": true,
+      "info_fields": [
+        "rating",
+        "reviews_count",
+        "delivery_time_min",
+        "delivery_fee_cents",
+        "minimum_order_cents"
+      ],
+      "menu_categories": true,
+      "menu_items": {
+        "fields": ["image", "name", "description", "price_cents"],
+        "add_to_cart": true,
+        "quantity_selector": true
+      }
+    },
+    "menu_item_modal": {
+      "customizations": {
+        "size": true,
+        "toppings": true,
+        "spice_level": true
+      },
+      "special_instructions": true,
+      "add_to_cart_with_quantity": true
+    },
+    "shopping_cart": {
+      "item_count_badge": true,
+      "sidebar_modal": true,
+      "pricing": {
+        "delivery_fee": true,
+        "service_fee_percent": 5,
+        "promo_code": true
+      },
+      "checkout_cta": true
+    },
+    "checkout": {
+      "delivery_address_selection": true,
+      "delivery_time": ["ASAP", "scheduled"],
+      "payment_method_selection": true,
+      "order_summary": true,
+      "place_order": true,
+      "confirmation": true
+    },
+    "order_tracking": {
+      "statuses": ["CONFIRMED", "PREPARING", "ON_THE_WAY", "DELIVERED"],
+      "eta": true,
+      "driver_info": true,
+      "contact_driver": true
+    },
+    "order_history": {
+      "list": true,
+      "details": true,
+      "reorder": true,
+      "rating_and_review": true
+    },
+    "favorites": {
+      "favorite_restaurants": true,
+      "quick_access": true
+    }
+  },
+  "data_model": {
+    "entities": {
+      "users": {
+        "fields": [
+          "id",
+          "email (unique)",
+          "password_hash",
+          "full_name",
+          "phone (optional)",
+          "created_at"
+        ]
+      },
+      "addresses": {
+        "fields": [
+          "id",
+          "user_id",
+          "label (Home/Work)",
+          "line1",
+          "line2 (optional)",
+          "city",
+          "state",
+          "postal_code",
+          "lat (optional)",
+          "lng (optional)",
+          "is_default"
+        ]
+      },
+      "payment_methods": {
+        "fields": [
+          "id",
+          "user_id",
+          "brand (Visa/Mastercard)",
+          "last4",
+          "exp_month",
+          "exp_year",
+          "billing_zip (optional)",
+          "is_default"
+        ]
+      },
+      "restaurant_categories": {
+        "fields": ["id", "name", "emoji", "sort_order"]
+      },
+      "restaurants": {
+        "fields": [
+          "id",
+          "category_id",
+          "name",
+          "description",
+          "price_range (1-4)",
+          "rating (0-5)",
+          "reviews_count",
+          "distance_miles",
+          "delivery_time_min",
+          "delivery_fee_cents",
+          "minimum_order_cents",
+          "cover_image_url",
+          "hero_image_url (optional)",
+          "is_featured"
+        ]
+      },
+      "menu_categories": {
+        "fields": ["id", "restaurant_id", "name", "icon_url (optional)", "sort_order"]
+      },
+      "menu_items": {
+        "fields": [
+          "id",
+          "restaurant_id",
+          "menu_category_id",
+          "name",
+          "description",
+          "price_cents",
+          "unit_info (e.g., '12 oz')",
+          "image_url",
+          "in_stock"
+        ]
+      },
+      "menu_item_options": {
+        "fields": [
+          "id",
+          "menu_item_id",
+          "option_group (size/toppings/spice_level)",
+          "option_name",
+          "price_delta_cents",
+          "is_default"
+        ]
+      },
+      "carts": {
+        "fields": ["id", "user_id", "restaurant_id (nullable until first add)", "created_at", "updated_at"]
+      },
+      "cart_items": {
+        "fields": [
+          "id",
+          "cart_id",
+          "menu_item_id",
+          "quantity",
+          "selected_options (json)",
+          "special_instructions (text)",
+          "unit_price_cents_snapshot"
+        ]
+      },
+      "promo_codes": {
+        "fields": [
+          "id",
+          "code (unique)",
+          "type (percent/fixed)",
+          "amount (percent or cents)",
+          "min_subtotal_cents",
+          "active",
+          "expires_at (optional)"
+        ]
+      },
+      "orders": {
+        "fields": [
+          "id",
+          "user_id",
+          "restaurant_id",
+          "address_id",
+          "payment_method_id",
+          "promo_code_id (optional)",
+          "delivery_type (delivery/pickup)",
+          "scheduled_for (nullable)",
+          "status",
+          "subtotal_cents",
+          "delivery_fee_cents",
+          "service_fee_cents",
+          "discount_cents",
+          "total_cents",
+          "placed_at",
+          "order_number (human readable)"
+        ]
+      },
+      "order_items": {
+        "fields": [
+          "id",
+          "order_id",
+          "menu_item_id",
+          "name_snapshot",
+          "unit_price_cents_snapshot",
+          "quantity",
+          "selected_options (json)",
+          "special_instructions (text)"
+        ]
+      },
+      "drivers": {
+        "fields": ["id", "name", "photo_url", "phone (optional)"]
+      },
+      "order_tracking": {
+        "fields": ["id", "order_id", "driver_id (nullable)", "eta_minutes", "current_status", "updated_at"]
+      },
+      "order_status_events": {
+        "fields": ["id", "order_id", "status", "event_time", "note (optional)"]
+      },
+      "favorites": {
+        "fields": ["id", "user_id", "restaurant_id", "created_at"]
+      },
+      "reviews": {
+        "fields": ["id", "order_id", "restaurant_id", "user_id", "rating (1-5)", "review_text", "created_at"]
+      },
+      "search_history": {
+        "fields": ["id", "user_id (nullable)", "query", "created_at"]
+      }
+    },
+    "constraints": {
+      "cart_single_restaurant": true,
+      "money_fields": "store as integer cents",
+      "rating_scale": "0-5",
+      "delivery_fee_minimum_order": "per-restaurant"
+    }
+  },
+  "api_expectations": {
+    "base_path": "/api",
+    "auth": {
+      "jwt_bearer": true,
+      "endpoints": [
+        "POST /auth/register",
+        "POST /auth/login",
+        "GET /auth/me"
+      ]
+    },
+    "public_endpoints": [
+      "GET /health",
+      "GET /categories",
+      "GET /restaurants",
+      "GET /restaurants/:id",
+      "GET /restaurants/:id/menu",
+      "GET /menu-items/:id",
+      "GET /search"
+    ],
+    "authenticated_endpoints": [
+      "GET /profile/addresses",
+      "POST /profile/addresses",
+      "PATCH /profile/addresses/:id",
+      "DELETE /profile/addresses/:id",
+      "GET /profile/payment-methods",
+      "POST /profile/payment-methods",
+      "PATCH /profile/payment-methods/:id",
+      "DELETE /profile/payment-methods/:id",
+      "GET /favorites",
+      "POST /favorites",
+      "DELETE /favorites/:id",
+      "GET /cart",
+      "POST /cart/items",
+      "PATCH /cart/items/:id",
+      "DELETE /cart/items/:id",
+      "POST /cart/apply-promo",
+      "POST /orders",
+      "GET /orders",
+      "GET /orders/:id",
+      "POST /orders/:id/reorder",
+      "POST /orders/:id/review",
+      "GET /orders/:id/tracking"
+    ],
+    "filters_and_sorting": {
+      "restaurants_list_query_params": [
+        "category_id",
+        "min_rating",
+        "max_delivery_time",
+        "price_range",
+        "max_distance",
+        "sort (rating|delivery_time|distance)",
+        "q (search)"
+      ],
+      "search_query_params": ["q", "type (restaurants|items|all)", "limit"]
+    },
+    "response_conventions": {
+      "list": {"shape": "{ items: [], total: number }"},
+      "errors": {"shape": "{ error: { message: string, code?: string } }"}
+    }
+  },
+  "ui_expectations": {
+    "routing": {
+      "public_pages": [
+        {"path": "/", "name": "Home"},
+        {"path": "/login", "name": "Login"},
+        {"path": "/register", "name": "Register"},
+        {"path": "/restaurants/:id", "name": "RestaurantDetail"}
+      ],
+      "protected_pages": [
+        {"path": "/checkout", "name": "Checkout"},
+        {"path": "/orders", "name": "OrderHistory"},
+        {"path": "/orders/:id", "name": "OrderDetail"},
+        {"path": "/orders/:id/tracking", "name": "OrderTracking"},
+        {"path": "/favorites", "name": "Favorites"},
+        {"path": "/profile", "name": "Profile"}
+      ]
+    },
+    "key_ui_states": {
+      "loading_states": true,
+      "empty_states": true,
+      "error_states": true
+    },
+    "modals_and_drawers": [
+      "ProductDetailModal",
+      "CartDrawer"
+    ]
+  },
+  "sample_data_requirements": {
+    "seed_counts": {
+      "restaurants_min": 20,
+      "categories_min": 6,
+      "menu_items_min": 100,
+      "promo_codes": 5,
+      "sample_orders_min": 6
+    },
+    "promo_code_list": ["SAVE10", "FIRSTORDER", "FREE5", "WELCOME15", "SHIPFREE"],
+    "test_user": {
+      "email": "user@foodhub.com",
+      "password": "food123"
+    },
+    "order_status_distribution": ["CONFIRMED", "PREPARING", "ON_THE_WAY", "DELIVERED"]
+  },
+  "tech_stack": {
+    "frontend": {
+      "framework": "React",
+      "bundler": "Vite",
+      "styling": "TailwindCSS"
+    },
+    "backend": {
+      "runtime": "Node.js",
+      "framework": "Express"
+    },
+    "database": {
+      "engine": "PostgreSQL"
+    },
+    "auth": {
+      "jwt": true,
+      "bcrypt": true
+    }
+  }
+}

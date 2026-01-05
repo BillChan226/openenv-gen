@@ -1,0 +1,58 @@
+# Root-level compose file for tooling compatibility.
+# Some harness tools assume docker-compose.yml exists at repo root and run:
+#   docker compose ps
+# without passing -f docker/docker-compose.yml.
+#
+# Keep this file in sync with docker/docker-compose.yml.
+# NOTE: Do NOT set a top-level `name:` here.
+# If you need a stable project name, use an explicit project flag or env:
+#   COMPOSE_PROJECT_NAME=<project_name> docker compose up --build
+#   docker compose -p <project_name> up --build
+#
+# For CI/ephemeral runners, prefer a UNIQUE project name per run to avoid stale state:
+#   docker compose -p foodhub_$(date +%s) up --build
+# or use the helper:
+#   ./docker/compose-up.sh
+version: '3.8'
+services:
+  db:
+    build: ./app/database
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+      PGPORT: 5432
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -p 5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./app/backend
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DATABASE_URL: postgres://postgres:postgres@db:5432/app
+      PORT: 8083
+    ports:
+      - "3000:8083"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./app/frontend
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8083
+    ports:
+      - "8000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data: null

@@ -1,0 +1,361 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "expedia_style_travel_booking",
+  "engine": "postgresql",
+  "conventions": {
+    "naming": "snake_case",
+    "money": {
+      "type": "INTEGER",
+      "suffix": "_cents",
+      "currency": "USD"
+    },
+    "timestamps": {
+      "created": "created_at",
+      "updated": "updated_at"
+    },
+    "datetime_suffix": "_at"
+  },
+  "extensions": ["pgcrypto"],
+  "tables": [
+    {
+      "name": "users",
+      "comment": "Registered users.",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "email", "type": "TEXT", "nullable": false },
+        { "name": "password_hash", "type": "TEXT", "nullable": false },
+        { "name": "full_name", "type": "TEXT", "nullable": false },
+        { "name": "phone", "type": "TEXT", "nullable": true },
+        { "name": "is_admin", "type": "BOOLEAN", "nullable": false, "default": false },
+        { "name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "users_email_uq", "unique": true, "columns": ["email"] }
+      ]
+    },
+    {
+      "name": "payment_methods",
+      "comment": "Tokenized/placeholder payment methods; do not store full PAN.",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "UUID", "nullable": false, "references": { "table": "users", "column": "id", "on_delete": "CASCADE" } },
+        { "name": "brand", "type": "TEXT", "nullable": false },
+        { "name": "last4", "type": "TEXT", "nullable": false },
+        { "name": "exp_month", "type": "INTEGER", "nullable": false },
+        { "name": "exp_year", "type": "INTEGER", "nullable": false },
+        { "name": "billing_zip", "type": "TEXT", "nullable": true },
+        { "name": "token", "type": "TEXT", "nullable": true, "comment": "Simulated token; could be null." },
+        { "name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "payment_methods_user_id_idx", "columns": ["user_id"] }
+      ]
+    },
+    {
+      "name": "locations",
+      "comment": "Locations for autocomplete: city/airport/region.",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "code", "type": "TEXT", "nullable": false },
+        { "name": "label", "type": "TEXT", "nullable": false },
+        { "name": "type", "type": "TEXT", "nullable": false, "check": "type in ('city','airport','region')" },
+        { "name": "country_code", "type": "TEXT", "nullable": true },
+        { "name": "region", "type": "TEXT", "nullable": true },
+        { "name": "lat", "type": "DOUBLE PRECISION", "nullable": true },
+        { "name": "lng", "type": "DOUBLE PRECISION", "nullable": true }
+      ],
+      "indexes": [
+        { "name": "locations_code_uq", "unique": true, "columns": ["code"] },
+        { "name": "locations_label_trgm_idx", "using": "GIN", "columns": ["label"], "comment": "Optional: use pg_trgm in implementation; otherwise btree on label." }
+      ]
+    },
+    {
+      "name": "airlines",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "code", "type": "TEXT", "nullable": false },
+        { "name": "name", "type": "TEXT", "nullable": false }
+      ],
+      "indexes": [
+        { "name": "airlines_code_uq", "unique": true, "columns": ["code"] }
+      ]
+    },
+    {
+      "name": "flights",
+      "comment": "Flight inventory. Prices may change by seat_class; base is economy.",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "airline_id", "type": "UUID", "nullable": false, "references": { "table": "airlines", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "flight_number", "type": "TEXT", "nullable": false },
+        { "name": "origin_location_id", "type": "UUID", "nullable": false, "references": { "table": "locations", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "destination_location_id", "type": "UUID", "nullable": false, "references": { "table": "locations", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "depart_at", "type": "TIMESTAMPTZ", "nullable": false },
+        { "name": "arrive_at", "type": "TIMESTAMPTZ", "nullable": false },
+        { "name": "duration_minutes", "type": "INTEGER", "nullable": false },
+        { "name": "stops", "type": "INTEGER", "nullable": false, "default": 0 },
+        { "name": "seat_class", "type": "TEXT", "nullable": false, "default": "economy", "check": "seat_class in ('economy','business','first')" },
+        { "name": "price_cents", "type": "INTEGER", "nullable": false },
+        { "name": "refundable", "type": "BOOLEAN", "nullable": false, "default": false },
+        { "name": "baggage_included", "type": "BOOLEAN", "nullable": false, "default": true },
+        { "name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "flights_origin_dest_depart_idx", "columns": ["origin_location_id", "destination_location_id", "depart_at"] },
+        { "name": "flights_price_idx", "columns": ["price_cents"] },
+        { "name": "flights_airline_idx", "columns": ["airline_id"] }
+      ]
+    },
+    {
+      "name": "hotels",
+      "comment": "Hotel inventory.",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "location_id", "type": "UUID", "nullable": false, "references": { "table": "locations", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "name", "type": "TEXT", "nullable": false },
+        { "name": "description", "type": "TEXT", "nullable": true },
+        { "name": "address", "type": "TEXT", "nullable": true },
+        { "name": "star_rating", "type": "NUMERIC(2,1)", "nullable": true },
+        { "name": "review_rating", "type": "NUMERIC(2,1)", "nullable": true },
+        { "name": "review_count", "type": "INTEGER", "nullable": false, "default": 0 },
+        { "name": "nightly_base_price_cents", "type": "INTEGER", "nullable": false },
+        { "name": "is_vip_access", "type": "BOOLEAN", "nullable": false, "default": false },
+        { "name": "lat", "type": "DOUBLE PRECISION", "nullable": true },
+        { "name": "lng", "type": "DOUBLE PRECISION", "nullable": true },
+        { "name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "hotels_location_idx", "columns": ["location_id"] },
+        { "name": "hotels_price_idx", "columns": ["nightly_base_price_cents"] }
+      ]
+    },
+    {
+      "name": "hotel_photos",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "hotel_id", "type": "UUID", "nullable": false, "references": { "table": "hotels", "column": "id", "on_delete": "CASCADE" } },
+        { "name": "url", "type": "TEXT", "nullable": false },
+        { "name": "sort_order", "type": "INTEGER", "nullable": false, "default": 0 }
+      ],
+      "indexes": [
+        { "name": "hotel_photos_hotel_id_idx", "columns": ["hotel_id"] }
+      ]
+    },
+    {
+      "name": "hotel_amenities",
+      "comment": "Normalized amenities list.",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "code", "type": "TEXT", "nullable": false },
+        { "name": "label", "type": "TEXT", "nullable": false }
+      ],
+      "indexes": [
+        { "name": "hotel_amenities_code_uq", "unique": true, "columns": ["code"] }
+      ]
+    },
+    {
+      "name": "hotel_hotel_amenities",
+      "comment": "Join table: hotels to amenities.",
+      "columns": [
+        { "name": "hotel_id", "type": "UUID", "pk": true, "nullable": false, "references": { "table": "hotels", "column": "id", "on_delete": "CASCADE" } },
+        { "name": "amenity_id", "type": "UUID", "pk": true, "nullable": false, "references": { "table": "hotel_amenities", "column": "id", "on_delete": "CASCADE" } }
+      ],
+      "indexes": [
+        { "name": "hotel_hotel_amenities_amenity_idx", "columns": ["amenity_id"] }
+      ]
+    },
+    {
+      "name": "hotel_rooms",
+      "comment": "Room types for a hotel.",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "hotel_id", "type": "UUID", "nullable": false, "references": { "table": "hotels", "column": "id", "on_delete": "CASCADE" } },
+        { "name": "name", "type": "TEXT", "nullable": false },
+        { "name": "bed_configuration", "type": "TEXT", "nullable": true },
+        { "name": "max_guests", "type": "INTEGER", "nullable": false, "default": 2 },
+        { "name": "price_per_night_cents", "type": "INTEGER", "nullable": false },
+        { "name": "inventory", "type": "INTEGER", "nullable": false, "default": 10 }
+      ],
+      "indexes": [
+        { "name": "hotel_rooms_hotel_id_idx", "columns": ["hotel_id"] }
+      ]
+    },
+    {
+      "name": "car_companies",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "name", "type": "TEXT", "nullable": false }
+      ]
+    },
+    {
+      "name": "cars",
+      "comment": "Car rental inventory.",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "company_id", "type": "UUID", "nullable": false, "references": { "table": "car_companies", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "pickup_location_id", "type": "UUID", "nullable": false, "references": { "table": "locations", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "dropoff_location_id", "type": "UUID", "nullable": false, "references": { "table": "locations", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "model", "type": "TEXT", "nullable": false },
+        { "name": "car_type", "type": "TEXT", "nullable": false },
+        { "name": "seats", "type": "INTEGER", "nullable": false, "default": 5 },
+        { "name": "transmission", "type": "TEXT", "nullable": false, "default": "automatic" },
+        { "name": "fuel_type", "type": "TEXT", "nullable": false, "default": "gas" },
+        { "name": "base_price_per_day_cents", "type": "INTEGER", "nullable": false },
+        { "name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "cars_pickup_dropoff_idx", "columns": ["pickup_location_id", "dropoff_location_id"] },
+        { "name": "cars_price_idx", "columns": ["base_price_per_day_cents"] }
+      ]
+    },
+    {
+      "name": "packages",
+      "comment": "Bundle offers (flight+hotel or flight+hotel+car).",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "bundle_type", "type": "TEXT", "nullable": false, "check": "bundle_type in ('flight_hotel','flight_hotel_car')" },
+        { "name": "flight_id", "type": "UUID", "nullable": false, "references": { "table": "flights", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "hotel_id", "type": "UUID", "nullable": false, "references": { "table": "hotels", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "car_id", "type": "UUID", "nullable": true, "references": { "table": "cars", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "discount_cents", "type": "INTEGER", "nullable": false, "default": 0 },
+        { "name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "packages_bundle_type_idx", "columns": ["bundle_type"] }
+      ]
+    },
+    {
+      "name": "favorites",
+      "comment": "User favorites. Start with hotels; can extend via item_type.",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "UUID", "nullable": false, "references": { "table": "users", "column": "id", "on_delete": "CASCADE" } },
+        { "name": "item_type", "type": "TEXT", "nullable": false, "default": "hotel", "check": "item_type in ('hotel','flight','car','package')" },
+        { "name": "hotel_id", "type": "UUID", "nullable": true, "references": { "table": "hotels", "column": "id", "on_delete": "CASCADE" } },
+        { "name": "flight_id", "type": "UUID", "nullable": true, "references": { "table": "flights", "column": "id", "on_delete": "CASCADE" } },
+        { "name": "car_id", "type": "UUID", "nullable": true, "references": { "table": "cars", "column": "id", "on_delete": "CASCADE" } },
+        { "name": "package_id", "type": "UUID", "nullable": true, "references": { "table": "packages", "column": "id", "on_delete": "CASCADE" } },
+        { "name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "favorites_user_id_idx", "columns": ["user_id"] },
+        { "name": "favorites_user_item_uq", "unique": true, "columns": ["user_id", "item_type", "hotel_id", "flight_id", "car_id", "package_id"] }
+      ]
+    },
+    {
+      "name": "promo_codes",
+      "comment": "Promo codes. Applied as discount_cents.",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "code", "type": "TEXT", "nullable": false },
+        { "name": "discount_type", "type": "TEXT", "nullable": false, "default": "amount", "check": "discount_type in ('amount','percent')" },
+        { "name": "discount_value", "type": "INTEGER", "nullable": false, "comment": "If amount: cents. If percent: integer percent (e.g., 10 for 10%)." },
+        { "name": "is_active", "type": "BOOLEAN", "nullable": false, "default": true },
+        { "name": "expires_at", "type": "TIMESTAMPTZ", "nullable": true }
+      ],
+      "indexes": [
+        { "name": "promo_codes_code_uq", "unique": true, "columns": ["code"] }
+      ]
+    },
+    {
+      "name": "carts",
+      "comment": "One open cart per user (or guest via session_id).",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "UUID", "nullable": true, "references": { "table": "users", "column": "id", "on_delete": "SET NULL" } },
+        { "name": "session_id", "type": "TEXT", "nullable": true, "comment": "Optional guest cart support." },
+        { "name": "promo_code_id", "type": "UUID", "nullable": true, "references": { "table": "promo_codes", "column": "id", "on_delete": "SET NULL" } },
+        { "name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()" },
+        { "name": "updated_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "carts_user_id_idx", "columns": ["user_id"] },
+        { "name": "carts_session_id_idx", "columns": ["session_id"] }
+      ]
+    },
+    {
+      "name": "cart_items",
+      "comment": "Cart line items referencing inventory. Pricing is snapshotted.",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "cart_id", "type": "UUID", "nullable": false, "references": { "table": "carts", "column": "id", "on_delete": "CASCADE" } },
+        { "name": "item_type", "type": "TEXT", "nullable": false, "check": "item_type in ('flight','hotel','car','package')" },
+        { "name": "flight_id", "type": "UUID", "nullable": true, "references": { "table": "flights", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "hotel_id", "type": "UUID", "nullable": true, "references": { "table": "hotels", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "hotel_room_id", "type": "UUID", "nullable": true, "references": { "table": "hotel_rooms", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "car_id", "type": "UUID", "nullable": true, "references": { "table": "cars", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "package_id", "type": "UUID", "nullable": true, "references": { "table": "packages", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "start_date", "type": "DATE", "nullable": true },
+        { "name": "end_date", "type": "DATE", "nullable": true },
+        { "name": "passengers", "type": "INTEGER", "nullable": true },
+        { "name": "guests", "type": "INTEGER", "nullable": true },
+        { "name": "rooms", "type": "INTEGER", "nullable": true },
+        { "name": "extras", "type": "JSONB", "nullable": true, "comment": "For car extras, seat class overrides, etc." },
+        { "name": "subtotal_cents", "type": "INTEGER", "nullable": false },
+        { "name": "taxes_cents", "type": "INTEGER", "nullable": false, "default": 0 },
+        { "name": "fees_cents", "type": "INTEGER", "nullable": false, "default": 0 },
+        { "name": "total_cents", "type": "INTEGER", "nullable": false },
+        { "name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "cart_items_cart_id_idx", "columns": ["cart_id"] },
+        { "name": "cart_items_type_idx", "columns": ["item_type"] }
+      ]
+    },
+    {
+      "name": "orders",
+      "comment": "Completed checkouts.",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "user_id", "type": "UUID", "nullable": false, "references": { "table": "users", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "status", "type": "TEXT", "nullable": false, "default": "confirmed", "check": "status in ('pending','confirmed','cancelled')" },
+        { "name": "promo_code_id", "type": "UUID", "nullable": true, "references": { "table": "promo_codes", "column": "id", "on_delete": "SET NULL" } },
+        { "name": "subtotal_cents", "type": "INTEGER", "nullable": false },
+        { "name": "taxes_cents", "type": "INTEGER", "nullable": false, "default": 0 },
+        { "name": "fees_cents", "type": "INTEGER", "nullable": false, "default": 0 },
+        { "name": "discounts_cents", "type": "INTEGER", "nullable": false, "default": 0 },
+        { "name": "total_cents", "type": "INTEGER", "nullable": false },
+        { "name": "payment_status", "type": "TEXT", "nullable": false, "default": "paid", "check": "payment_status in ('unpaid','paid','failed')" },
+        { "name": "refund_total_cents", "type": "INTEGER", "nullable": false, "default": 0, "comment": "Deterministic simulation; can equal total_cents for fully refundable items." },
+        { "name": "cancelled_at", "type": "TIMESTAMPTZ", "nullable": true },
+        { "name": "confirmation_code", "type": "TEXT", "nullable": false },
+        { "name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "orders_user_id_idx", "columns": ["user_id"] },
+        { "name": "orders_confirmation_uq", "unique": true, "columns": ["confirmation_code"] }
+      ]
+    },
+    {
+      "name": "order_items",
+      "comment": "Order line items. Pricing is snapshotted.",
+      "columns": [
+        { "name": "id", "type": "UUID", "pk": true, "default": "gen_random_uuid()" },
+        { "name": "order_id", "type": "UUID", "nullable": false, "references": { "table": "orders", "column": "id", "on_delete": "CASCADE" } },
+        { "name": "item_type", "type": "TEXT", "nullable": false, "check": "item_type in ('flight','hotel','car','package')" },
+        { "name": "flight_id", "type": "UUID", "nullable": true, "references": { "table": "flights", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "hotel_id", "type": "UUID", "nullable": true, "references": { "table": "hotels", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "hotel_room_id", "type": "UUID", "nullable": true, "references": { "table": "hotel_rooms", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "car_id", "type": "UUID", "nullable": true, "references": { "table": "cars", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "package_id", "type": "UUID", "nullable": true, "references": { "table": "packages", "column": "id", "on_delete": "RESTRICT" } },
+        { "name": "start_date", "type": "DATE", "nullable": true },
+        { "name": "end_date", "type": "DATE", "nullable": true },
+        { "name": "passengers", "type": "INTEGER", "nullable": true },
+        { "name": "guests", "type": "INTEGER", "nullable": true },
+        { "name": "rooms", "type": "INTEGER", "nullable": true },
+        { "name": "extras", "type": "JSONB", "nullable": true },
+        { "name": "subtotal_cents", "type": "INTEGER", "nullable": false },
+        { "name": "taxes_cents", "type": "INTEGER", "nullable": false, "default": 0 },
+        { "name": "fees_cents", "type": "INTEGER", "nullable": false, "default": 0 },
+        { "name": "total_cents", "type": "INTEGER", "nullable": false },
+        { "name": "status", "type": "TEXT", "nullable": false, "default": "confirmed", "check": "status in ('confirmed','cancelled','modified')" },
+        { "name": "cancelled_at", "type": "TIMESTAMPTZ", "nullable": true },
+        { "name": "created_at", "type": "TIMESTAMPTZ", "nullable": false, "default": "now()" }
+      ],
+      "indexes": [
+        { "name": "order_items_order_id_idx", "columns": ["order_id"] },
+        { "name": "order_items_type_idx", "columns": ["item_type"] }
+      ]
+    }
+  ]
+}
