@@ -324,6 +324,13 @@ from .task_tools import (
     create_task_tools,
 )
 
+# Verification Tools (screenshot comparison, API contract)
+from .verification_tools import (
+    CompareScreenshotsTool,  # compare_screenshots
+    VerifyAPIContractTool,   # verify_api_contract
+    create_verification_tools,
+)
+
 
 def get_all_tools(
     output_dir: str = None, 
@@ -667,6 +674,11 @@ __all__ = [
     "ExportTaskConfigTool",
     "TestActionTool",
     "create_task_tools",
+    
+    # Verification Tools
+    "CompareScreenshotsTool",
+    "VerifyAPIContractTool",
+    "create_verification_tools",
     
     # Helpers
     "get_all_tools",

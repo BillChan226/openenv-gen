@@ -163,6 +163,11 @@ from tools import (
     CheckImportsTool,
     MissingDependenciesTool,
     
+    # Verification Tools (screenshot comparison, API contract)
+    CompareScreenshotsTool,    # compare_screenshots
+    VerifyAPIContractTool,     # verify_api_contract
+    create_verification_tools,
+    
     # Note: Debug classes (CrossLayerDebugger, APIAlignmentVerifier, etc.) 
     # are helper classes, not tools - they're used internally by agents
 )
@@ -343,6 +348,9 @@ def get_agent_tools(
         
         # Image search tools (for finding reference images)
         tools.extend(create_image_search_tools(workspace=workspace))
+        
+        # Verification tools (screenshot comparison, API contract validation)
+        tools.extend(create_verification_tools(workspace=workspace))
         
         return tools
     
