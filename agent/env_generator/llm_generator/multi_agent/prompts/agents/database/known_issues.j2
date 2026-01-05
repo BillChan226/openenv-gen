@@ -60,6 +60,45 @@ Document your choice when notifying backend!
 ### 6. Realistic Seed Data
 **Problem**: Empty tables cause frontend to show blank pages during testing.
 **Solution**: Include meaningful test data for ALL tables (at least 10-20 rows per main entity).
+
+### 7. Image URLs - NEVER Use Unsplash Source API! (CRITICAL!)
+**Problem**: `https://source.unsplash.com/...` URLs return 404 - THIS SERVICE WAS DEPRECATED IN 2023!
+**Symptom**: All images show blank/broken in UI.
+
+**NEVER use these (DEPRECATED/BROKEN):**
+```sql
+-- WRONG - These URLs DO NOT WORK!
+'https://source.unsplash.com/800x600/?pizza'
+'https://source.unsplash.com/1200x800/?food'
+```
+
+**USE these instead:**
+```sql
+-- Option 1: Lorem Picsum (RECOMMENDED - always works)
+'https://picsum.photos/seed/pizza1/800/600'   -- seed ensures consistent image
+'https://picsum.photos/seed/burger2/1200/800'
+'https://picsum.photos/800/600'               -- random image
+
+-- Option 2: Placeholder.co (simple solid color)
+'https://placehold.co/800x600/orange/white?text=Pizza'
+'https://placehold.co/1200x800/blue/white?text=Restaurant'
+
+-- Option 3: Direct Unsplash image URLs (with specific photo ID)
+'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&h=600&fit=crop'
+```
+
+**Best Practice for Food/Restaurant Projects:**
+```sql
+-- Use picsum with unique seeds for variety:
+INSERT INTO restaurants (name, cover_image_url) VALUES
+  ('Pizza Place', 'https://picsum.photos/seed/rest1/1200/800'),
+  ('Burger Joint', 'https://picsum.photos/seed/rest2/1200/800'),
+  ('Taco Shop', 'https://picsum.photos/seed/rest3/1200/800');
+
+INSERT INTO menu_items (name, image_url) VALUES
+  ('Margherita', 'https://picsum.photos/seed/item1/800/600'),
+  ('Pepperoni', 'https://picsum.photos/seed/item2/800/600');
+```
 {% endmacro %}
 
 
