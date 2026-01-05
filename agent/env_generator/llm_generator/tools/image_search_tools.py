@@ -749,14 +749,3 @@ def create_image_search_tools(
         SaveImageTool(workspace=workspace),
         CaptureWebpageTool(workspace=workspace),
     ]
-
-
-# =============================================================================
-# BACKWARD COMPATIBILITY - Aliases for old tool names
-# =============================================================================
-
-# Aliases so old code still works
-SearchImageTool = IconSearchTool
-GoogleImageSearchTool = PhotoSearchTool
-DownloadImageTool = SaveImageTool
-WebScreenshotTool = CaptureWebpageTool

@@ -78,18 +78,12 @@ from .file_tools import (
 
 # Image Tools (search, download, screenshot)
 from .image_search_tools import (
-    # New tool names (recommended)
-    IconSearchTool,
-    PhotoSearchTool,
-    LogoSearchTool,
-    SaveImageTool,
-    CaptureWebpageTool,
+    IconSearchTool,      # search_icons - Icons/SVGs from Iconify
+    PhotoSearchTool,     # search_photos - Photos/screenshots via Google
+    LogoSearchTool,      # search_logos - Company/brand logos
+    SaveImageTool,       # save_image - Download images
+    CaptureWebpageTool,  # capture_webpage - Screenshot webpages
     create_image_search_tools,
-    # Legacy aliases (backward compatibility)
-    SearchImageTool,
-    DownloadImageTool,
-    GoogleImageSearchTool,
-    WebScreenshotTool,
 )
 
 # Code Tools (search, edit, lint)
@@ -482,18 +476,13 @@ __all__ = [
     "GlobTool",
     "FileHistory",
     
-    # Image Tools (new names)
+    # Image Tools
     "IconSearchTool",
     "PhotoSearchTool",
     "LogoSearchTool",
     "SaveImageTool",
     "CaptureWebpageTool",
     "create_image_search_tools",
-    # Legacy aliases
-    "SearchImageTool",
-    "DownloadImageTool",
-    "GoogleImageSearchTool",
-    "WebScreenshotTool",
     
     # Code Tools
     "GrepTool",

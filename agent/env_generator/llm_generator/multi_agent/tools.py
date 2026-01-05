@@ -38,18 +38,13 @@ from tools import (
     CopyReferenceImageTool,
     # FileHistory is a singleton helper, not a tool
     
-    # Image Tools (new names)
-    IconSearchTool,
-    PhotoSearchTool,
-    LogoSearchTool,
-    SaveImageTool,
-    CaptureWebpageTool,
+    # Image Tools
+    IconSearchTool,      # search_icons
+    PhotoSearchTool,     # search_photos
+    LogoSearchTool,      # search_logos
+    SaveImageTool,       # save_image
+    CaptureWebpageTool,  # capture_webpage
     create_image_search_tools,
-    # Legacy aliases
-    SearchImageTool,
-    DownloadImageTool,
-    GoogleImageSearchTool,
-    WebScreenshotTool,
     
     # Code Tools
     LintTool,
