@@ -43,37 +43,37 @@ ask_agent(agent_id="backend", question="Response format for GET /api/flights?")
 4. Integrate with backend API via services/api.js
 5. Test with `lint()`
 
-### RECOMMENDED: Use Image Search for Assets
+### RECOMMENDED: Use Image Tools for Assets
 
-**Use image search tools to find logos, icons, and placeholder images:**
+**Use image tools to find logos, icons, and placeholder images:**
 
 ```python
 # Search for brand/company logos
-logo_search(query="doordash", domain="doordash.com")
+search_logos(query="doordash")
 # Returns: high-quality logo URL for header/footer
 
-# Search for category icons or images
-search_image(query="food delivery icon flat design", count=5)
+# Search for icons (SVGs)
+search_icons(query="shopping cart")
+search_icons(query="delivery truck")
+# Returns: SVG URLs from Iconify
 
-# Search for placeholder images
-search_image(query="restaurant interior modern", count=10)
-
-# For specific branded elements
-logo_search(query="visa mastercard payment", domain="visa.com")
+# Search for photos/UI screenshots
+search_photos(query="food delivery app UI", limit=5)
 
 # Download important assets locally
-download_image(
-    url="https://logo.clearbit.com/doordash.com",
-    save_path="app/frontend/public/images/logo.png"
+save_image(
+    url="https://img.logo.dev/doordash.com?token=...",
+    path="app/frontend/public/images/logo.png"
 )
 ```
 
 **Best practices for frontend images:**
-1. **Logos**: Use `logo_search()` for company/brand logos in header/footer
-2. **Icons**: Use `search_image()` with "icon flat design" for category icons
-3. **Placeholders**: Use placeholder services for missing images: `https://placehold.co/400x300`
-4. **Store locally**: Download critical assets to `app/frontend/public/images/`
-5. **Reference images**: Compare your UI with provided screenshots using `view_image()`
+1. **Logos**: Use `search_logos()` for company/brand logos
+2. **Icons**: Use `search_icons()` for UI icons (returns SVGs)
+3. **Photos**: Use `search_photos()` for real photos and screenshots
+4. **Placeholders**: Use `https://picsum.photos/seed/unique/800/600` for diverse images
+5. **Store locally**: Download critical assets to `app/frontend/public/images/`
+6. **Reference images**: Compare your UI with provided screenshots using `view_image()`
 
 ### Step 5: Finish & Notify UserAgent
 When done, use `finish(notify=[...])` to notify UserAgent for testing:

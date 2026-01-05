@@ -8,8 +8,12 @@ File Tools:
     ViewTool, StrReplaceEditorTool, WriteFileTool, DeleteFileTool,
     ViewImageTool, ListReferenceImagesTool, CopyReferenceImageTool, GlobTool
 
-Image Search Tools:
-    SearchImageTool, DownloadImageTool, GoogleImageSearchTool, WebScreenshotTool
+Image Tools:
+    IconSearchTool (search_icons) - Icons/SVGs from Iconify
+    PhotoSearchTool (search_photos) - Photos/screenshots via Google
+    LogoSearchTool (search_logos) - Company/brand logos
+    SaveImageTool (save_image) - Download images
+    CaptureWebpageTool (capture_webpage) - Screenshot webpages
 
 Code Tools:
     GrepTool, EditFileTool, LintTool, ThinkTool, PlanTool, VerifyPlanTool,
@@ -72,13 +76,20 @@ from .file_tools import (
     FileHistory,
 )
 
-# Image Search Tools
+# Image Tools (search, download, screenshot)
 from .image_search_tools import (
+    # New tool names (recommended)
+    IconSearchTool,
+    PhotoSearchTool,
+    LogoSearchTool,
+    SaveImageTool,
+    CaptureWebpageTool,
+    create_image_search_tools,
+    # Legacy aliases (backward compatibility)
     SearchImageTool,
     DownloadImageTool,
     GoogleImageSearchTool,
     WebScreenshotTool,
-    create_image_search_tools,
 )
 
 # Code Tools (search, edit, lint)
@@ -360,11 +371,12 @@ def get_all_tools(
         CopyReferenceImageTool(workspace=workspace),
         GlobTool(workspace=workspace),
         
-        # Image search tools
-        SearchImageTool(workspace=workspace),
-        DownloadImageTool(workspace=workspace),
-        GoogleImageSearchTool(workspace=workspace),
-        WebScreenshotTool(workspace=workspace),
+        # Image tools
+        IconSearchTool(workspace=workspace),
+        PhotoSearchTool(workspace=workspace),
+        LogoSearchTool(workspace=workspace),
+        SaveImageTool(workspace=workspace),
+        CaptureWebpageTool(workspace=workspace),
         
         # Code tools
         GrepTool(workspace=workspace),
@@ -470,12 +482,18 @@ __all__ = [
     "GlobTool",
     "FileHistory",
     
-    # Image Search Tools
+    # Image Tools (new names)
+    "IconSearchTool",
+    "PhotoSearchTool",
+    "LogoSearchTool",
+    "SaveImageTool",
+    "CaptureWebpageTool",
+    "create_image_search_tools",
+    # Legacy aliases
     "SearchImageTool",
     "DownloadImageTool",
     "GoogleImageSearchTool",
     "WebScreenshotTool",
-    "create_image_search_tools",
     
     # Code Tools
     "GrepTool",

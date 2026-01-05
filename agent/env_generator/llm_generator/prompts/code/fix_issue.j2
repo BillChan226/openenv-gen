@@ -92,7 +92,7 @@ If the issue is about frontend not building/starting:
 - Use cwd parameter instead of "cd ... &&":
   - execute_bash("npm install", cwd="app/frontend")
   - execute_bash("npm run build", cwd="app/frontend")
-- If icons/images are missing, use `google_image_search` / `search_image` + `download_image` and store locally.
+- If icons/images are missing, use `search_icons` (for SVGs), `search_photos` (for photos), or `search_logos` (for brand logos) + `save_image` to download.
 </COMMON_FRONTEND_FIXES>
 
 <COMMON_DOCKER_DB_FIXES>

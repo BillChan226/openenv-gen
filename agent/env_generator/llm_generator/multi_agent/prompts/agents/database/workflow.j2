@@ -85,35 +85,32 @@ generate_seed_sql(
 - Need very specific test scenarios that datasets can't provide
 - Add a SQL comment explaining: `-- Manual seed: No relevant HuggingFace datasets found for [topic]`
 
-### RECOMMENDED: Use Image Search for Seed Data with Images
+### RECOMMENDED: Use Image Tools for Seed Data
 
-If your seed data needs image URLs (restaurants, products, menu items, etc.), **use the image search tools**:
+If your seed data needs image URLs (restaurants, products, menu items, etc.), **use image tools**:
 
 ```python
-# Search for restaurant images
-search_image(query="chinese restaurant storefront", count=5)
-# Returns: list of image URLs
-
-# Search for food/menu item images
-search_image(query="kung pao chicken dish", count=3)
+# Search for photos (restaurants, food, products)
+search_photos(query="chinese restaurant storefront", limit=5)
+# Returns: list of image URLs from Google
 
 # Search for company/brand logos
-logo_search(query="starbucks", domain="starbucks.com")
+search_logos(query="starbucks")
 # Returns: high-quality logo URL
 
 # Download and save image locally (optional)
-download_image(url="https://...", save_path="app/frontend/public/images/restaurant1.jpg")
+save_image(url="https://...", path="app/frontend/public/images/restaurant1.jpg")
 
-# For website screenshots (useful for reference)
-google_image_search(query="food delivery app UI", num_results=5)
+# For placeholder images, use picsum.photos:
+# https://picsum.photos/seed/restaurant1/800/600
 ```
 
 **Best practices for image seed data:**
-1. Use `search_image()` for general images (food, restaurants, products)
-2. Use `logo_search()` for brand/company logos
-3. Store found URLs directly in seed SQL: `image_url VARCHAR(500)`
-4. Consider downloading critical images to `app/frontend/public/images/` for offline use
-5. Add placeholder URL fallback: `COALESCE(image_url, 'https://placehold.co/400x300?text=No+Image')`
+1. Use `search_photos()` for real photos (food, restaurants, products)
+2. Use `search_logos()` for brand/company logos
+3. Use `https://picsum.photos/seed/unique123/800/600` for diverse placeholders
+4. Store URLs directly in seed SQL: `image_url VARCHAR(500)`
+5. **NEVER use source.unsplash.com** - deprecated API, use picsum.photos instead
 
 ### Step 3: Finish & Notify Downstream
 When done, use `finish(notify=[...])` to notify dependent agents:
