@@ -20,26 +20,29 @@ from workspace import Workspace
 
 
 class SearchImageTool(BaseTool):
-    """Search for images online using various sources."""
+    """Search for icons and UI components using Iconify API."""
     
     NAME = "search_image"
     
-    DESCRIPTION = """Search for images online to find design references, icons, or UI components.
+    DESCRIPTION = """Search for icons and UI components.
 
 Returns a list of image URLs that can be downloaded using download_image.
 
-Examples:
-    search_image "atlassian logo"
-    search_image "material design button"
-    search_image "dashboard UI mockup"
-    search_image "notification bell icon svg"
+**For icons and SVGs - use this tool:**
+    search_image "menu icon"
+    search_image "notification bell icon"
+    search_image "dashboard icon"
+    search_image "search magnifying glass"
+
+**For photos and screenshots - use google_image_search instead:**
+    google_image_search "food delivery app screenshot"
+    google_image_search "restaurant website design"
 
 Sources searched:
-- Unsplash (free stock photos)
-- Iconify (icons and SVGs)
-- UI patterns and components
+- Iconify (icons and SVGs from 100+ icon sets)
+- UI component patterns
 
-Note: Respect copyright and licensing when using downloaded images.
+Note: For stock photos, use google_image_search which provides better results.
 """
     
     def __init__(self, workspace: Workspace = None):
@@ -100,9 +103,8 @@ Note: Respect copyright and licensing when using downloaded images.
                     icon_results = await self._search_iconify(session, query, limit)
                     results.extend(icon_results)
                 
-                if image_type in ["photo", "any"]:
-                    photo_results = await self._search_unsplash(session, query, limit)
-                    results.extend(photo_results)
+                # Note: For photos, use google_image_search tool instead
+                # Unsplash Source API was deprecated in 2023
                 
                 if image_type in ["ui", "any"]:
                     ui_results = await self._search_ui_patterns(session, query, limit)
@@ -174,30 +176,6 @@ Note: Respect copyright and licensing when using downloaded images.
         
         return results
     
-    async def _search_unsplash(self, session, query: str, limit: int) -> List[Dict]:
-        """Search Unsplash for photos (using their public source.unsplash.com)"""
-        results = []
-        try:
-            # source.unsplash.com provides direct image URLs
-            # We'll generate URLs based on search terms
-            encoded_query = urllib.parse.quote(query)
-            
-            # Generate multiple image URLs with different sizes
-            sizes = ["800x600", "1200x800", "400x300"]
-            for i, size in enumerate(sizes[:limit]):
-                url = f"https://source.unsplash.com/{size}/?{encoded_query}"
-                results.append({
-                    "url": url,
-                    "title": f"Unsplash: {query} ({size})",
-                    "source": "unsplash",
-                    "type": "photo",
-                    "format": "jpg",
-                    "license": "Unsplash License (free)"
-                })
-        except Exception as e:
-            self._logger.debug(f"Unsplash search failed: {e}")
-        
-        return results
     
     async def _search_ui_patterns(self, session, query: str, limit: int) -> List[Dict]:
         """Search for UI patterns and components"""
@@ -252,14 +230,17 @@ class DownloadImageTool(BaseTool):
     
     DESCRIPTION = """Download an image from a URL to your workspace.
 
-Use this after search_image to download images you want to use.
+Use this after search_image, google_image_search, or logo_search to download images.
 
 Examples:
     download_image "https://example.com/image.png" "design/reference.png"
     download_image "https://api.iconify.design/mdi/home.svg" "assets/icons/home.svg"
-    download_image "https://source.unsplash.com/800x600/?nature" "images/background.jpg"
+    download_image "https://picsum.photos/800/600" "images/background.jpg"
 
 The image will be saved to the specified path in your workspace.
+
+Tip: Use picsum.photos for placeholder images:
+    download_image "https://picsum.photos/seed/food1/800/600" "images/food.jpg"
 """
     
     def __init__(self, workspace: Workspace = None):
